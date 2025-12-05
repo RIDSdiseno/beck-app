@@ -3,6 +3,9 @@ import { View, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Card, Text, Chip, SegmentedButtons } from "react-native-paper";
 import { useRegistros } from "../../context/RegistrosContext";
+import { BrandHeader } from "../../components/BrandHeader";
+import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function DashboardScreen() {
   const { registros } = useRegistros();
@@ -49,12 +52,18 @@ export default function DashboardScreen() {
     frentes: equipos.length,
   };
 
+  const handleLogout = () => {
+    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
+    router.replace("/login");
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 8 }]}
       edges={["top", "left", "right"]}
     >
       <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <BrandHeader subtitle="Obra demo · CRM BECK" onLogout={handleLogout} />
         <Text variant="titleLarge" style={styles.title}>
           Centro de mando de la obra
         </Text>

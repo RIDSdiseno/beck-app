@@ -10,6 +10,9 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Card, Text, DataTable, Chip } from "react-native-paper";
 import { BarChart, PieChart } from "react-native-chart-kit";
 import { useRegistros } from "../../context/RegistrosContext";
+import { BrandHeader } from "../../components/BrandHeader";
+import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type TramoEspuma = {
   id: string;
@@ -101,12 +104,18 @@ export default function ReportesScreen() {
     };
   }, [registros]);
 
+  const handleLogout = () => {
+    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
+    router.replace("/login");
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 8 }]}
       edges={["top", "left", "right"]}
     >
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
+        <BrandHeader subtitle="Analítica de obra · BECK" onLogout={handleLogout} />
         <Text variant="titleLarge" style={styles.title}>
           Reportes de obra · Sellos y junta lineal ESPUMA
         </Text>

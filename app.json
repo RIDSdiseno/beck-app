@@ -4,7 +4,7 @@
     "slug": "beck-crm-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo_beck.png",
     "scheme": "beckcrmapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -30,16 +30,21 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/logo_beck.png",
+          "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#0f172a",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0b1223"
           }
         }
       ]
     ],
+    "splash": {
+      "image": "./assets/images/logo_beck.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

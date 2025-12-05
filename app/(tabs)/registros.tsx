@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, FlatList, StyleSheet, Image, ScrollView } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -15,6 +15,9 @@ import {
 import { useRegistros } from "../../context/RegistrosContext";
 import type { TipoRegistro, EstadoRegistro } from "../../types/beck";
 import * as ImagePicker from "expo-image-picker";
+import { BrandHeader } from "../../components/BrandHeader";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 
 const estadoChipColors: Record<EstadoRegistro, string> = {
   pendiente: "#fb923c",
@@ -23,11 +26,13 @@ const estadoChipColors: Record<EstadoRegistro, string> = {
   aprobado: "#22c55e",
 };
 
+const STORAGE_KEY = "beckcrm_user_email";
+
 export default function RegistrosScreen() {
-  const { registros, agregarRegistro, actualizarRegistro, eliminarRegistro } =
-    useRegistros();
+  const { registros, agregarRegistro } = useRegistros();
   const insets = useSafeAreaInsets();
 
+  const [usuarioActual, setUsuarioActual] = useState("Usuario");
   const [modalVisible, setModalVisible] = useState(false);
   const [detalleVisible, setDetalleVisible] = useState(false);
   const [tipo, setTipo] = useState<TipoRegistro>("sello");
@@ -42,19 +47,21 @@ export default function RegistrosScreen() {
   const [filtroTipo, setFiltroTipo] = useState<TipoRegistro | "todos">("todos");
   const [filtroEstado, setFiltroEstado] =
     useState<EstadoRegistro | "todos">("todos");
-  const [registroDetalle, setRegistroDetalle] = useState<
-    | (ReturnType<typeof useRegistros>["registros"][number] & {
-        fotoLocalUri?: string;
+  const [registroDetalle, setRegistroDetalle] =
+    useState<typeof registros[0] | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((val) => {
+        if (val) setUsuarioActual(val);
       })
-    | null
-  >(null);
-  const [editando, setEditando] = useState(false);
-  const [editObra, setEditObra] = useState("");
-  const [editPiso, setEditPiso] = useState("");
-  const [editEquipo, setEditEquipo] = useState("");
-  const [editEstado, setEditEstado] = useState<EstadoRegistro>("pendiente");
-  const [editFotoUrl, setEditFotoUrl] = useState("");
-  const [editFotoLocalUri, setEditFotoLocalUri] = useState<string | undefined>();
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = () => {
+    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    router.replace("/login");
+  };
 
   const abrirModal = () => setModalVisible(true);
   const cerrarModal = () => setModalVisible(false);
@@ -98,6 +105,7 @@ export default function RegistrosScreen() {
       piso: piso.trim(),
       equipo: equipo.trim(),
       estado,
+      usuario: usuarioActual || "Usuario",
       fotoUrl: fotoUrl.trim() || undefined,
       fotoLocalUri,
     });
@@ -112,7 +120,8 @@ export default function RegistrosScreen() {
       !q ||
       r.obra.toLowerCase().includes(q) ||
       r.piso.toLowerCase().includes(q) ||
-      r.equipo.toLowerCase().includes(q);
+      r.equipo.toLowerCase().includes(q) ||
+      r.usuario.toLowerCase().includes(q);
     const okTipo = filtroTipo === "todos" || r.tipo === filtroTipo;
     const okEstado = filtroEstado === "todos" || r.estado === filtroEstado;
     return okSearch && okTipo && okEstado;
@@ -120,54 +129,7 @@ export default function RegistrosScreen() {
 
   const abrirDetalle = (item: typeof registros[0]) => {
     setRegistroDetalle(item);
-    setEditando(false);
-    setEditObra(item.obra);
-    setEditPiso(item.piso);
-    setEditEquipo(item.equipo);
-    setEditEstado(item.estado);
-    setEditFotoUrl(item.fotoUrl || "");
-    setEditFotoLocalUri(item.fotoLocalUri);
     setDetalleVisible(true);
-  };
-
-  const guardarCambiosDetalle = () => {
-    if (!registroDetalle) return;
-    if (!editObra.trim() || !editPiso.trim() || !editEquipo.trim()) {
-      setError("Completa obra, piso y equipo");
-      return;
-    }
-    actualizarRegistro(registroDetalle.id, {
-      obra: editObra.trim(),
-      piso: editPiso.trim(),
-      equipo: editEquipo.trim(),
-      estado: editEstado,
-      fotoUrl: editFotoUrl.trim() || undefined,
-      fotoLocalUri: editFotoLocalUri,
-    });
-    setEditando(false);
-    setError("");
-  };
-
-  const borrarRegistro = () => {
-    if (!registroDetalle) return;
-    eliminarRegistro(registroDetalle.id);
-    setDetalleVisible(false);
-  };
-
-  const pickImageDetalle = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      setError("Permiso de galería denegado");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.6,
-    });
-    if (!result.canceled && result.assets?.length) {
-      setEditFotoLocalUri(result.assets[0].uri);
-      setError("");
-    }
   };
 
   return (
@@ -175,6 +137,7 @@ export default function RegistrosScreen() {
       style={[styles.container, { paddingTop: insets.top + 8 }]}
       edges={["top", "left", "right"]}
     >
+      <BrandHeader subtitle="Protección pasiva · CRM BECK" onLogout={handleLogout} />
       <Text variant="titleLarge" style={styles.title}>
         Registros de sellos / juntas
       </Text>
@@ -192,59 +155,63 @@ export default function RegistrosScreen() {
       </Button>
 
       <Searchbar
-        placeholder="Buscar obra, piso o equipo..."
+        placeholder="Buscar obra, piso, equipo o usuario..."
         value={search}
         onChangeText={setSearch}
-        style={{ marginBottom: 10 }}
+        style={styles.search}
       />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {(["todos", "sello", "junta"] as (TipoRegistro | "todos")[]).map((t) => {
-          const selected = filtroTipo === t;
-          return (
-            <Chip
-              key={t}
-              compact
-              selected={selected}
-              onPress={() => setFiltroTipo(selected ? "todos" : t)}
-              style={[styles.filterChip, selected && styles.filterChipSelected]}
-              textStyle={styles.filterChipText}
-            >
-              {t === "todos" ? "Todos" : t === "sello" ? "Sellos" : "Juntas"}
-            </Chip>
-          );
-        })}
-      </ScrollView>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.filterRow, { marginBottom: 12 }]}
-      >
-        {(["todos", "pendiente", "instalado", "observado", "aprobado"] as (EstadoRegistro | "todos")[]).map(
-          (est) => {
-            const selected = filtroEstado === est;
+      <View style={styles.filtersWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+          style={styles.filterRow}
+        >
+          {(["todos", "sello", "junta"] as (TipoRegistro | "todos")[]).map((t) => {
+            const selected = filtroTipo === t;
             return (
               <Chip
-                key={est}
+                key={t}
                 compact
                 selected={selected}
-                onPress={() =>
-                  setFiltroEstado(selected ? "todos" : (est as EstadoRegistro | "todos"))
-                }
+                onPress={() => setFiltroTipo(selected ? "todos" : t)}
                 style={[styles.filterChip, selected && styles.filterChipSelected]}
                 textStyle={styles.filterChipText}
               >
-                {est === "todos" ? "Estado: Todos" : est}
+                {t === "todos" ? "Todos" : t === "sello" ? "Sellos" : "Juntas"}
               </Chip>
             );
-          }
-        )}
-      </ScrollView>
+          })}
+        </ScrollView>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+          style={styles.filterRow}
+        >
+          {(["todos", "pendiente", "instalado", "observado", "aprobado"] as (EstadoRegistro | "todos")[]).map(
+            (est) => {
+              const selected = filtroEstado === est;
+              return (
+                <Chip
+                  key={est}
+                  compact
+                  selected={selected}
+                  onPress={() =>
+                    setFiltroEstado(selected ? "todos" : (est as EstadoRegistro | "todos"))
+                  }
+                  style={[styles.filterChip, selected && styles.filterChipSelected]}
+                  textStyle={styles.filterChipText}
+                >
+                  {est === "todos" ? "Estado: Todos" : est}
+                </Chip>
+              );
+            }
+          )}
+        </ScrollView>
+      </View>
 
       <FlatList
         data={registrosFiltrados}
@@ -266,15 +233,15 @@ export default function RegistrosScreen() {
               )}
               right={() => (
                 <Chip
-                  icon="alert-circle-check"
+                  icon="account"
                   style={[
                     styles.statusChip,
-                    { backgroundColor: estadoChipColors[item.estado] },
+                    { backgroundColor: "#0ea5e9" },
                   ]}
                   compact
                   textStyle={styles.statusChipText}
                 >
-                  {item.estado}
+                  {item.usuario}
                 </Chip>
               )}
             />
@@ -375,22 +342,14 @@ export default function RegistrosScreen() {
               value={estado}
             >
               <View style={styles.column}>
-                <View style={styles.row}>
-                  <RadioButton value="pendiente" />
-                  <Text style={styles.radioLabel}>Pendiente</Text>
-                </View>
-                <View style={styles.row}>
-                  <RadioButton value="instalado" />
-                  <Text style={styles.radioLabel}>Instalado</Text>
-                </View>
-                <View style={styles.row}>
-                  <RadioButton value="observado" />
-                  <Text style={styles.radioLabel}>Observado</Text>
-                </View>
-                <View style={styles.row}>
-                  <RadioButton value="aprobado" />
-                  <Text style={styles.radioLabel}>Aprobado</Text>
-                </View>
+                {(["pendiente", "instalado", "observado", "aprobado"] as EstadoRegistro[]).map(
+                  (est) => (
+                    <View style={styles.row} key={est}>
+                      <RadioButton value={est} />
+                      <Text style={styles.radioLabel}>{est}</Text>
+                    </View>
+                  )
+                )}
               </View>
             </RadioButton.Group>
 
@@ -404,6 +363,7 @@ export default function RegistrosScreen() {
             </View>
           </ScrollView>
         </Modal>
+
         <Modal
           visible={detalleVisible}
           onDismiss={() => setDetalleVisible(false)}
@@ -414,107 +374,26 @@ export default function RegistrosScreen() {
               <Text variant="titleMedium" style={styles.modalTitle}>
                 {registroDetalle.tipo.toUpperCase()} · {registroDetalle.obra}
               </Text>
-              {!editando ? (
-                <>
-                  <Text style={styles.helperTextSmall}>
-                    Piso: {registroDetalle.piso} · Estado: {registroDetalle.estado}
-                  </Text>
-                  <Text style={styles.helperTextSmall}>
-                    Equipo: {registroDetalle.equipo}
-                  </Text>
-                  <Text style={[styles.label, { marginTop: 10 }]}>Foto</Text>
-                  {registroDetalle.fotoLocalUri || registroDetalle.fotoUrl ? (
-                    <Image
-                      source={{
-                        uri: registroDetalle.fotoLocalUri || registroDetalle.fotoUrl,
-                      }}
-                      style={{ width: "100%", height: 200, borderRadius: 10 }}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Text style={styles.helperTextSmall}>Sin foto adjunta.</Text>
-                  )}
-                  <View style={styles.modalButtons}>
-                    <Button
-                      mode="outlined"
-                      textColor="#dc2626"
-                      onPress={borrarRegistro}
-                    >
-                      Eliminar
-                    </Button>
-                    <Button mode="contained" onPress={() => setEditando(true)}>
-                      Editar
-                    </Button>
-                  </View>
-                </>
+              <Text style={styles.helperTextSmall}>
+                Piso: {registroDetalle.piso} · Estado: {registroDetalle.estado}
+              </Text>
+              <Text style={styles.helperTextSmall}>
+                Usuario: {registroDetalle.usuario}
+              </Text>
+              <Text style={styles.helperTextSmall}>
+                Equipo: {registroDetalle.equipo}
+              </Text>
+              <Text style={[styles.label, { marginTop: 10 }]}>Foto</Text>
+              {registroDetalle.fotoLocalUri || registroDetalle.fotoUrl ? (
+                <Image
+                  source={{
+                    uri: registroDetalle.fotoLocalUri || registroDetalle.fotoUrl,
+                  }}
+                  style={{ width: "100%", height: 200, borderRadius: 10 }}
+                  resizeMode="cover"
+                />
               ) : (
-                <>
-                  <TextInput
-                    label="Obra"
-                    value={editObra}
-                    onChangeText={setEditObra}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Piso"
-                    value={editPiso}
-                    onChangeText={setEditPiso}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Equipo"
-                    value={editEquipo}
-                    onChangeText={setEditEquipo}
-                    style={styles.input}
-                  />
-                  <Text style={styles.label}>Estado</Text>
-                  <RadioButton.Group
-                    onValueChange={(value) =>
-                      setEditEstado(value as EstadoRegistro)
-                    }
-                    value={editEstado}
-                  >
-                    <View style={styles.column}>
-                      {(["pendiente", "instalado", "observado", "aprobado"] as EstadoRegistro[]).map((est) => (
-                        <View style={styles.row} key={est}>
-                          <RadioButton value={est} />
-                          <Text style={styles.radioLabel}>{est}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </RadioButton.Group>
-
-                  <TextInput
-                    label="Foto URL (opcional)"
-                    value={editFotoUrl}
-                    onChangeText={setEditFotoUrl}
-                    style={styles.input}
-                    left={<TextInput.Icon icon="camera" />}
-                  />
-                  <Button
-                    mode="outlined"
-                    icon="image"
-                    style={styles.buttonSmall}
-                    onPress={pickImageDetalle}
-                  >
-                    Cambiar foto local
-                  </Button>
-                  {editFotoLocalUri && (
-                    <Image
-                      source={{ uri: editFotoLocalUri }}
-                      style={{ width: "100%", height: 150, borderRadius: 8 }}
-                      resizeMode="cover"
-                    />
-                  )}
-
-                  {error ? <Text style={styles.error}>{error}</Text> : null}
-                  <View style={styles.modalButtons}>
-                    <Button onPress={() => setEditando(false)}>Cancelar</Button>
-                    <Button mode="contained" onPress={guardarCambiosDetalle}>
-                      Guardar cambios
-                    </Button>
-                  </View>
-                </>
+                <Text style={styles.helperTextSmall}>Sin foto adjunta.</Text>
               )}
             </ScrollView>
           ) : (
@@ -538,6 +417,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: "#475569",
+    marginBottom: 12,
+  },
+  filtersWrapper: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  search: {
     marginBottom: 12,
   },
   helperTextSmall: {
@@ -632,7 +518,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   filterRow: {
-    gap: 8,
     paddingVertical: 4,
   },
 });

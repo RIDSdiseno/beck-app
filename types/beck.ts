@@ -15,6 +15,7 @@ export interface Registro {
   piso: string;
   equipo: string;
   estado: EstadoRegistro;
+  usuario: string;
   fotoUrl?: string;
   fotoLocalUri?: string;
 }

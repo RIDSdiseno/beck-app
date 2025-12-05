@@ -1,6 +1,7 @@
 // context/RegistrosContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import type { Registro, TipoRegistro, EstadoRegistro } from "../types/beck";
+import type { Registro } from "../types/beck";
+import { useHistorial } from "./HistorialContext";
 
 interface RegistrosContextValue {
   registros: Registro[];
@@ -9,9 +10,7 @@ interface RegistrosContextValue {
   eliminarRegistro: (id: number) => void;
 }
 
-const RegistrosContext = createContext<RegistrosContextValue | undefined>(
-  undefined
-);
+const RegistrosContext = createContext<RegistrosContextValue | undefined>(undefined);
 
 // Datos iniciales (mock)
 const REGISTROS_INICIALES: Registro[] = [
@@ -22,6 +21,7 @@ const REGISTROS_INICIALES: Registro[] = [
     piso: "Piso 5",
     equipo: "Ducto climatización",
     estado: "instalado",
+    usuario: "carlos@beck.cl",
     fotoUrl: "https://picsum.photos/200/120?1",
   },
   {
@@ -31,6 +31,7 @@ const REGISTROS_INICIALES: Registro[] = [
     piso: "Subterráneo 2",
     equipo: "Pasamuros eléctrico",
     estado: "pendiente",
+    usuario: "maria@beck.cl",
     fotoUrl: "https://picsum.photos/200/120?2",
   },
 ];
@@ -41,22 +42,24 @@ interface Props {
 
 export const RegistrosProvider: React.FC<Props> = ({ children }) => {
   const [registros, setRegistros] = useState<Registro[]>(REGISTROS_INICIALES);
+  const { agregarMovimiento } = useHistorial();
 
   const agregarRegistro = (data: Omit<Registro, "id">) => {
     setRegistros((prev) => {
       const maxId = prev.reduce((max, r) => (r.id > max ? r.id : max), 0);
       const nuevo: Registro = { ...data, id: maxId + 1 };
-      return [nuevo, ...prev]; // lo agregamos arriba
+      return [nuevo, ...prev];
+    });
+    agregarMovimiento({
+      tipo: "registro",
+      titulo: "Nuevo registro",
+      detalle: `${data.obra} | ${data.piso} | ${data.estado}`,
+      usuario: data.usuario,
     });
   };
 
-  const actualizarRegistro = (
-    id: number,
-    data: Partial<Omit<Registro, "id">>
-  ) => {
-    setRegistros((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...data } : r))
-    );
+  const actualizarRegistro = (id: number, data: Partial<Omit<Registro, "id">>) => {
+    setRegistros((prev) => prev.map((r) => (r.id === id ? { ...r, ...data } : r)));
   };
 
   const eliminarRegistro = (id: number) => {

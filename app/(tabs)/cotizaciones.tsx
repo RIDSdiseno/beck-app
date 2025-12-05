@@ -9,6 +9,9 @@ import {
   DataTable,
 } from "react-native-paper";
 import dayjs from "dayjs";
+import { BrandHeader } from "../../components/BrandHeader";
+import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type EstadoCotizacion = "borrador" | "enviada" | "aceptada" | "rechazada";
 type TipoCotizacion = "Cliente" | "Interna" | "Servicio" | "Mantencion" | "Otro";
@@ -123,12 +126,18 @@ export default function CotizacionesScreen() {
     );
   };
 
+  const handleLogout = () => {
+    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
+    router.replace("/login");
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 8 }]}
       edges={["top", "left", "right"]}
     >
       <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <BrandHeader subtitle="Gestión comercial · BECK" onLogout={handleLogout} />
         <Text variant="titleLarge" style={styles.title}>
           Cotizaciones
         </Text>
