@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, FlatList, StyleSheet, Image, ScrollView } from "react-native";
+import { View, FlatList, StyleSheet, Image, ScrollView, Pressable } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Card,
@@ -29,7 +29,7 @@ const estadoChipColors: Record<EstadoRegistro, string> = {
 const STORAGE_KEY = "beckcrm_user_email";
 
 export default function RegistrosScreen() {
-  const { registros, agregarRegistro } = useRegistros();
+  const { registros, agregarRegistro, actualizarRegistro, eliminarRegistro } = useRegistros();
   const insets = useSafeAreaInsets();
 
   const [usuarioActual, setUsuarioActual] = useState("Usuario");
@@ -49,6 +49,9 @@ export default function RegistrosScreen() {
     useState<EstadoRegistro | "todos">("todos");
   const [registroDetalle, setRegistroDetalle] =
     useState<typeof registros[0] | null>(null);
+  const [fotoFullUri, setFotoFullUri] = useState<string | null>(null);
+  const [cantidadSellos, setCantidadSellos] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -64,7 +67,10 @@ export default function RegistrosScreen() {
   };
 
   const abrirModal = () => setModalVisible(true);
-  const cerrarModal = () => setModalVisible(false);
+  const cerrarModal = () => {
+    setModalVisible(false);
+    setEditingId(null);
+  };
 
   const limpiarFormulario = () => {
     setTipo("sello");
@@ -74,6 +80,8 @@ export default function RegistrosScreen() {
     setEstado("pendiente");
     setFotoUrl("");
     setFotoLocalUri(undefined);
+    setCantidadSellos("");
+    setEditingId(null);
     setError("");
   };
 
@@ -99,7 +107,7 @@ export default function RegistrosScreen() {
       return;
     }
 
-    agregarRegistro({
+    const payload = {
       tipo,
       obra: obra.trim(),
       piso: piso.trim(),
@@ -108,7 +116,15 @@ export default function RegistrosScreen() {
       usuario: usuarioActual || "Usuario",
       fotoUrl: fotoUrl.trim() || undefined,
       fotoLocalUri,
-    });
+      // cantidadSellos solo aplica a sellos; se ignora si es junta
+      cantidadSellos: tipo === "sello" && cantidadSellos ? Number(cantidadSellos) : undefined,
+    };
+
+    if (editingId !== null) {
+      actualizarRegistro(editingId, payload);
+    } else {
+      agregarRegistro(payload);
+    }
 
     limpiarFormulario();
     cerrarModal();
@@ -130,6 +146,25 @@ export default function RegistrosScreen() {
   const abrirDetalle = (item: typeof registros[0]) => {
     setRegistroDetalle(item);
     setDetalleVisible(true);
+  };
+
+  const abrirEdicion = (item: typeof registros[0]) => {
+    setTipo(item.tipo);
+    setObra(item.obra);
+    setPiso(item.piso);
+    setEquipo(item.equipo);
+    setEstado(item.estado);
+    setFotoUrl(item.fotoUrl || "");
+    setFotoLocalUri(item.fotoLocalUri);
+    setEditingId(item.id);
+    setModalVisible(true);
+  };
+
+  const handleEliminar = (id: number) => {
+    eliminarRegistro(id);
+    if (detalleVisible && registroDetalle?.id === id) {
+      setDetalleVisible(false);
+    }
   };
 
   return (
@@ -250,19 +285,40 @@ export default function RegistrosScreen() {
               {(item.fotoLocalUri || item.fotoUrl) && (
                 <View style={{ marginTop: 8 }}>
                   <Text variant="labelSmall">Foto</Text>
-                  <Image
-                    source={{ uri: item.fotoLocalUri || item.fotoUrl }}
-                    style={{
-                      width: "100%",
-                      height: 140,
-                      borderRadius: 8,
-                      marginTop: 4,
-                    }}
-                    resizeMode="cover"
-                  />
+                  <Pressable onPress={() => setFotoFullUri(item.fotoLocalUri || item.fotoUrl)}>
+                    <Image
+                      source={{ uri: item.fotoLocalUri || item.fotoUrl }}
+                      style={{
+                        width: "100%",
+                        height: 140,
+                        borderRadius: 8,
+                        marginTop: 4,
+                      }}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
                 </View>
               )}
             </Card.Content>
+            <Card.Actions style={styles.cardActions}>
+              <Button
+                icon="pencil"
+                mode="text"
+                compact
+                onPress={() => abrirEdicion(item)}
+              >
+                Editar
+              </Button>
+              <Button
+                icon="delete"
+                mode="text"
+                compact
+                textColor="#dc2626"
+                onPress={() => handleEliminar(item.id)}
+              >
+                Eliminar
+              </Button>
+            </Card.Actions>
           </Card>
         )}
       />
@@ -275,7 +331,7 @@ export default function RegistrosScreen() {
         >
           <ScrollView>
             <Text variant="titleMedium" style={styles.modalTitle}>
-              Nuevo registro
+              {editingId !== null ? "Editar registro" : "Nuevo registro"}
             </Text>
             <Text style={styles.modalSubtitle}>
               Completa los datos operativos y adjunta evidencia fotográfica.
@@ -312,6 +368,15 @@ export default function RegistrosScreen() {
               onChangeText={setEquipo}
               style={styles.input}
             />
+            {tipo === "sello" && (
+              <TextInput
+                label="Cantidad de sellos"
+                value={cantidadSellos}
+                onChangeText={setCantidadSellos}
+                keyboardType="numeric"
+                style={styles.input}
+              />
+            )}
 
             <TextInput
               label="Foto URL (opcional)"
@@ -358,7 +423,7 @@ export default function RegistrosScreen() {
             <View style={styles.modalButtons}>
               <Button onPress={cerrarModal}>Cancelar</Button>
               <Button mode="contained" onPress={handleGuardar}>
-                Guardar
+                {editingId !== null ? "Actualizar" : "Guardar"}
               </Button>
             </View>
           </ScrollView>
@@ -385,13 +450,19 @@ export default function RegistrosScreen() {
               </Text>
               <Text style={[styles.label, { marginTop: 10 }]}>Foto</Text>
               {registroDetalle.fotoLocalUri || registroDetalle.fotoUrl ? (
-                <Image
-                  source={{
-                    uri: registroDetalle.fotoLocalUri || registroDetalle.fotoUrl,
-                  }}
-                  style={{ width: "100%", height: 200, borderRadius: 10 }}
-                  resizeMode="cover"
-                />
+                <Pressable
+                  onPress={() =>
+                    setFotoFullUri(registroDetalle.fotoLocalUri || registroDetalle.fotoUrl || null)
+                  }
+                >
+                  <Image
+                    source={{
+                      uri: registroDetalle.fotoLocalUri || registroDetalle.fotoUrl,
+                    }}
+                    style={{ width: "100%", height: 200, borderRadius: 10 }}
+                    resizeMode="cover"
+                  />
+                </Pressable>
               ) : (
                 <Text style={styles.helperTextSmall}>Sin foto adjunta.</Text>
               )}
@@ -399,6 +470,22 @@ export default function RegistrosScreen() {
           ) : (
             <Text>Sin detalle</Text>
           )}
+        </Modal>
+
+        <Modal
+          visible={!!fotoFullUri}
+          onDismiss={() => setFotoFullUri(null)}
+          contentContainerStyle={styles.fullImageContainer}
+        >
+          {fotoFullUri ? (
+            <Pressable onPress={() => setFotoFullUri(null)}>
+              <Image
+                source={{ uri: fotoFullUri }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            </Pressable>
+          ) : null}
         </Modal>
       </Portal>
     </SafeAreaView>
@@ -439,6 +526,10 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     borderWidth: 1,
     backgroundColor: "#ffffff",
+  },
+  cardActions: {
+    justifyContent: "flex-end",
+    paddingHorizontal: 8,
   },
   modalContainer: {
     backgroundColor: "white",
@@ -519,5 +610,14 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     paddingVertical: 4,
+  },
+  fullImageContainer: {
+    backgroundColor: "#000000cc",
+    borderRadius: 16,
+    padding: 8,
+  },
+  fullImage: {
+    width: "100%",
+    height: 420,
   },
 });

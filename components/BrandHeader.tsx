@@ -1,6 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Image } from "react-native";
-import { Text, IconButton } from "react-native-paper";
+import { Text, IconButton, Button } from "react-native-paper";
 
 type Props = {
   title?: string;
@@ -35,13 +35,18 @@ export const BrandHeader: React.FC<Props> = ({
         </View>
       </View>
       {onLogout ? (
-        <IconButton
-          icon="logout"
-          size={20}
-          onPress={onLogout}
-          accessibilityLabel="Cerrar sesión"
-          style={styles.logoutButton}
-        />
+        <View style={styles.logoutWrapper}>
+          <Button
+            mode="text"
+            icon="logout"
+            compact
+            labelStyle={styles.logoutLabel}
+            onPress={onLogout}
+            accessibilityLabel="Cerrar sesión"
+          >
+            Salir
+          </Button>
+        </View>
       ) : null}
     </View>
   );
@@ -82,5 +87,13 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     margin: 0,
+  },
+  logoutWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  logoutLabel: {
+    fontWeight: "700",
+    color: "#0f172a",
   },
 });
