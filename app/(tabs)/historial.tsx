@@ -44,6 +44,12 @@ export default function HistorialScreen() {
         data={movimientos}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Sin movimientos</Text>
+            <Text style={styles.itemMeta}>Aún no hay acciones registradas.</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <Card style={styles.card}>
             <Card.Content>
@@ -143,5 +149,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
     textTransform: "capitalize",
+  },
+  emptyState: {
+    paddingVertical: 24,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    color: "#0f172a",
+    fontWeight: "700",
+    marginBottom: 4,
   },
 });

@@ -11,14 +11,18 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [recordar, setRecordar] = useState(true);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const isValid = correo.trim().length > 0 && password.trim().length >= 4;
 
   const onLogin = () => {
-    if (!correo.trim() || !password.trim()) {
-      setError("Ingresa usuario y contraseña");
+    if (!correo.trim() || !password.trim() || password.trim().length < 4) {
+      setError("Ingresa usuario y una contraseña de al menos 4 caracteres");
       return;
     }
+    setIsLoading(true);
     setError("");
     router.replace("/(tabs)");
+    setIsLoading(false);
   };
 
   return (
@@ -41,6 +45,7 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             style={styles.input}
+            error={!!error && !correo.trim()}
             left={<TextInput.Icon icon="account" />}
           />
           <TextInput
@@ -49,6 +54,7 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             secureTextEntry
             style={styles.input}
+            error={!!error && password.trim().length < 4}
             left={<TextInput.Icon icon="lock" />}
           />
 
@@ -64,8 +70,18 @@ export default function LoginScreen() {
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {!error && password.trim().length > 0 && password.trim().length < 4 ? (
+            <Text style={styles.helper}>Mínimo 4 caracteres.</Text>
+          ) : null}
 
-          <Button mode="contained" onPress={onLogin} style={styles.button} icon="login">
+          <Button
+            mode="contained"
+            onPress={onLogin}
+            style={styles.button}
+            icon="login"
+            loading={isLoading}
+            disabled={!isValid || isLoading}
+          >
             Entrar
           </Button>
         </Card.Content>

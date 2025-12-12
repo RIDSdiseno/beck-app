@@ -48,3 +48,47 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+1️⃣ Clonar el proyecto
+git clone <URL_DEL_REPOSITORIO>
+cd <nombre-carpeta-proyecto>
+(Reemplaza <URL_DEL_REPOSITORIO> y <nombre-carpeta-proyecto> por los tuyos.)
+
+2️⃣ Instalar dependencias
+
+Dentro de la carpeta del proyecto:
+npm install
+
+
+3️⃣ Crear archivo .env (opcional pero recomendado)
+
+En la raíz del proyecto (donde está package.json) crea un archivo llamado .env con:
+
+VITE_API_BASE_URL=http://localhost:3000
+
+Si no lo crean, el front usará por defecto https://localhost:3000.
+Para solo ver la UI basta con que el front levante; si quieren login funcional, el backend debe estar arriba en esa URL.
+
+
+4️⃣ Levantar el proyecto en modo desarrollo
+npm run dev
+
+
+La consola de Vite mostrará algo como:
+
+  ➜  Local:   http://localhost:5173/
+
+5️⃣ Abrir en el navegador
+
+Abrir en el navegador:
+
+http://localhost:5173/
+
+
+
+
+comandos que use 
+npx rn-new --nativewind
+npm install nativewind react-native-reanimated@~3.17.4 react-native-safe-area-context@5.4.0
+npm install --dev tailwindcss@^3.4.17 prettier-plugin-tailwindcss@^0.5.11

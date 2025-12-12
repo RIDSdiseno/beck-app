@@ -11,6 +11,7 @@ import {
   Modal,
   Chip,
   Searchbar,
+  Snackbar,
 } from "react-native-paper";
 import { useRegistros } from "../../context/RegistrosContext";
 import type { TipoRegistro, EstadoRegistro } from "../../types/beck";
@@ -52,6 +53,16 @@ export default function RegistrosScreen() {
   const [fotoFullUri, setFotoFullUri] = useState<string | null>(null);
   const [cantidadSellos, setCantidadSellos] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const isFormValid =
+    obra.trim().length > 0 &&
+    piso.trim().length > 0 &&
+    equipo.trim().length > 0 &&
+    (tipo !== "sello" ||
+      cantidadSellos.trim().length === 0 ||
+      (Number.isFinite(Number(cantidadSellos)) && Number(cantidadSellos) > 0));
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -102,8 +113,19 @@ export default function RegistrosScreen() {
   };
 
   const handleGuardar = () => {
+    setIsSaving(true);
     if (!obra.trim() || !piso.trim() || !equipo.trim()) {
       setError("Completa obra, piso y equipo");
+      setIsSaving(false);
+      return;
+    }
+    if (
+      tipo === "sello" &&
+      cantidadSellos.trim().length > 0 &&
+      (!Number.isFinite(Number(cantidadSellos)) || Number(cantidadSellos) <= 0)
+    ) {
+      setError("La cantidad de sellos debe ser un número mayor a 0");
+      setIsSaving(false);
       return;
     }
 
@@ -122,12 +144,16 @@ export default function RegistrosScreen() {
 
     if (editingId !== null) {
       actualizarRegistro(editingId, payload);
+      setSnackbarMessage("Registro actualizado");
     } else {
       agregarRegistro(payload);
+      setSnackbarMessage("Registro creado");
     }
 
     limpiarFormulario();
     cerrarModal();
+    setIsSaving(false);
+    setSnackbarVisible(true);
   };
 
   const registrosFiltrados = registros.filter((r) => {
@@ -156,8 +182,14 @@ export default function RegistrosScreen() {
     setEstado(item.estado);
     setFotoUrl(item.fotoUrl || "");
     setFotoLocalUri(item.fotoLocalUri);
+    setCantidadSellos(
+      item.tipo === "sello" && typeof item.cantidadSellos === "number"
+        ? String(item.cantidadSellos)
+        : ""
+    );
     setEditingId(item.id);
     setModalVisible(true);
+    setSnackbarVisible(false);
   };
 
   const handleEliminar = (id: number) => {
@@ -165,6 +197,8 @@ export default function RegistrosScreen() {
     if (detalleVisible && registroDetalle?.id === id) {
       setDetalleVisible(false);
     }
+    setSnackbarMessage("Registro eliminado");
+    setSnackbarVisible(true);
   };
 
   return (
@@ -252,7 +286,12 @@ export default function RegistrosScreen() {
         data={registrosFiltrados}
         keyExtractor={(item) => item.id.toString()}
         ListEmptyComponent={
-          <Text style={styles.helperTextSmall}>Sin resultados con estos filtros.</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Sin resultados</Text>
+            <Text style={styles.helperTextSmall}>
+              Ajusta tus filtros o crea un nuevo registro.
+            </Text>
+          </View>
         }
         renderItem={({ item }) => (
           <Card style={styles.card} onPress={() => abrirDetalle(item)}>
@@ -282,6 +321,11 @@ export default function RegistrosScreen() {
             />
             <Card.Content>
               <Text>Equipo: {item.equipo}</Text>
+              {item.tipo === "sello" && typeof item.cantidadSellos === "number" ? (
+                <Text style={styles.helperTextSmall}>
+                  Cantidad: {item.cantidadSellos} sellos
+                </Text>
+              ) : null}
               {(item.fotoLocalUri || item.fotoUrl) && (
                 <View style={{ marginTop: 8 }}>
                   <Text variant="labelSmall">Foto</Text>
@@ -297,6 +341,11 @@ export default function RegistrosScreen() {
                       resizeMode="cover"
                     />
                   </Pressable>
+                </View>
+              )}
+              {!item.fotoLocalUri && !item.fotoUrl && (
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.helperTextSmall}>Sin foto adjunta</Text>
                 </View>
               )}
             </Card.Content>
@@ -422,7 +471,12 @@ export default function RegistrosScreen() {
 
             <View style={styles.modalButtons}>
               <Button onPress={cerrarModal}>Cancelar</Button>
-              <Button mode="contained" onPress={handleGuardar}>
+              <Button
+                mode="contained"
+                onPress={handleGuardar}
+                disabled={!isFormValid || isSaving}
+                loading={isSaving}
+              >
                 {editingId !== null ? "Actualizar" : "Guardar"}
               </Button>
             </View>
@@ -448,6 +502,12 @@ export default function RegistrosScreen() {
               <Text style={styles.helperTextSmall}>
                 Equipo: {registroDetalle.equipo}
               </Text>
+              {registroDetalle.tipo === "sello" &&
+              typeof registroDetalle.cantidadSellos === "number" ? (
+                <Text style={styles.helperTextSmall}>
+                  Cantidad de sellos: {registroDetalle.cantidadSellos}
+                </Text>
+              ) : null}
               <Text style={[styles.label, { marginTop: 10 }]}>Foto</Text>
               {registroDetalle.fotoLocalUri || registroDetalle.fotoUrl ? (
                 <Pressable
@@ -464,7 +524,9 @@ export default function RegistrosScreen() {
                   />
                 </Pressable>
               ) : (
-                <Text style={styles.helperTextSmall}>Sin foto adjunta.</Text>
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.helperTextSmall}>Sin foto adjunta.</Text>
+                </View>
               )}
             </ScrollView>
           ) : (
@@ -488,6 +550,14 @@ export default function RegistrosScreen() {
           ) : null}
         </Modal>
       </Portal>
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={2500}
+        action={{ label: "Cerrar", onPress: () => setSnackbarVisible(false) }}
+      >
+        {snackbarMessage || "Acción realizada"}
+      </Snackbar>
     </SafeAreaView>
   );
 }
@@ -610,6 +680,24 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     paddingVertical: 4,
+  },
+  emptyState: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    color: "#0f172a",
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  photoPlaceholder: {
+    marginTop: 8,
+    paddingVertical: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
   },
   fullImageContainer: {
     backgroundColor: "#000000cc",

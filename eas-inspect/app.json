@@ -43,8 +43,7 @@
             "backgroundColor": "#0B0B0F"
           }
         }
-      ],
-      "expo-web-browser"
+      ]
     ],
     "splash": {
       "image": "./assets/images/logo_beck.png",
@@ -59,9 +58,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9c9b4430-55be-4c2f-8536-fdb7a097bf02"
+        "projectId": "f4b8005b-1323-4e12-bda0-110ec4ddb928"
       }
     },
-    "owner": "diseno1"
+    "owner": "expotest2s-organization",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/bc65a98e-2cf6-4b70-8d26-8fce81a18842"
+    }
   }
 }

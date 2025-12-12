@@ -7,31 +7,14 @@ import * as SplashScreen from "expo-splash-screen";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 
 import { BeckSplash } from "@/components/BeckSplash";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { HistorialProvider } from "@/context/HistorialContext";
-import { RegistrosProvider } from "@/context/RegistrosContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export const unstable_settings = {
   anchor: "(tabs)",
-};
-
-const paperTheme = {
-  ...MD3LightTheme,
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: "#f97316",
-    secondary: "#0ea5e9",
-    background: "#f5f7fb",
-    surface: "#ffffff",
-    surfaceVariant: "#e2e8f0",
-    onSurface: "#0f172a",
-    outline: "#cbd5e1",
-  },
 };
 
 export default function RootLayout() {
@@ -41,8 +24,13 @@ export default function RootLayout() {
 
   React.useEffect(() => {
     const start = async () => {
+      // Hide native splash and run overlay exit animation
       await SplashScreen.hideAsync();
-      progress.value = withTiming(1, { duration: 800 }, () => runOnJS(setSplashDone)(true));
+      progress.value = withTiming(
+        1,
+        { duration: 800 },
+        () => runOnJS(setSplashDone)(true)
+      );
     };
     start();
   }, [progress]);
@@ -55,18 +43,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <PaperProvider theme={paperTheme}>
-          <HistorialProvider>
-            <RegistrosProvider>
-              <Stack initialRouteName="login" screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="login" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
-              </Stack>
-              <StatusBar style="auto" />
-            </RegistrosProvider>
-          </HistorialProvider>
-        </PaperProvider>
+        <Stack initialRouteName="login">
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
+        </Stack>
+        <StatusBar style="auto" />
       </ThemeProvider>
 
       {!splashDone && (

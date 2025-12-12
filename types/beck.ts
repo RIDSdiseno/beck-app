@@ -1,12 +1,7 @@
 // types/beck.ts
-
 export type TipoRegistro = "sello" | "junta";
 
-export type EstadoRegistro =
-  | "pendiente"
-  | "instalado"
-  | "observado"
-  | "aprobado";
+export type EstadoRegistro = "pendiente" | "instalado" | "observado" | "aprobado";
 
 export interface Registro {
   id: number;
@@ -18,4 +13,5 @@ export interface Registro {
   usuario: string;
   fotoUrl?: string;
   fotoLocalUri?: string;
+  cantidadSellos?: number;
 }
