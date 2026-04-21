@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "beck-crm-app",
+    "name": "Beck App",
     "slug": "beckapp",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "beckcrmapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -18,10 +18,8 @@
     "android": {
       "package": "com.expotest2sorganization.beckapp",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/android-foreground-small.png",
+        "backgroundColor": "#facc15"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -35,23 +33,18 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo_beck.png",
-          "imageWidth": 260,
+          "image": "./assets/images/beck-splash-logo.png",
+          "imageWidth": 340,
           "resizeMode": "contain",
-          "backgroundColor": "#0B0B0F",
+          "backgroundColor": "#facc15",
           "dark": {
-            "backgroundColor": "#0B0B0F"
+            "image": "./assets/images/beck-splash-logo.png",
+            "backgroundColor": "#facc15"
           }
         }
       ],
       "expo-web-browser"
     ],
-    "splash": {
-      "image": "./assets/images/logo_beck.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B0B0F",
-      "imageWidth": 260
-    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

@@ -1,18 +1,26 @@
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { StyleSheet } from "react-native";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import * as SplashScreen from "expo-splash-screen";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import "react-native-reanimated";
+import { MD3LightTheme, Provider as PaperProvider } from "react-native-paper";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 
 import { BeckSplash } from "@/components/BeckSplash";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { HistorialProvider } from "@/context/HistorialContext";
 import { RegistrosProvider } from "@/context/RegistrosContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -37,19 +45,24 @@ const paperTheme = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [splashDone, setSplashDone] = React.useState(false);
-  const progress = useSharedValue(0);
+  const splashOpacity = useSharedValue(1);
 
   React.useEffect(() => {
     const start = async () => {
       await SplashScreen.hideAsync();
-      progress.value = withTiming(1, { duration: 800 }, () => runOnJS(setSplashDone)(true));
+
+      setTimeout(() => {
+        splashOpacity.value = withTiming(0, { duration: 450 }, () => {
+          runOnJS(setSplashDone)(true);
+        });
+      }, 3000);
     };
+
     start();
-  }, [progress]);
+  }, [splashOpacity]);
 
   const splashStyle = useAnimatedStyle(() => ({
-    opacity: 1 - progress.value,
-    transform: [{ scale: 1 + 0.06 * progress.value }],
+    opacity: splashOpacity.value,
   }));
 
   return (
@@ -58,10 +71,16 @@ export default function RootLayout() {
         <PaperProvider theme={paperTheme}>
           <HistorialProvider>
             <RegistrosProvider>
-              <Stack initialRouteName="login" screenOptions={{ headerShown: false }}>
+              <Stack
+                initialRouteName="login"
+                screenOptions={{ headerShown: false }}
+              >
                 <Stack.Screen name="login" />
                 <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
+                <Stack.Screen
+                  name="modal"
+                  options={{ presentation: "modal", title: "Modal" }}
+                />
               </Stack>
               <StatusBar style="auto" />
             </RegistrosProvider>

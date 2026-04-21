@@ -1,21 +1,13 @@
 {
-  "cli": {
-    "appVersionSource": "remote"
-  },
   "build": {
     "preview": {
-      "distribution": "internal",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "distribution": "store",
       "android": {
         "buildType": "app-bundle"
-      },
-      "ios": {
-        "simulator": false
       }
     }
   }

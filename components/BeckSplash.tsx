@@ -1,32 +1,60 @@
-import React from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import React, { useEffect } from "react";
+import { Image, StyleSheet, View } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 
-import { BeckLogo } from "../assets/BeckLogo";
+export function BeckSplash() {
+  const scale = useSharedValue(1);
 
-export const BeckSplash: React.FC = () => {
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.06, {
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        withTiming(1, {
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ),
+      -1,
+      false,
+    );
+  }, [scale]);
+
+  const animatedLogoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
     <View style={styles.container}>
-      <BeckLogo width={220} height={180} />
-      <Text style={styles.tagline}>CRM COMERCIAL · PROTECCIÓN PASIVA</Text>
-      <ActivityIndicator style={styles.spinner} color="#E0E0E0" />
+      <Animated.View style={animatedLogoStyle}>
+        <Image
+          source={require("../assets/images/beck-splash-logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </Animated.View>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B0B0F",
+    backgroundColor: "#facc15",
     alignItems: "center",
     justifyContent: "center",
   },
-  tagline: {
-    marginTop: 16,
-    color: "#E0E0E0",
-    fontSize: 16,
-    letterSpacing: 2,
-  },
-  spinner: {
-    marginTop: 24,
+  logo: {
+    width: 340,
+    height: 340,
   },
 });
