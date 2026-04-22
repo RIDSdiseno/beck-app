@@ -1,24 +1,35 @@
+import { clearSession } from "@/services/auth/session";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { View, FlatList, StyleSheet, Image, ScrollView, Pressable } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  Card,
-  Text,
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import {
   Button,
-  TextInput,
-  RadioButton,
-  Portal,
-  Modal,
+  Card,
   Chip,
+  Modal,
+  Portal,
+  RadioButton,
   Searchbar,
   Snackbar,
+  Text,
+  TextInput,
 } from "react-native-paper";
-import { useRegistros } from "../../context/RegistrosContext";
-import type { TipoRegistro, EstadoRegistro } from "../../types/beck";
-import * as ImagePicker from "expo-image-picker";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { useRegistros } from "../../context/RegistrosContext";
+import type { EstadoRegistro, TipoRegistro } from "../../types/beck";
 
 const estadoChipColors: Record<EstadoRegistro, string> = {
   pendiente: "#fb923c",
@@ -30,7 +41,8 @@ const estadoChipColors: Record<EstadoRegistro, string> = {
 const STORAGE_KEY = "beckcrm_user_email";
 
 export default function RegistrosScreen() {
-  const { registros, agregarRegistro, actualizarRegistro, eliminarRegistro } = useRegistros();
+  const { registros, agregarRegistro, actualizarRegistro, eliminarRegistro } =
+    useRegistros();
   const insets = useSafeAreaInsets();
 
   const [usuarioActual, setUsuarioActual] = useState("Usuario");
@@ -46,10 +58,12 @@ export default function RegistrosScreen() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<TipoRegistro | "todos">("todos");
-  const [filtroEstado, setFiltroEstado] =
-    useState<EstadoRegistro | "todos">("todos");
-  const [registroDetalle, setRegistroDetalle] =
-    useState<typeof registros[0] | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<EstadoRegistro | "todos">(
+    "todos",
+  );
+  const [registroDetalle, setRegistroDetalle] = useState<
+    (typeof registros)[0] | null
+  >(null);
   const [fotoFullUri, setFotoFullUri] = useState<string | null>(null);
   const [cantidadSellos, setCantidadSellos] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -72,9 +86,13 @@ export default function RegistrosScreen() {
       .catch(() => {});
   }, []);
 
-  const handleLogout = () => {
-    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
   };
 
   const abrirModal = () => setModalVisible(true);
@@ -139,7 +157,8 @@ export default function RegistrosScreen() {
       fotoUrl: fotoUrl.trim() || undefined,
       fotoLocalUri,
       // cantidadSellos solo aplica a sellos; se ignora si es junta
-      cantidadSellos: tipo === "sello" && cantidadSellos ? Number(cantidadSellos) : undefined,
+      cantidadSellos:
+        tipo === "sello" && cantidadSellos ? Number(cantidadSellos) : undefined,
     };
 
     if (editingId !== null) {
@@ -169,12 +188,12 @@ export default function RegistrosScreen() {
     return okSearch && okTipo && okEstado;
   });
 
-  const abrirDetalle = (item: typeof registros[0]) => {
+  const abrirDetalle = (item: (typeof registros)[0]) => {
     setRegistroDetalle(item);
     setDetalleVisible(true);
   };
 
-  const abrirEdicion = (item: typeof registros[0]) => {
+  const abrirEdicion = (item: (typeof registros)[0]) => {
     setTipo(item.tipo);
     setObra(item.obra);
     setPiso(item.piso);
@@ -185,7 +204,7 @@ export default function RegistrosScreen() {
     setCantidadSellos(
       item.tipo === "sello" && typeof item.cantidadSellos === "number"
         ? String(item.cantidadSellos)
-        : ""
+        : "",
     );
     setEditingId(item.id);
     setModalVisible(true);
@@ -206,7 +225,10 @@ export default function RegistrosScreen() {
       style={[styles.container, { paddingTop: insets.top + 8 }]}
       edges={["top", "left", "right"]}
     >
-      <BrandHeader subtitle="Protección pasiva · CRM BECK" onLogout={handleLogout} />
+      <BrandHeader
+        subtitle="Protección pasiva · CRM BECK"
+        onLogout={handleLogout}
+      />
       <Text variant="titleLarge" style={styles.title}>
         Registros de sellos / juntas
       </Text>
@@ -237,21 +259,30 @@ export default function RegistrosScreen() {
           contentContainerStyle={{ gap: 8, paddingRight: 8 }}
           style={styles.filterRow}
         >
-          {(["todos", "sello", "junta"] as (TipoRegistro | "todos")[]).map((t) => {
-            const selected = filtroTipo === t;
-            return (
-              <Chip
-                key={t}
-                compact
-                selected={selected}
-                onPress={() => setFiltroTipo(selected ? "todos" : t)}
-                style={[styles.filterChip, selected && styles.filterChipSelected]}
-                textStyle={styles.filterChipText}
-              >
-                {t === "todos" ? "Todos" : t === "sello" ? "Sellos" : "Juntas"}
-              </Chip>
-            );
-          })}
+          {(["todos", "sello", "junta"] as (TipoRegistro | "todos")[]).map(
+            (t) => {
+              const selected = filtroTipo === t;
+              return (
+                <Chip
+                  key={t}
+                  compact
+                  selected={selected}
+                  onPress={() => setFiltroTipo(selected ? "todos" : t)}
+                  style={[
+                    styles.filterChip,
+                    selected && styles.filterChipSelected,
+                  ]}
+                  textStyle={styles.filterChipText}
+                >
+                  {t === "todos"
+                    ? "Todos"
+                    : t === "sello"
+                      ? "Sellos"
+                      : "Juntas"}
+                </Chip>
+              );
+            },
+          )}
         </ScrollView>
 
         <ScrollView
@@ -260,25 +291,33 @@ export default function RegistrosScreen() {
           contentContainerStyle={{ gap: 8, paddingRight: 8 }}
           style={styles.filterRow}
         >
-          {(["todos", "pendiente", "instalado", "observado", "aprobado"] as (EstadoRegistro | "todos")[]).map(
-            (est) => {
-              const selected = filtroEstado === est;
-              return (
-                <Chip
-                  key={est}
-                  compact
-                  selected={selected}
-                  onPress={() =>
-                    setFiltroEstado(selected ? "todos" : (est as EstadoRegistro | "todos"))
-                  }
-                  style={[styles.filterChip, selected && styles.filterChipSelected]}
-                  textStyle={styles.filterChipText}
-                >
-                  {est === "todos" ? "Estado: Todos" : est}
-                </Chip>
-              );
-            }
-          )}
+          {(
+            ["todos", "pendiente", "instalado", "observado", "aprobado"] as (
+              | EstadoRegistro
+              | "todos"
+            )[]
+          ).map((est) => {
+            const selected = filtroEstado === est;
+            return (
+              <Chip
+                key={est}
+                compact
+                selected={selected}
+                onPress={() =>
+                  setFiltroEstado(
+                    selected ? "todos" : (est as EstadoRegistro | "todos"),
+                  )
+                }
+                style={[
+                  styles.filterChip,
+                  selected && styles.filterChipSelected,
+                ]}
+                textStyle={styles.filterChipText}
+              >
+                {est === "todos" ? "Estado: Todos" : est}
+              </Chip>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -308,10 +347,7 @@ export default function RegistrosScreen() {
               right={() => (
                 <Chip
                   icon="account"
-                  style={[
-                    styles.statusChip,
-                    { backgroundColor: "#0ea5e9" },
-                  ]}
+                  style={[styles.statusChip, { backgroundColor: "#0ea5e9" }]}
                   compact
                   textStyle={styles.statusChipText}
                 >
@@ -321,7 +357,8 @@ export default function RegistrosScreen() {
             />
             <Card.Content>
               <Text>Equipo: {item.equipo}</Text>
-              {item.tipo === "sello" && typeof item.cantidadSellos === "number" ? (
+              {item.tipo === "sello" &&
+              typeof item.cantidadSellos === "number" ? (
                 <Text style={styles.helperTextSmall}>
                   Cantidad: {item.cantidadSellos} sellos
                 </Text>
@@ -329,7 +366,11 @@ export default function RegistrosScreen() {
               {(item.fotoLocalUri || item.fotoUrl) && (
                 <View style={{ marginTop: 8 }}>
                   <Text variant="labelSmall">Foto</Text>
-                  <Pressable onPress={() => setFotoFullUri(item.fotoLocalUri || item.fotoUrl)}>
+                  <Pressable
+                    onPress={() =>
+                      setFotoFullUri(item.fotoLocalUri || item.fotoUrl)
+                    }
+                  >
                     <Image
                       source={{ uri: item.fotoLocalUri || item.fotoUrl }}
                       style={{
@@ -456,14 +497,19 @@ export default function RegistrosScreen() {
               value={estado}
             >
               <View style={styles.column}>
-                {(["pendiente", "instalado", "observado", "aprobado"] as EstadoRegistro[]).map(
-                  (est) => (
-                    <View style={styles.row} key={est}>
-                      <RadioButton value={est} />
-                      <Text style={styles.radioLabel}>{est}</Text>
-                    </View>
-                  )
-                )}
+                {(
+                  [
+                    "pendiente",
+                    "instalado",
+                    "observado",
+                    "aprobado",
+                  ] as EstadoRegistro[]
+                ).map((est) => (
+                  <View style={styles.row} key={est}>
+                    <RadioButton value={est} />
+                    <Text style={styles.radioLabel}>{est}</Text>
+                  </View>
+                ))}
               </View>
             </RadioButton.Group>
 
@@ -512,12 +558,17 @@ export default function RegistrosScreen() {
               {registroDetalle.fotoLocalUri || registroDetalle.fotoUrl ? (
                 <Pressable
                   onPress={() =>
-                    setFotoFullUri(registroDetalle.fotoLocalUri || registroDetalle.fotoUrl || null)
+                    setFotoFullUri(
+                      registroDetalle.fotoLocalUri ||
+                        registroDetalle.fotoUrl ||
+                        null,
+                    )
                   }
                 >
                   <Image
                     source={{
-                      uri: registroDetalle.fotoLocalUri || registroDetalle.fotoUrl,
+                      uri:
+                        registroDetalle.fotoLocalUri || registroDetalle.fotoUrl,
                     }}
                     style={{ width: "100%", height: 200, borderRadius: 10 }}
                     resizeMode="cover"

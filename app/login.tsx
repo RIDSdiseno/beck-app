@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AuthSession from "expo-auth-session";
-import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Image, ImageBackground, StyleSheet, View } from "react-native";
 import { Button, Card, Text } from "react-native-paper";
 import {
@@ -12,15 +11,13 @@ import {
 
 WebBrowser.maybeCompleteAuthSession();
 
-const tenantId = "9b1d2116-2dff-4efa-89a3-465b62215224";
-const clientId = "7bcbc920-c3d3-4d9f-811f-7cf3013361be";
+const tenantId = process.env.EXPO_PUBLIC_AZURE_TENANT_ID!;
+const clientId = process.env.EXPO_PUBLIC_AZURE_CLIENT_ID!;
 
 const discovery = {
   authorizationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
   tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
 };
-
-const API_BASE_URL = "http://192.168.10.178:3001";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -36,7 +33,7 @@ export default function LoginScreen() {
     [],
   );
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+  const [request, , promptAsync] = AuthSession.useAuthRequest(
     {
       clientId,
       scopes: ["openid", "profile", "email", "offline_access"],
@@ -50,89 +47,28 @@ export default function LoginScreen() {
     discovery,
   );
 
-  useEffect(() => {
-    const handleResponse = async () => {
-      if (!response) return;
-
-      if (response.type === "error") {
-        console.log("MICROSOFT RESPONSE ERROR", response);
-        setError("Microsoft devolvió un error de autenticación.");
-        return;
-      }
-
-      if (response.type !== "success") return;
-
-      try {
-        setIsLoading(true);
-        setError("");
-
-        const code = response.params.code;
-
-        if (!code) {
-          throw new Error("Microsoft no devolvió un code válido.");
-        }
-
-        const tokenResult = await AuthSession.exchangeCodeAsync(
-          {
-            clientId,
-            code,
-            redirectUri,
-            extraParams: {
-              code_verifier: request?.codeVerifier || "",
-            },
-          },
-          discovery,
-        );
-
-        const idToken = tokenResult.idToken;
-
-        if (!idToken) {
-          throw new Error("No se recibió id_token desde Microsoft.");
-        }
-
-        const apiResponse = await fetch(
-          `${API_BASE_URL}/api/mobile/auth/microsoft`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              idToken,
-            }),
-          },
-        );
-
-        const data = await apiResponse.json();
-
-        if (!apiResponse.ok) {
-          throw new Error(data?.message || "No se pudo iniciar sesión.");
-        }
-
-        await AsyncStorage.multiSet([
-          ["beck_token", data.token],
-          ["beck_user", JSON.stringify(data.user)],
-        ]);
-
-        router.replace("/(tabs)");
-      } catch (err: any) {
-        console.log("LOGIN MICROSOFT ERROR", err);
-        setError(err?.message || "No se pudo iniciar sesión.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    handleResponse();
-  }, [response, request, redirectUri]);
-
   const onMicrosoftLogin = async () => {
     try {
       setError("");
+      setIsLoading(true);
+
+      const codeVerifier =
+        (request as any)?.codeVerifier || (request as any)?.code_verifier || "";
+
+      if (!codeVerifier) {
+        throw new Error("No se pudo obtener el code_verifier.");
+      }
+
+      await AsyncStorage.multiSet([
+        ["beck_code_verifier", codeVerifier],
+        ["beck_redirect_uri", redirectUri],
+      ]);
+
       await promptAsync();
-    } catch (err) {
+    } catch (err: any) {
       console.log("PROMPT MICROSOFT ERROR", err);
-      setError("No se pudo abrir el login de Microsoft.");
+      setError(err?.message || "No se pudo abrir el login de Microsoft.");
+      setIsLoading(false);
     }
   };
 

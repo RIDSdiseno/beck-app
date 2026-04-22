@@ -1,20 +1,22 @@
-import React, { useMemo, useState } from "react";
-import { ScrollView, View, StyleSheet } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Card,
-  Text,
-  Chip,
-  TextInput,
-  DataTable,
-} from "react-native-paper";
+import { clearSession } from "@/services/auth/session";
 import dayjs from "dayjs";
-import { BrandHeader } from "../../components/BrandHeader";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Card, Chip, DataTable, Text, TextInput } from "react-native-paper";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { BrandHeader } from "../../components/BrandHeader";
 
 type EstadoCotizacion = "borrador" | "enviada" | "aceptada" | "rechazada";
-type TipoCotizacion = "Cliente" | "Interna" | "Servicio" | "Mantencion" | "Otro";
+type TipoCotizacion =
+  | "Cliente"
+  | "Interna"
+  | "Servicio"
+  | "Mantencion"
+  | "Otro";
 
 type Cotizacion = {
   id: number;
@@ -64,14 +66,27 @@ const MOCK: Cotizacion[] = [
   },
 ];
 
-const estados: EstadoCotizacion[] = ["borrador", "enviada", "aceptada", "rechazada"];
-const tipos: TipoCotizacion[] = ["Cliente", "Interna", "Servicio", "Mantencion", "Otro"];
+const estados: EstadoCotizacion[] = [
+  "borrador",
+  "enviada",
+  "aceptada",
+  "rechazada",
+];
+const tipos: TipoCotizacion[] = [
+  "Cliente",
+  "Interna",
+  "Servicio",
+  "Mantencion",
+  "Otro",
+];
 const origenes = ["BECK", "Directo"];
 
 export default function CotizacionesScreen() {
   const [data] = useState<Cotizacion[]>(MOCK);
   const [search, setSearch] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<EstadoCotizacion | undefined>();
+  const [filtroEstado, setFiltroEstado] = useState<
+    EstadoCotizacion | undefined
+  >();
   const [filtroOrigen, setFiltroOrigen] = useState<string | undefined>();
   const [filtroTipo, setFiltroTipo] = useState<TipoCotizacion | undefined>();
   const insets = useSafeAreaInsets();
@@ -126,9 +141,13 @@ export default function CotizacionesScreen() {
     );
   };
 
-  const handleLogout = () => {
-    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
   };
 
   return (
@@ -137,12 +156,16 @@ export default function CotizacionesScreen() {
       edges={["top", "left", "right"]}
     >
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <BrandHeader subtitle="Gestión comercial · BECK" onLogout={handleLogout} />
+        <BrandHeader
+          subtitle="Gestión comercial · BECK"
+          onLogout={handleLogout}
+        />
         <Text variant="titleLarge" style={styles.title}>
           Cotizaciones
         </Text>
         <Text style={styles.subtitle}>
-          Gestion y seguimiento por cliente, origen, estado y tipo. Version movil.
+          Gestion y seguimiento por cliente, origen, estado y tipo. Version
+          movil.
         </Text>
 
         <TextInput
@@ -154,7 +177,11 @@ export default function CotizacionesScreen() {
           style={styles.input}
         />
 
-        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ gap: 8 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator
+          contentContainerStyle={{ gap: 8 }}
+        >
           <Chip
             icon="filter"
             selected={!filtroOrigen}
@@ -166,14 +193,20 @@ export default function CotizacionesScreen() {
             <Chip
               key={o}
               selected={filtroOrigen === o}
-              onPress={() => setFiltroOrigen(o === filtroOrigen ? undefined : o)}
+              onPress={() =>
+                setFiltroOrigen(o === filtroOrigen ? undefined : o)
+              }
             >
               {o}
             </Chip>
           ))}
         </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ gap: 8, marginTop: 8 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator
+          contentContainerStyle={{ gap: 8, marginTop: 8 }}
+        >
           <Chip
             icon="filter"
             selected={!filtroEstado}
@@ -185,14 +218,20 @@ export default function CotizacionesScreen() {
             <Chip
               key={e}
               selected={filtroEstado === e}
-              onPress={() => setFiltroEstado(filtroEstado === e ? undefined : e)}
+              onPress={() =>
+                setFiltroEstado(filtroEstado === e ? undefined : e)
+              }
             >
               {e}
             </Chip>
           ))}
         </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ gap: 8, marginTop: 8 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator
+          contentContainerStyle={{ gap: 8, marginTop: 8 }}
+        >
           <Chip
             icon="filter"
             selected={!filtroTipo}
@@ -223,15 +262,21 @@ export default function CotizacionesScreen() {
           <Card style={styles.kpiCard}>
             <Card.Content>
               <Text style={styles.kpiLabel}>Monto total</Text>
-              <Text style={styles.kpiValue}>$ {kpis.totalMonto.toLocaleString("es-CL")}</Text>
+              <Text style={styles.kpiValue}>
+                $ {kpis.totalMonto.toLocaleString("es-CL")}
+              </Text>
               <Text style={styles.kpiHelper}>Solo CLP (mock)</Text>
             </Card.Content>
           </Card>
           <Card style={styles.kpiCard}>
             <Card.Content>
               <Text style={styles.kpiLabel}>Tasa de exito</Text>
-              <Text style={[styles.kpiValue, { color: "#22c55e" }]}>{kpis.tasa}%</Text>
-              <Text style={styles.kpiHelper}>Aceptadas / (Aceptadas + Enviadas)</Text>
+              <Text style={[styles.kpiValue, { color: "#22c55e" }]}>
+                {kpis.tasa}%
+              </Text>
+              <Text style={styles.kpiHelper}>
+                Aceptadas / (Aceptadas + Enviadas)
+              </Text>
             </Card.Content>
           </Card>
           <Card style={styles.kpiCard}>
@@ -251,27 +296,44 @@ export default function CotizacionesScreen() {
               <DataTable.Header>
                 <DataTable.Title style={styles.colNum}>No.</DataTable.Title>
                 <DataTable.Title style={styles.colFecha}>Fecha</DataTable.Title>
-                <DataTable.Title style={styles.colEstado}>Estado</DataTable.Title>
+                <DataTable.Title style={styles.colEstado}>
+                  Estado
+                </DataTable.Title>
                 <DataTable.Title style={styles.colTipo}>Tipo</DataTable.Title>
-                <DataTable.Title style={styles.colCliente}>Cliente</DataTable.Title>
-                <DataTable.Title style={styles.colOrigen}>Origen</DataTable.Title>
-                <DataTable.Title numeric style={styles.colTotal}>Total</DataTable.Title>
+                <DataTable.Title style={styles.colCliente}>
+                  Cliente
+                </DataTable.Title>
+                <DataTable.Title style={styles.colOrigen}>
+                  Origen
+                </DataTable.Title>
+                <DataTable.Title numeric style={styles.colTotal}>
+                  Total
+                </DataTable.Title>
               </DataTable.Header>
 
               {filtradas.map((c) => (
                 <DataTable.Row key={c.id}>
-                  <DataTable.Cell style={styles.colNum}>{c.numero}</DataTable.Cell>
+                  <DataTable.Cell style={styles.colNum}>
+                    {c.numero}
+                  </DataTable.Cell>
                   <DataTable.Cell style={styles.colFecha}>
                     {dayjs(c.fecha).format("DD-MM-YYYY")}
                   </DataTable.Cell>
-                  <DataTable.Cell style={styles.colEstado}>{badgeEstado(c.estado)}</DataTable.Cell>
-                  <DataTable.Cell style={styles.colTipo}>{c.tipo}</DataTable.Cell>
+                  <DataTable.Cell style={styles.colEstado}>
+                    {badgeEstado(c.estado)}
+                  </DataTable.Cell>
+                  <DataTable.Cell style={styles.colTipo}>
+                    {c.tipo}
+                  </DataTable.Cell>
                   <DataTable.Cell style={styles.colCliente} numberOfLines={1}>
                     {c.cliente}
                   </DataTable.Cell>
-                  <DataTable.Cell style={styles.colOrigen}>{c.origen}</DataTable.Cell>
+                  <DataTable.Cell style={styles.colOrigen}>
+                    {c.origen}
+                  </DataTable.Cell>
                   <DataTable.Cell numeric style={styles.colTotal}>
-                    {c.moneda === "CLP" ? "$" : "US$"} {c.total.toLocaleString("es-CL")}
+                    {c.moneda === "CLP" ? "$" : "US$"}{" "}
+                    {c.total.toLocaleString("es-CL")}
                   </DataTable.Cell>
                 </DataTable.Row>
               ))}

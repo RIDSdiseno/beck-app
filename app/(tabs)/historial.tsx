@@ -1,10 +1,13 @@
+import { clearSession } from "@/services/auth/session";
+import { router } from "expo-router";
 import React from "react";
 import { FlatList, StyleSheet, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Card, Text, Chip } from "react-native-paper";
+import { Card, Chip, Text } from "react-native-paper";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useHistorial } from "../../context/HistorialContext";
 
 const tipoColor = {
@@ -19,9 +22,13 @@ export default function HistorialScreen() {
   const insets = useSafeAreaInsets();
   const { movimientos } = useHistorial();
 
-  const handleLogout = () => {
-    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
   };
 
   return (
@@ -32,12 +39,16 @@ export default function HistorialScreen() {
       <FlatList
         ListHeaderComponent={
           <View style={styles.headerWrapper}>
-            <BrandHeader subtitle="Bitácora de acciones · BECK" onLogout={handleLogout} />
+            <BrandHeader
+              subtitle="Bitácora de acciones · BECK"
+              onLogout={handleLogout}
+            />
             <Text variant="titleLarge" style={styles.title}>
               Historial de acuerdos
             </Text>
             <Text style={styles.subtitle}>
-              Registro de movimientos recientes en la app: creación, edición, borrado, cotizaciones y reportes.
+              Registro de movimientos recientes en la app: creación, edición,
+              borrado, cotizaciones y reportes.
             </Text>
           </View>
         }
@@ -47,7 +58,9 @@ export default function HistorialScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Sin movimientos</Text>
-            <Text style={styles.itemMeta}>Aún no hay acciones registradas.</Text>
+            <Text style={styles.itemMeta}>
+              Aún no hay acciones registradas.
+            </Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -57,7 +70,10 @@ export default function HistorialScreen() {
                 <Text style={styles.itemTitle}>{item.titulo}</Text>
                 <Chip
                   compact
-                  style={[styles.chip, { backgroundColor: tipoColor[item.tipo] || "#0ea5e9" }]}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: tipoColor[item.tipo] || "#0ea5e9" },
+                  ]}
                   textStyle={styles.chipText}
                 >
                   {item.tipo}

@@ -1,11 +1,11 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { RegistrosProvider } from "../../context/RegistrosContext";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { MD3LightTheme, Provider as PaperProvider } from "react-native-paper";
 import { HistorialProvider } from "../../context/HistorialContext";
+import { RegistrosProvider } from "../../context/RegistrosContext";
 
 const theme = {
   ...MD3LightTheme,
@@ -47,6 +47,21 @@ export default function TabLayout() {
                   ),
                 }}
               />
+
+              <Tabs.Screen
+                name="mis-obras"
+                options={{
+                  title: "Mis Obras",
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="office-building"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+
               <Tabs.Screen
                 name="registros"
                 options={{
@@ -60,6 +75,7 @@ export default function TabLayout() {
                   ),
                 }}
               />
+
               <Tabs.Screen
                 name="cotizaciones"
                 options={{
@@ -73,6 +89,7 @@ export default function TabLayout() {
                   ),
                 }}
               />
+
               <Tabs.Screen
                 name="reportes"
                 options={{
@@ -86,6 +103,7 @@ export default function TabLayout() {
                   ),
                 }}
               />
+
               <Tabs.Screen
                 name="historial"
                 options={{

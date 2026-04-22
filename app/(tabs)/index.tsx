@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Card, Text, Chip, SegmentedButtons } from "react-native-paper";
+import { clearSession } from "@/services/auth/session";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MotiView } from "moti";
-
-import { useRegistros } from "../../context/RegistrosContext";
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Card, Chip, SegmentedButtons, Text } from "react-native-paper";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { useRegistros } from "../../context/RegistrosContext";
 
 export default function DashboardScreen() {
   const { registros } = useRegistros();
@@ -28,9 +30,16 @@ export default function DashboardScreen() {
   }, [registros]);
 
   const equipos = useMemo(() => {
-    const mapa = new Map<string, { piso?: string; sellos: number; factor: number }>();
+    const mapa = new Map<
+      string,
+      { piso?: string; sellos: number; factor: number }
+    >();
     registros.forEach((r) => {
-      const target = mapa.get(r.equipo) || { piso: r.piso, sellos: 0, factor: 1 };
+      const target = mapa.get(r.equipo) || {
+        piso: r.piso,
+        sellos: 0,
+        factor: 1,
+      };
       target.sellos += 1;
       target.piso = target.piso || r.piso;
       target.factor = 1 + (target.sellos % 4) * 0.06; // mock factor
@@ -51,9 +60,13 @@ export default function DashboardScreen() {
     frentes: equipos.length,
   };
 
-  const handleLogout = () => {
-    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
   };
 
   const fadeIn = (delay = 0) => ({
@@ -101,7 +114,10 @@ export default function DashboardScreen() {
     >
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
         <MotiView {...fadeIn(0)}>
-          <BrandHeader subtitle="Obra demo - CRM BECK" onLogout={handleLogout} />
+          <BrandHeader
+            subtitle="Obra demo - CRM BECK"
+            onLogout={handleLogout}
+          />
         </MotiView>
 
         <MotiView {...fadeIn(60)}>
@@ -109,7 +125,8 @@ export default function DashboardScreen() {
             Centro de mando de la obra
           </Text>
           <Text style={styles.subtitle}>
-            Controla el avance de sellos y juntas por rango de tiempo, piso y equipo.
+            Controla el avance de sellos y juntas por rango de tiempo, piso y
+            equipo.
           </Text>
         </MotiView>
 
@@ -133,7 +150,9 @@ export default function DashboardScreen() {
               <Card style={[styles.kpiCard, styles.cardShadow]}>
                 <Card.Content>
                   <Text style={styles.kpiLabel}>{item.label}</Text>
-                  <Text style={[styles.kpiValue, { color: item.color }]}>{item.value}</Text>
+                  <Text style={[styles.kpiValue, { color: item.color }]}>
+                    {item.value}
+                  </Text>
                   <Text style={styles.kpiHelper}>{item.helper}</Text>
                   <View style={styles.progressBar}>
                     <View
@@ -155,7 +174,10 @@ export default function DashboardScreen() {
             <Card.Content>
               <ScrollView horizontal showsHorizontalScrollIndicator>
                 {pisos.map((p) => (
-                  <Card key={p.label} style={[styles.pisoCard, styles.cardShadow]}>
+                  <Card
+                    key={p.label}
+                    style={[styles.pisoCard, styles.cardShadow]}
+                  >
                     <Card.Content>
                       <Text variant="labelSmall" style={{ color: "#f97316" }}>
                         {p.label}
@@ -165,7 +187,10 @@ export default function DashboardScreen() {
                         <View
                           style={[
                             styles.progressFill,
-                            { width: `${p.progress}%`, backgroundColor: "#f97316" },
+                            {
+                              width: `${p.progress}%`,
+                              backgroundColor: "#f97316",
+                            },
                           ]}
                         />
                       </View>

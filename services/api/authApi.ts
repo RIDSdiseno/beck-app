@@ -14,7 +14,7 @@ type MicrosoftLoginPayload = {
   redirectUri: string;
 };
 
-const API_BASE_URL = "http://192.168.10.178:3001";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
 export async function loginWithMicrosoft(
   payload: MicrosoftLoginPayload,

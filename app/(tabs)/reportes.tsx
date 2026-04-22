@@ -1,18 +1,21 @@
+import { clearSession } from "@/services/auth/session";
+import { router } from "expo-router";
 import React, { useMemo } from "react";
 import {
-  ScrollView,
-  View,
-  StyleSheet,
   Dimensions,
   FlatList,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Card, Text, DataTable, Chip } from "react-native-paper";
 import { BarChart, PieChart } from "react-native-chart-kit";
-import { useRegistros } from "../../context/RegistrosContext";
+import { Card, Chip, DataTable, Text } from "react-native-paper";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRegistros } from "../../context/RegistrosContext";
 
 type TramoEspuma = {
   id: string;
@@ -65,12 +68,11 @@ export default function ReportesScreen() {
 
     const agrupadoPorSellador: Record<string, number> = {};
     registros.forEach((r) => {
-      agrupadoPorSellador[r.equipo] =
-        (agrupadoPorSellador[r.equipo] || 0) + 1;
+      agrupadoPorSellador[r.equipo] = (agrupadoPorSellador[r.equipo] || 0) + 1;
     });
 
     const chartSelladores = Object.entries(agrupadoPorSellador).map(
-      ([name, value]) => ({ name, value })
+      ([name, value]) => ({ name, value }),
     );
 
     const agrupadoPorPiso: Record<string, number> = {};
@@ -85,11 +87,12 @@ export default function ReportesScreen() {
         color: ["#22c55e", "#3b82f6", "#f97316", "#a855f7"][idx % 4],
         legendFontColor: "#1f2937",
         legendFontSize: 12,
-      })
+      }),
     );
 
     const metrosEspuma = TRAMOS_ESPUMA.reduce((acc, t) => acc + t.metros, 0);
-    const cuadrillasEspuma = new Set(TRAMOS_ESPUMA.map((t) => t.cuadrilla)).size;
+    const cuadrillasEspuma = new Set(TRAMOS_ESPUMA.map((t) => t.cuadrilla))
+      .size;
 
     return {
       totalSellos,
@@ -104,9 +107,13 @@ export default function ReportesScreen() {
     };
   }, [registros]);
 
-  const handleLogout = () => {
-    AsyncStorage.removeItem("beckcrm_user_email").catch(() => {});
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
   };
 
   return (
@@ -115,12 +122,16 @@ export default function ReportesScreen() {
       edges={["top", "left", "right"]}
     >
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
-        <BrandHeader subtitle="Analítica de obra · BECK" onLogout={handleLogout} />
+        <BrandHeader
+          subtitle="Analítica de obra · BECK"
+          onLogout={handleLogout}
+        />
         <Text variant="titleLarge" style={styles.title}>
           Reportes de obra · Sellos y junta lineal ESPUMA
         </Text>
         <Text style={styles.subtitle}>
-          KPIs rápidos, barras y distribución por piso; incluye cubicación de junta lineal espuma.
+          KPIs rápidos, barras y distribución por piso; incluye cubicación de
+          junta lineal espuma.
         </Text>
 
         {/* KPIs */}
@@ -165,7 +176,9 @@ export default function ReportesScreen() {
               <BarChart
                 data={{
                   labels: stats.chartSelladores.map((c) => c.name),
-                  datasets: [{ data: stats.chartSelladores.map((c) => c.value) }],
+                  datasets: [
+                    { data: stats.chartSelladores.map((c) => c.value) },
+                  ],
                 }}
                 width={screenWidth}
                 height={220}
@@ -209,7 +222,9 @@ export default function ReportesScreen() {
             <View style={styles.kpiRow}>
               <View style={styles.kpiMini}>
                 <Text style={styles.kpiLabel}>Metros lineales</Text>
-                <Text style={styles.kpiValue}>{stats.metrosEspuma.toFixed(1)} m</Text>
+                <Text style={styles.kpiValue}>
+                  {stats.metrosEspuma.toFixed(1)} m
+                </Text>
               </View>
               <View style={styles.kpiMini}>
                 <Text style={styles.kpiLabel}>Tramos</Text>
@@ -237,7 +252,9 @@ export default function ReportesScreen() {
               />
             </View>
 
-            <Text style={[styles.helperText, { marginTop: 12, marginBottom: 4 }]}>
+            <Text
+              style={[styles.helperText, { marginTop: 12, marginBottom: 4 }]}
+            >
               Tramos registrados
             </Text>
             <FlatList
@@ -256,7 +273,9 @@ export default function ReportesScreen() {
                     <Text style={styles.tramoMeta}>
                       {item.metros} m · {item.cuadrilla}
                     </Text>
-                    <Text style={styles.tramoMetaSmall}>Fecha: {item.fecha}</Text>
+                    <Text style={styles.tramoMetaSmall}>
+                      Fecha: {item.fecha}
+                    </Text>
                   </Card.Content>
                 </Card>
               )}
@@ -270,17 +289,36 @@ export default function ReportesScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator>
             <DataTable style={{ minWidth: 680 }}>
               <DataTable.Header>
-                <DataTable.Title style={styles.colCodigo}>Codigo</DataTable.Title>
-                <DataTable.Title style={styles.colDescripcion}>Descripcion</DataTable.Title>
-                <DataTable.Title numeric style={styles.colSellos}>Sellos</DataTable.Title>
-                <DataTable.Title numeric style={styles.colPond}>Ponderado</DataTable.Title>
+                <DataTable.Title style={styles.colCodigo}>
+                  Codigo
+                </DataTable.Title>
+                <DataTable.Title style={styles.colDescripcion}>
+                  Descripcion
+                </DataTable.Title>
+                <DataTable.Title numeric style={styles.colSellos}>
+                  Sellos
+                </DataTable.Title>
+                <DataTable.Title numeric style={styles.colPond}>
+                  Ponderado
+                </DataTable.Title>
               </DataTable.Header>
               {registros.map((r) => (
                 <DataTable.Row key={`${r.id}-beck`}>
-                  <DataTable.Cell style={styles.colCodigo}>{`BECK-${r.id.toString().padStart(3, "0")}`}</DataTable.Cell>
-                  <DataTable.Cell style={styles.colDescripcion} numberOfLines={1}>{r.obra}</DataTable.Cell>
-                  <DataTable.Cell numeric style={styles.colSellos}>1</DataTable.Cell>
-                  <DataTable.Cell numeric style={styles.colPond}>1.0</DataTable.Cell>
+                  <DataTable.Cell
+                    style={styles.colCodigo}
+                  >{`BECK-${r.id.toString().padStart(3, "0")}`}</DataTable.Cell>
+                  <DataTable.Cell
+                    style={styles.colDescripcion}
+                    numberOfLines={1}
+                  >
+                    {r.obra}
+                  </DataTable.Cell>
+                  <DataTable.Cell numeric style={styles.colSellos}>
+                    1
+                  </DataTable.Cell>
+                  <DataTable.Cell numeric style={styles.colPond}>
+                    1.0
+                  </DataTable.Cell>
                 </DataTable.Row>
               ))}
             </DataTable>
@@ -292,17 +330,36 @@ export default function ReportesScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator>
             <DataTable style={{ minWidth: 680 }}>
               <DataTable.Header>
-                <DataTable.Title style={styles.colCodigo}>Codigo</DataTable.Title>
-                <DataTable.Title style={styles.colDescripcion}>Descripcion</DataTable.Title>
-                <DataTable.Title numeric style={styles.colSellos}>Sellos</DataTable.Title>
-                <DataTable.Title numeric style={styles.colPond}>Ponderado</DataTable.Title>
+                <DataTable.Title style={styles.colCodigo}>
+                  Codigo
+                </DataTable.Title>
+                <DataTable.Title style={styles.colDescripcion}>
+                  Descripcion
+                </DataTable.Title>
+                <DataTable.Title numeric style={styles.colSellos}>
+                  Sellos
+                </DataTable.Title>
+                <DataTable.Title numeric style={styles.colPond}>
+                  Ponderado
+                </DataTable.Title>
               </DataTable.Header>
               {registros.map((r) => (
                 <DataTable.Row key={`${r.id}-sacyr`}>
-                  <DataTable.Cell style={styles.colCodigo}>{`SACYR-${r.id.toString().padStart(3, "0")}`}</DataTable.Cell>
-                  <DataTable.Cell style={styles.colDescripcion} numberOfLines={1}>{r.obra}</DataTable.Cell>
-                  <DataTable.Cell numeric style={styles.colSellos}>1</DataTable.Cell>
-                  <DataTable.Cell numeric style={styles.colPond}>1.0</DataTable.Cell>
+                  <DataTable.Cell
+                    style={styles.colCodigo}
+                  >{`SACYR-${r.id.toString().padStart(3, "0")}`}</DataTable.Cell>
+                  <DataTable.Cell
+                    style={styles.colDescripcion}
+                    numberOfLines={1}
+                  >
+                    {r.obra}
+                  </DataTable.Cell>
+                  <DataTable.Cell numeric style={styles.colSellos}>
+                    1
+                  </DataTable.Cell>
+                  <DataTable.Cell numeric style={styles.colPond}>
+                    1.0
+                  </DataTable.Cell>
                 </DataTable.Row>
               ))}
             </DataTable>
