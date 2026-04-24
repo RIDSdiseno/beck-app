@@ -1,35 +1,35 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getSession } from "@/services/auth/session";
 
-export type Obra = {
+export type ObraApi = {
   id: string;
   nombre: string;
-  direccion: string;
-  estado: "PLANIFICADA" | "EN_EJECUCION" | "PAUSADA" | "FINALIZADA";
-  supervisor: string;
+  codigo: string;
+  descripcion?: string | null;
+  estado?: string | null;
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
-export async function getMisObras(): Promise<Obra[]> {
-  const token = await AsyncStorage.getItem("beck_token");
+export async function getMisObras(): Promise<ObraApi[]> {
+  const session = await getSession();
 
-  if (!token) {
+  if (!session.token) {
     throw new Error("No hay sesión activa");
   }
 
   const response = await fetch(`${API_BASE_URL}/api/obras/mis-obras`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${session.token}`,
       "Content-Type": "application/json",
     },
   });
 
-  const data = await response.json();
+  const result = await response.json();
 
-  if (!response.ok) {
-    throw new Error(data?.message || "No se pudieron obtener las obras");
+  if (!response.ok || !result.success) {
+    throw new Error(result?.error || "No se pudieron obtener las obras");
   }
 
-  return data;
+  return result.data as ObraApi[];
 }

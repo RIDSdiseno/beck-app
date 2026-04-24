@@ -1,18 +1,15 @@
+import { loginWithMicrosoftIdToken } from "@/services/api/authApi";
+import {
+  getMicrosoftClientId,
+  microsoftDiscovery,
+} from "@/services/auth/microsoft";
+import { saveSession } from "@/services/auth/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AuthSession from "expo-auth-session";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
 import { Button, Text } from "react-native-paper";
-
-const tenantId = process.env.EXPO_PUBLIC_AZURE_TENANT_ID!;
-const clientId = process.env.EXPO_PUBLIC_AZURE_CLIENT_ID!;
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
-
-const discovery = {
-  authorizationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
-  tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-};
 
 type CallbackStep =
   | "Preparando autenticación..."
@@ -60,14 +57,14 @@ export default function AuthCallbackScreen() {
 
         const tokenResult = await AuthSession.exchangeCodeAsync(
           {
-            clientId,
+            clientId: getMicrosoftClientId(),
             code,
             redirectUri,
             extraParams: {
               code_verifier: codeVerifier,
             },
           },
-          discovery,
+          microsoftDiscovery,
         );
 
         const idToken = tokenResult.idToken;
@@ -78,36 +75,18 @@ export default function AuthCallbackScreen() {
 
         setStep("Validando acceso con Beck...");
 
-        const apiResponse = await fetch(
-          `${API_BASE_URL}/api/mobile/auth/microsoft`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ idToken }),
-          },
-        );
-
-        const data = await apiResponse.json();
-
-        if (!apiResponse.ok) {
-          throw new Error(data?.message || "No se pudo iniciar sesión.");
-        }
+        const data = await loginWithMicrosoftIdToken(idToken);
 
         setStep("Cargando tu sesión...");
 
-        await AsyncStorage.multiSet([
-          ["beck_token", data.token],
-          ["beck_user", JSON.stringify(data.user)],
-        ]);
+        await saveSession(data.token, data.user);
 
         await AsyncStorage.multiRemove([
           "beck_code_verifier",
           "beck_redirect_uri",
         ]);
 
-        router.replace("/");
+        router.replace("/mis-obras");
       } catch (err: any) {
         console.log("AUTH CALLBACK ERROR", err);
 
@@ -123,7 +102,8 @@ export default function AuthCallbackScreen() {
     handleAuth();
   }, [params]);
 
-  const volverAlLogin = () => {
+  const volverAlLogin = async () => {
+    await AsyncStorage.multiRemove(["beck_code_verifier", "beck_redirect_uri"]);
     router.replace("/login");
   };
 

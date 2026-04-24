@@ -1,11 +1,17 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { MD3LightTheme, Provider as PaperProvider } from "react-native-paper";
+import {
+  ActivityIndicator,
+  MD3LightTheme,
+  Provider as PaperProvider,
+  Text,
+} from "react-native-paper";
 import { HistorialProvider } from "../../context/HistorialContext";
 import { RegistrosProvider } from "../../context/RegistrosContext";
+import { getSession } from "../../services/auth/session";
 
 const theme = {
   ...MD3LightTheme,
@@ -22,6 +28,37 @@ const theme = {
 };
 
 export default function TabLayout() {
+  const [loading, setLoading] = React.useState(true);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const session = await getSession();
+        setIsAuthenticated(session.isAuthenticated);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  if (loading) {
+    return (
+      <PaperProvider theme={theme}>
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#f97316" />
+          <Text style={styles.loaderText}>Cargando sesión...</Text>
+        </View>
+      </PaperProvider>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/login" />;
+  }
+
   return (
     <PaperProvider theme={theme}>
       <HistorialProvider>
@@ -47,7 +84,6 @@ export default function TabLayout() {
                   ),
                 }}
               />
-
               <Tabs.Screen
                 name="mis-obras"
                 options={{
@@ -61,7 +97,6 @@ export default function TabLayout() {
                   ),
                 }}
               />
-
               <Tabs.Screen
                 name="registros"
                 options={{
@@ -75,7 +110,6 @@ export default function TabLayout() {
                   ),
                 }}
               />
-
               <Tabs.Screen
                 name="cotizaciones"
                 options={{
@@ -89,7 +123,6 @@ export default function TabLayout() {
                   ),
                 }}
               />
-
               <Tabs.Screen
                 name="reportes"
                 options={{
@@ -103,7 +136,6 @@ export default function TabLayout() {
                   ),
                 }}
               />
-
               <Tabs.Screen
                 name="historial"
                 options={{
@@ -129,5 +161,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f7fb",
+  },
+  loaderContainer: {
+    flex: 1,
+    backgroundColor: "#0b0b0f",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loaderText: {
+    marginTop: 12,
+    color: "#ffffff",
+    fontWeight: "600",
   },
 });

@@ -8,23 +8,17 @@ export type LoginResponse = {
   };
 };
 
-type MicrosoftLoginPayload = {
-  code: string;
-  codeVerifier: string;
-  redirectUri: string;
-};
-
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
-export async function loginWithMicrosoft(
-  payload: MicrosoftLoginPayload,
+export async function loginWithMicrosoftIdToken(
+  idToken: string,
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/mobile/auth/microsoft`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ idToken }),
   });
 
   const data = await response.json();

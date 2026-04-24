@@ -1,128 +1,194 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getMisObras, ObraApi } from "@/services/api/obrasApi";
+import { saveSelectedObra } from "@/services/auth/session";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Chip,
-    Text,
+  ActivityIndicator,
+  Button,
+  Card,
+  Chip,
+  Text,
 } from "react-native-paper";
-import {
-    SafeAreaView,
-    useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import { getMisObras, Obra } from "../../services/api/obrasApi";
 
-
-function colorEstado(estado: Obra["estado"]) {
+function getEstadoLabel(estado?: string | null) {
   switch (estado) {
-    case "EN_EJECUCION":
+    case "activa":
+      return "Activa";
+    case "pausada":
+      return "Pausada";
+    case "finalizada":
+      return "Finalizada";
+    default:
+      return "Sin estado";
+  }
+}
+
+function getEstadoBg(estado?: string | null) {
+  switch (estado) {
+    case "activa":
       return "#16a34a";
-    case "PLANIFICADA":
-      return "#2563eb";
-    case "PAUSADA":
+    case "pausada":
       return "#f59e0b";
-    case "FINALIZADA":
+    case "finalizada":
       return "#64748b";
     default:
-      return "#0f172a";
+      return "#475569";
   }
 }
 
 export default function MisObrasScreen() {
-  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
-  const [obras, setObras] = useState<Obra[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [obras, setObras] = useState<ObraApi[]>([]);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const data = await getMisObras();
-        setObras(data);
-      } catch (err: any) {
-        setError(err?.message || "No se pudieron cargar las obras");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
+  const loadObras = useCallback(async () => {
+    try {
+      setError("");
+      const data = await getMisObras();
+      setObras(data);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron cargar las obras");
+    }
   }, []);
 
-  const seleccionarObra = async (obra: Obra) => {
-    await AsyncStorage.setItem("beck_obra_seleccionada", JSON.stringify(obra));
-    router.push("/(tabs)");
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await loadObras();
+      setLoading(false);
+    };
+
+    init();
+  }, [loadObras]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadObras();
+    setRefreshing(false);
   };
 
-  return (
-    <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 12 }]}
-      edges={["top", "left", "right"]}
-    >
-      <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.title}>
-          Mis Obras
-        </Text>
-        <Text style={styles.subtitle}>
-          Selecciona la obra asignada para continuar con tus registros.
+  const onSelectObra = async (obra: ObraApi) => {
+    try {
+      setSelectingId(obra.id);
+
+      await saveSelectedObra({
+        id: obra.id,
+        nombre: obra.nombre,
+        codigo: obra.codigo,
+        descripcion: obra.descripcion,
+        estado: obra.estado,
+      });
+
+      router.replace("/registros");
+    } catch (err) {
+      console.log("SELECT OBRA ERROR", err);
+    } finally {
+      setSelectingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator size="large" color="#f97316" />
+        <Text style={styles.helper}>Cargando tus obras...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerBox}>
+        <Text style={styles.errorTitle}>No se pudieron cargar las obras</Text>
+        <Text style={styles.errorText}>{error}</Text>
+
+        <Button
+          mode="contained"
+          onPress={loadObras}
+          style={styles.retryButton}
+          contentStyle={styles.retryButtonContent}
+          labelStyle={styles.retryButtonLabel}
+        >
+          Reintentar
+        </Button>
+      </View>
+    );
+  }
+
+  if (!obras.length) {
+    return (
+      <View style={styles.centerBox}>
+        <Text style={styles.emptyTitle}>No tienes obras asignadas</Text>
+        <Text style={styles.helper}>
+          Cuando el administrador te asigne una obra, aparecerá aquí.
         </Text>
       </View>
+    );
+  }
 
-      {loading ? (
-        <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color="#f97316" />
-          <Text style={styles.loadingText}>Cargando obras...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.centerBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={obras}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <Card style={styles.card}>
-              <Card.Content>
-                <View style={styles.rowTop}>
-                  <Text style={styles.cardTitle}>{item.nombre}</Text>
-                  <Chip
-                    style={[
-                      styles.chip,
-                      { backgroundColor: colorEstado(item.estado) },
-                    ]}
-                    textStyle={styles.chipText}
-                  >
-                    {item.estado.replace("_", " ")}
-                  </Chip>
-                </View>
+  return (
+    <View style={styles.container}>
+      <Text variant="headlineSmall" style={styles.title}>
+        Mis Obras
+      </Text>
 
-                <Text style={styles.cardText}>{item.direccion}</Text>
-                <Text style={styles.cardText}>
-                  Supervisor: {item.supervisor}
-                </Text>
+      <Text style={styles.subtitle}>
+        Selecciona la obra con la que vas a trabajar hoy.
+      </Text>
 
-                <Button
-                  mode="contained"
-                  onPress={() => seleccionarObra(item)}
-                  style={styles.button}
-                  contentStyle={styles.buttonContent}
-                  labelStyle={styles.buttonLabel}
+      <FlatList
+        data={obras}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        renderItem={({ item }) => (
+          <Card style={styles.card}>
+            <Card.Content>
+              <View style={styles.topRow}>
+                <Text style={styles.cardTitle}>{item.nombre}</Text>
+
+                <Chip
+                  style={[
+                    styles.chip,
+                    { backgroundColor: getEstadoBg(item.estado) },
+                  ]}
+                  textStyle={styles.chipText}
                 >
-                  Seleccionar obra
-                </Button>
-              </Card.Content>
-            </Card>
-          )}
-        />
-      )}
-    </SafeAreaView>
+                  {getEstadoLabel(item.estado)}
+                </Chip>
+              </View>
+
+              <Text style={styles.cardLabel}>Código</Text>
+              <Text style={styles.cardValue}>{item.codigo}</Text>
+
+              <Text style={styles.cardLabel}>Descripción</Text>
+              <Text style={styles.cardValue}>
+                {item.descripcion || "Sin descripción"}
+              </Text>
+
+              <Button
+                mode="contained"
+                onPress={() => onSelectObra(item)}
+                loading={selectingId === item.id}
+                disabled={selectingId === item.id}
+                style={styles.selectButton}
+                contentStyle={styles.selectButtonContent}
+                labelStyle={styles.selectButtonLabel}
+              >
+                {selectingId === item.id
+                  ? "Seleccionando..."
+                  : "Usar esta obra"}
+              </Button>
+            </Card.Content>
+          </Card>
+        )}
+      />
+    </View>
   );
 }
 
@@ -131,9 +197,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f7fb",
     paddingHorizontal: 16,
-  },
-  header: {
-    marginBottom: 16,
+    paddingTop: 16,
   },
   title: {
     color: "#0f172a",
@@ -141,6 +205,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 6,
+    marginBottom: 16,
     color: "#475569",
     fontSize: 14,
     lineHeight: 20,
@@ -155,12 +220,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  rowTop: {
+  topRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   cardTitle: {
     flex: 1,
@@ -168,43 +233,79 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
   },
-  cardText: {
-    color: "#475569",
-    fontSize: 14,
-    marginBottom: 6,
-  },
   chip: {
     borderRadius: 14,
   },
   chipText: {
     color: "#ffffff",
-    fontWeight: "700",
     fontSize: 12,
+    fontWeight: "700",
   },
-  button: {
-    marginTop: 12,
+  cardLabel: {
+    marginTop: 4,
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  cardValue: {
+    marginTop: 2,
+    color: "#334155",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  selectButton: {
+    marginTop: 16,
     backgroundColor: "#f97316",
     borderRadius: 14,
   },
-  buttonContent: {
+  selectButtonContent: {
     minHeight: 46,
   },
-  buttonLabel: {
+  selectButtonLabel: {
+    fontSize: 14,
     fontWeight: "700",
   },
   centerBox: {
     flex: 1,
+    backgroundColor: "#f5f7fb",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
-  loadingText: {
+  helper: {
     marginTop: 12,
     color: "#475569",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  emptyTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  errorTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
   },
   errorText: {
+    marginTop: 10,
     color: "#dc2626",
     textAlign: "center",
-    fontWeight: "600",
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 18,
+    backgroundColor: "#f97316",
+    borderRadius: 14,
+  },
+  retryButtonContent: {
+    minHeight: 46,
+  },
+  retryButtonLabel: {
+    fontWeight: "700",
   },
 });

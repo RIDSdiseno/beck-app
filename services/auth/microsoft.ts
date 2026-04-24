@@ -18,7 +18,19 @@ export function getMicrosoftRedirectUri() {
   });
 }
 
-export const microsoftAuthConfig = {
-  clientId,
-  scopes: ["openid", "profile", "email", "offline_access"],
-};
+export function getMicrosoftAuthRequestConfig(redirectUri: string) {
+  return {
+    clientId,
+    scopes: ["openid", "profile", "email", "offline_access"],
+    redirectUri,
+    responseType: AuthSession.ResponseType.Code,
+    usePKCE: true,
+    extraParams: {
+      prompt: "select_account",
+    },
+  };
+}
+
+export function getMicrosoftClientId() {
+  return clientId;
+}

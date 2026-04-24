@@ -1,6 +1,10 @@
+import {
+  getMicrosoftAuthRequestConfig,
+  getMicrosoftRedirectUri,
+  microsoftDiscovery,
+} from "@/services/auth/microsoft";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AuthSession from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
 import React, { useMemo, useState } from "react";
 import { Image, ImageBackground, StyleSheet, View } from "react-native";
 import { Button, Card, Text } from "react-native-paper";
@@ -9,42 +13,16 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-WebBrowser.maybeCompleteAuthSession();
-
-const tenantId = process.env.EXPO_PUBLIC_AZURE_TENANT_ID!;
-const clientId = process.env.EXPO_PUBLIC_AZURE_CLIENT_ID!;
-
-const discovery = {
-  authorizationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
-  tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-};
-
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const redirectUri = useMemo(
-    () =>
-      AuthSession.makeRedirectUri({
-        scheme: "beckcrmapp",
-        path: "auth",
-      }),
-    [],
-  );
+  const redirectUri = useMemo(() => getMicrosoftRedirectUri(), []);
 
   const [request, , promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId,
-      scopes: ["openid", "profile", "email", "offline_access"],
-      redirectUri,
-      responseType: AuthSession.ResponseType.Code,
-      usePKCE: true,
-      extraParams: {
-        prompt: "select_account",
-      },
-    },
-    discovery,
+    getMicrosoftAuthRequestConfig(redirectUri),
+    microsoftDiscovery,
   );
 
   const onMicrosoftLogin = async () => {
@@ -64,7 +42,11 @@ export default function LoginScreen() {
         ["beck_redirect_uri", redirectUri],
       ]);
 
-      await promptAsync();
+      const result = await promptAsync();
+
+      if (result.type !== "success") {
+        setIsLoading(false);
+      }
     } catch (err: any) {
       console.log("PROMPT MICROSOFT ERROR", err);
       setError(err?.message || "No se pudo abrir el login de Microsoft.");
@@ -128,9 +110,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
+  background: { flex: 1 },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.48)",
