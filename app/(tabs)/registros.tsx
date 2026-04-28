@@ -2,12 +2,17 @@ import {
   createRegistro,
   uploadRegistroFotos,
 } from "@/services/api/registrosApi";
-import { getSelectedObra } from "@/services/auth/session";
+import { clearSession, getSelectedObra } from "@/services/auth/session";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, Text, TextInput } from "react-native-paper";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { BrandHeader } from "../../components/BrandHeader";
 
 type ObraSeleccionada = {
   id: string;
@@ -24,6 +29,7 @@ type FotoLocal = {
 };
 
 export default function RegistrosScreen() {
+  const insets = useSafeAreaInsets();
   const [obra, setObra] = useState<ObraSeleccionada | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -203,217 +209,239 @@ export default function RegistrosScreen() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text variant="headlineSmall" style={styles.title}>
-        Registros
-      </Text>
+    <SafeAreaView
+      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      edges={["top", "left", "right"]}
+    >
+      <ScrollView contentContainerStyle={styles.content}>
+        <BrandHeader
+          subtitle="Registro de terreno · BECK"
+          onLogout={handleLogout}
+        />
+        <Text variant="titleLarge" style={styles.title}>
+          Registros
+        </Text>
+        <Text style={styles.subtitle}>
+          Carga avances, fotos y datos de instalación por obra seleccionada.
+        </Text>
 
-      {!obra ? (
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.emptyTitle}>No hay obra seleccionada</Text>
-            <Text style={styles.emptyText}>
-              Primero debes seleccionar una obra antes de registrar información.
-            </Text>
-
-            <Button
-              mode="contained"
-              onPress={() => router.replace("/mis-obras")}
-              style={styles.button}
-              contentStyle={styles.buttonContent}
-              labelStyle={styles.buttonLabel}
-            >
-              Ir a Mis Obras
-            </Button>
-          </Card.Content>
-        </Card>
-      ) : (
-        <>
+        {!obra ? (
           <Card style={styles.card}>
             <Card.Content>
-              <View style={styles.cardHeaderRow}>
-                <View style={styles.cardHeaderInfo}>
-                  <Text style={styles.label}>Obra seleccionada</Text>
-                  <Text style={styles.value}>{obra.nombre}</Text>
-
-                  <Text style={styles.label}>Código</Text>
-                  <Text style={styles.value}>{obra.codigo}</Text>
-
-                  <Text style={styles.label}>Estado</Text>
-                  <Text style={styles.value}>
-                    {obra.estado || "Sin estado"}
-                  </Text>
-                </View>
-
-                <Button
-                  mode="outlined"
-                  onPress={() => router.replace("/mis-obras")}
-                  style={styles.changeButton}
-                >
-                  Cambiar obra
-                </Button>
-              </View>
-            </Card.Content>
-          </Card>
-
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text style={styles.formTitle}>Nuevo registro de terreno</Text>
-
-              <TextInput
-                label="Fecha (YYYY-MM-DD)"
-                value={fecha}
-                onChangeText={setFecha}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Descripción material"
-                value={descripcionMaterial}
-                onChangeText={setDescripcionMaterial}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Módulo"
-                value={modulo}
-                onChangeText={setModulo}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Piso"
-                value={piso}
-                onChangeText={setPiso}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Eje numérico"
-                value={ejeNumerico}
-                onChangeText={setEjeNumerico}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Eje alfabético"
-                value={ejeAlfabetico}
-                onChangeText={setEjeAlfabetico}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Número de sello"
-                value={numeroSello}
-                onChangeText={setNumeroSello}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Cantidad de sellos"
-                value={cantidadSellos}
-                onChangeText={setCantidadSellos}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Nombre del sellador"
-                value={nombreSellador}
-                onChangeText={setNombreSellador}
-                mode="outlined"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Holgura"
-                value={holgura}
-                onChangeText={setHolgura}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Accesibilidad"
-                value={accesibilidad}
-                onChangeText={setAccesibilidad}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-
-              <TextInput
-                label="Observaciones"
-                value={observaciones}
-                onChangeText={setObservaciones}
-                mode="outlined"
-                multiline
-                numberOfLines={4}
-                style={styles.input}
-              />
-
-              <Text style={styles.photosTitle}>Fotografías</Text>
-
-              <View style={styles.photoActions}>
-                <Button mode="outlined" onPress={pickFromLibrary}>
-                  Elegir de galería
-                </Button>
-                <Button mode="outlined" onPress={takePhoto}>
-                  Tomar foto
-                </Button>
-              </View>
-
-              <View style={styles.photosGrid}>
-                {fotos.map((foto, index) => (
-                  <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
-                    <Image
-                      source={{ uri: foto.uri }}
-                      style={styles.photoPreview}
-                    />
-                    <Button
-                      mode="text"
-                      onPress={() => removeFoto(index)}
-                      compact
-                      textColor="#dc2626"
-                    >
-                      Quitar
-                    </Button>
-                  </View>
-                ))}
-              </View>
-
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-              {success ? (
-                <Text style={styles.successText}>{success}</Text>
-              ) : null}
+              <Text style={styles.emptyTitle}>No hay obra seleccionada</Text>
+              <Text style={styles.emptyText}>
+                Primero debes seleccionar una obra antes de registrar
+                información.
+              </Text>
 
               <Button
                 mode="contained"
-                onPress={onSubmit}
-                loading={saving}
-                disabled={saving}
+                onPress={() => router.replace("/mis-obras")}
                 style={styles.button}
                 contentStyle={styles.buttonContent}
                 labelStyle={styles.buttonLabel}
               >
-                {saving ? "Enviando..." : "Guardar registro y fotos"}
+                Ir a Mis Obras
               </Button>
             </Card.Content>
           </Card>
-        </>
-      )}
-    </ScrollView>
+        ) : (
+          <>
+            <Card style={styles.card}>
+              <Card.Content>
+                <View style={styles.cardHeaderRow}>
+                  <View style={styles.cardHeaderInfo}>
+                    <Text style={styles.label}>Obra seleccionada</Text>
+                    <Text style={styles.value}>{obra.nombre}</Text>
+
+                    <Text style={styles.label}>Código</Text>
+                    <Text style={styles.value}>{obra.codigo}</Text>
+
+                    <Text style={styles.label}>Estado</Text>
+                    <Text style={styles.value}>
+                      {obra.estado || "Sin estado"}
+                    </Text>
+                  </View>
+
+                  <Button
+                    mode="outlined"
+                    onPress={() => router.replace("/mis-obras")}
+                    style={styles.changeButton}
+                  >
+                    Cambiar obra
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text style={styles.formTitle}>Nuevo registro de terreno</Text>
+
+                <TextInput
+                  label="Fecha (YYYY-MM-DD)"
+                  value={fecha}
+                  onChangeText={setFecha}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Descripción material"
+                  value={descripcionMaterial}
+                  onChangeText={setDescripcionMaterial}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Módulo"
+                  value={modulo}
+                  onChangeText={setModulo}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Piso"
+                  value={piso}
+                  onChangeText={setPiso}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Eje numérico"
+                  value={ejeNumerico}
+                  onChangeText={setEjeNumerico}
+                  mode="outlined"
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Eje alfabético"
+                  value={ejeAlfabetico}
+                  onChangeText={setEjeAlfabetico}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Número de sello"
+                  value={numeroSello}
+                  onChangeText={setNumeroSello}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Cantidad de sellos"
+                  value={cantidadSellos}
+                  onChangeText={setCantidadSellos}
+                  mode="outlined"
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Nombre del sellador"
+                  value={nombreSellador}
+                  onChangeText={setNombreSellador}
+                  mode="outlined"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Holgura"
+                  value={holgura}
+                  onChangeText={setHolgura}
+                  mode="outlined"
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Accesibilidad"
+                  value={accesibilidad}
+                  onChangeText={setAccesibilidad}
+                  mode="outlined"
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Observaciones"
+                  value={observaciones}
+                  onChangeText={setObservaciones}
+                  mode="outlined"
+                  multiline
+                  numberOfLines={4}
+                  style={styles.input}
+                />
+
+                <Text style={styles.photosTitle}>Fotografías</Text>
+
+                <View style={styles.photoActions}>
+                  <Button mode="outlined" onPress={pickFromLibrary}>
+                    Elegir de galería
+                  </Button>
+                  <Button mode="outlined" onPress={takePhoto}>
+                    Tomar foto
+                  </Button>
+                </View>
+
+                <View style={styles.photosGrid}>
+                  {fotos.map((foto, index) => (
+                    <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
+                      <Image
+                        source={{ uri: foto.uri }}
+                        style={styles.photoPreview}
+                      />
+                      <Button
+                        mode="text"
+                        onPress={() => removeFoto(index)}
+                        compact
+                        textColor="#dc2626"
+                      >
+                        Quitar
+                      </Button>
+                    </View>
+                  ))}
+                </View>
+
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                {success ? (
+                  <Text style={styles.successText}>{success}</Text>
+                ) : null}
+
+                <Button
+                  mode="contained"
+                  onPress={onSubmit}
+                  loading={saving}
+                  disabled={saving}
+                  style={styles.button}
+                  contentStyle={styles.buttonContent}
+                  labelStyle={styles.buttonLabel}
+                >
+                  {saving ? "Enviando..." : "Guardar registro y fotos"}
+                </Button>
+              </Card.Content>
+            </Card>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -424,13 +452,17 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 28,
+    paddingTop: 0,
+    paddingBottom: 80,
   },
   title: {
     color: "#0f172a",
-    fontWeight: "700",
-    marginBottom: 16,
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: "#0f172a",
+    marginBottom: 14,
+    fontWeight: "500",
   },
   card: {
     borderRadius: 18,

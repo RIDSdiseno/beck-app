@@ -33,7 +33,7 @@ export default function HistorialScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 8 }]}
+      style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
       <FlatList

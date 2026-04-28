@@ -5,6 +5,7 @@ import {
 } from "@/services/auth/microsoft";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AuthSession from "expo-auth-session";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Image, ImageBackground, StyleSheet, View } from "react-native";
 import { Button, Card, Text } from "react-native-paper";
@@ -44,9 +45,19 @@ export default function LoginScreen() {
 
       const result = await promptAsync();
 
-      if (result.type !== "success") {
-        setIsLoading(false);
+      if (result.type === "success") {
+        router.replace({
+          pathname: "/auth",
+          params: result.params,
+        });
+        return;
       }
+
+      if (result.type === "error") {
+        setError(result.error?.message || "Microsoft no completó el login.");
+      }
+
+      setIsLoading(false);
     } catch (err: any) {
       console.log("PROMPT MICROSOFT ERROR", err);
       setError(err?.message || "No se pudo abrir el login de Microsoft.");

@@ -109,10 +109,16 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView
       className="bg-[#f5f7fb]"
-      style={[styles.container, { paddingTop: insets.top + 8 }]}
+      style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 0,
+          paddingBottom: 24,
+        }}
+      >
         <MotiView {...fadeIn(0)}>
           <BrandHeader
             subtitle="Obra demo - CRM BECK"

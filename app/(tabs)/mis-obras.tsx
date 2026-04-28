@@ -1,5 +1,5 @@
 import { getMisObras, ObraApi } from "@/services/api/obrasApi";
-import { saveSelectedObra } from "@/services/auth/session";
+import { clearSession, saveSelectedObra } from "@/services/auth/session";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
@@ -10,6 +10,11 @@ import {
   Chip,
   Text,
 } from "react-native-paper";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { BrandHeader } from "../../components/BrandHeader";
 
 function getEstadoLabel(estado?: string | null) {
   switch (estado) {
@@ -38,6 +43,7 @@ function getEstadoBg(estado?: string | null) {
 }
 
 export default function MisObrasScreen() {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -90,6 +96,15 @@ export default function MisObrasScreen() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+      router.replace("/login");
+    } catch (error) {
+      console.log("LOGOUT ERROR", error);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centerBox}>
@@ -130,19 +145,28 @@ export default function MisObrasScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text variant="headlineSmall" style={styles.title}>
-        Mis Obras
-      </Text>
-
-      <Text style={styles.subtitle}>
-        Selecciona la obra con la que vas a trabajar hoy.
-      </Text>
-
+    <SafeAreaView
+      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      edges={["top", "left", "right"]}
+    >
       <FlatList
         data={obras}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <>
+            <BrandHeader
+              subtitle="Obras asignadas · BECK"
+              onLogout={handleLogout}
+            />
+            <Text variant="titleLarge" style={styles.title}>
+              Mis Obras
+            </Text>
+            <Text style={styles.subtitle}>
+              Selecciona la obra con la que vas a trabajar hoy.
+            </Text>
+          </>
+        }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -188,7 +212,7 @@ export default function MisObrasScreen() {
           </Card>
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -196,22 +220,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f7fb",
-    paddingHorizontal: 16,
-    paddingTop: 16,
   },
   title: {
     color: "#0f172a",
-    fontWeight: "700",
+    marginBottom: 4,
   },
   subtitle: {
-    marginTop: 6,
-    marginBottom: 16,
-    color: "#475569",
-    fontSize: 14,
-    lineHeight: 20,
+    color: "#0f172a",
+    marginBottom: 14,
+    fontWeight: "500",
   },
   listContent: {
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 80,
   },
   card: {
     marginBottom: 14,

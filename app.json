@@ -12,7 +12,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.beckcrm.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocalNetworkUsageDescription": "Beck App necesita acceder al servidor local de desarrollo.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {

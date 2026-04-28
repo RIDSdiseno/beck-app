@@ -1,6 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Image } from "react-native";
-import { Text, IconButton, Button } from "react-native-paper";
+import { Text, Button } from "react-native-paper";
 
 type Props = {
   title?: string;
