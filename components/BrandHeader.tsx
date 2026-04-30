@@ -18,7 +18,7 @@ export const BrandHeader: React.FC<Props> = ({
       <View style={styles.container}>
         <View style={styles.logoWrapper}>
           <Image
-            source={require("../assets/images/logo_beck.png")}
+            source={require("../assets/images/Beck_menus.png")}
             style={styles.logo}
             resizeMode="contain"
           />

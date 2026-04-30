@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Tabs, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { StyleSheet, View } from "react-native";
@@ -11,6 +11,7 @@ import {
 } from "react-native-paper";
 import { HistorialProvider } from "../../context/HistorialContext";
 import { RegistrosProvider } from "../../context/RegistrosContext";
+import { canViewAllModules } from "../../services/auth/roles";
 import { getSession } from "../../services/auth/session";
 
 const theme = {
@@ -28,14 +29,17 @@ const theme = {
 };
 
 export default function TabLayout() {
+  const segments = useSegments();
   const [loading, setLoading] = React.useState(true);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [userRole, setUserRole] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const checkSession = async () => {
       try {
         const session = await getSession();
         setIsAuthenticated(session.isAuthenticated);
+        setUserRole(session.user?.rol ?? null);
       } finally {
         setLoading(false);
       }
@@ -59,6 +63,14 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
 
+  const showAllModules = canViewAllModules(userRole);
+  const currentTab = String(segments[segments.length - 1] || "index");
+  const restrictedTabs = new Set(["index", "cotizaciones", "reportes"]);
+
+  if (!showAllModules && restrictedTabs.has(currentTab)) {
+    return <Redirect href="/mis-obras" />;
+  }
+
   return (
     <PaperProvider theme={theme}>
       <HistorialProvider>
@@ -75,6 +87,7 @@ export default function TabLayout() {
                 name="index"
                 options={{
                   title: "Dashboard",
+                  href: showAllModules ? undefined : null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="view-dashboard-outline"
@@ -114,6 +127,7 @@ export default function TabLayout() {
                 name="cotizaciones"
                 options={{
                   title: "Cotizaciones",
+                  href: showAllModules ? undefined : null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="file-document-edit-outline"
@@ -127,6 +141,7 @@ export default function TabLayout() {
                 name="reportes"
                 options={{
                   title: "Reportes",
+                  href: showAllModules ? undefined : null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="chart-bar-stacked"

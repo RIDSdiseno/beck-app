@@ -3,6 +3,7 @@ import {
   getMicrosoftClientId,
   microsoftDiscovery,
 } from "@/services/auth/microsoft";
+import { getInitialRouteForRole } from "@/services/auth/roles";
 import { saveSession } from "@/services/auth/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AuthSession from "expo-auth-session";
@@ -86,7 +87,7 @@ export default function AuthCallbackScreen() {
           "beck_redirect_uri",
         ]);
 
-        router.replace("/mis-obras");
+        router.replace(getInitialRouteForRole(data.user.rol));
       } catch (err: any) {
         console.log("AUTH CALLBACK ERROR", err);
 

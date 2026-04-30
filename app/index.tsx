@@ -1,4 +1,5 @@
 import { getSession } from "@/services/auth/session";
+import { getInitialRouteForRole } from "@/services/auth/roles";
 import { Redirect } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -6,16 +7,24 @@ import { ActivityIndicator, Text } from "react-native-paper";
 
 export default function AppEntryScreen() {
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [redirectTo, setRedirectTo] = useState<"/login" | "/(tabs)" | "/mis-obras">(
+    "/login",
+  );
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
         const session = await getSession();
-        setIsAuthenticated(session.isAuthenticated);
+        setRedirectTo(
+          session.isAuthenticated
+            ? (getInitialRouteForRole(session.user?.rol) as
+                | "/(tabs)"
+                | "/mis-obras")
+            : "/login",
+        );
       } catch (error) {
         console.log("APP ENTRY ERROR", error);
-        setIsAuthenticated(false);
+        setRedirectTo("/login");
       } finally {
         setLoading(false);
       }
@@ -33,11 +42,7 @@ export default function AppEntryScreen() {
     );
   }
 
-  if (isAuthenticated) {
-    return <Redirect href="/mis-obras" />;
-  }
-
-  return <Redirect href="/login" />;
+  return <Redirect href={redirectTo} />;
 }
 
 const styles = StyleSheet.create({

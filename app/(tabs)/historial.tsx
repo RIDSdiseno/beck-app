@@ -1,35 +1,189 @@
-import { clearSession } from "@/services/auth/session";
+import {
+  getMisRegistros,
+  RegistroHistorialApi,
+} from "@/services/api/registrosApi";
+import { clearSession, STORAGE_KEYS } from "@/services/auth/session";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import React from "react";
-import { FlatList, StyleSheet, View } from "react-native";
-import { Card, Chip, Text } from "react-native-paper";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Chip,
+  Text,
+} from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import { useHistorial } from "../../context/HistorialContext";
 
-const tipoColor = {
-  registro: "#22c55e",
-  edicion: "#3b82f6",
-  borrado: "#ef4444",
-  cotizacion: "#f97316",
-  reporte: "#8b5cf6",
+const HIDDEN_VALIDATED_REGISTROS_KEY = "beck_historial_registros_ocultos";
+
+const estadoColor = {
+  pendiente: "#f59e0b",
+  en_revision: "#3b82f6",
+  validado: "#16a34a",
+  rechazado: "#dc2626",
 } as const;
+
+function getEstadoLabel(estado: RegistroHistorialApi["estado"]) {
+  switch (estado) {
+    case "pendiente":
+      return "Pendiente";
+    case "en_revision":
+      return "En revisión";
+    case "validado":
+      return "Validado";
+    case "rechazado":
+      return "Rechazado";
+    default:
+      return "Pendiente";
+  }
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sin fecha";
+
+  return date.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+async function getHiddenValidatedIds() {
+  const raw = await AsyncStorage.getItem(HIDDEN_VALIDATED_REGISTROS_KEY);
+
+  if (!raw) return new Set<string>();
+
+  try {
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+async function saveHiddenValidatedIds(ids: Set<string>) {
+  await AsyncStorage.setItem(
+    HIDDEN_VALIDATED_REGISTROS_KEY,
+    JSON.stringify(Array.from(ids)),
+  );
+}
 
 export default function HistorialScreen() {
   const insets = useSafeAreaInsets();
-  const { movimientos } = useHistorial();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [hiddenValidatedIds, setHiddenValidatedIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const loadRegistros = useCallback(async () => {
+    try {
+      setError("");
+      const [hiddenIds, data] = await Promise.all([
+        getHiddenValidatedIds(),
+        getMisRegistros(),
+      ]);
+
+      setHiddenValidatedIds(hiddenIds);
+      setRegistros(data);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron cargar los registros");
+    }
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await loadRegistros();
+      setLoading(false);
+    };
+
+    init();
+  }, [loadRegistros]);
+
+  const visibleRegistros = useMemo(
+    () =>
+      registros.filter(
+        (registro) =>
+          registro.estado !== "validado" || !hiddenValidatedIds.has(registro.id),
+      ),
+    [hiddenValidatedIds, registros],
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadRegistros();
+    setRefreshing(false);
+  };
+
+  const hideValidatedRegistro = async (registroId: string) => {
+    const next = new Set(hiddenValidatedIds);
+    next.add(registroId);
+
+    setHiddenValidatedIds(next);
+    await saveHiddenValidatedIds(next);
+  };
 
   const handleLogout = async () => {
     try {
       await clearSession();
+      await AsyncStorage.removeItem(STORAGE_KEYS.obraSeleccionada);
       router.replace("/login");
-    } catch (error) {
-      console.log("LOGOUT ERROR", error);
+    } catch (logoutError) {
+      console.log("LOGOUT ERROR", logoutError);
     }
   };
+
+  const renderHeader = () => (
+    <View style={styles.headerWrapper}>
+      <BrandHeader subtitle="Registros realizados · BECK" onLogout={handleLogout} />
+      <Text variant="titleLarge" style={styles.title}>
+        Historial de registros
+      </Text>
+      <Text style={styles.subtitle}>
+        Revisa el estado de tus registros y actualiza la lista para ver cambios
+        recientes.
+      </Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator size="large" color="#f97316" />
+        <Text style={styles.helper}>Cargando historial...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerBox}>
+        <Text style={styles.errorTitle}>No se pudo cargar el historial</Text>
+        <Text style={styles.errorText}>{error}</Text>
+
+        <Button
+          mode="contained"
+          onPress={loadRegistros}
+          style={styles.retryButton}
+          contentStyle={styles.retryButtonContent}
+          labelStyle={styles.retryButtonLabel}
+        >
+          Reintentar
+        </Button>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -37,56 +191,87 @@ export default function HistorialScreen() {
       edges={["top", "left", "right"]}
     >
       <FlatList
-        ListHeaderComponent={
-          <View style={styles.headerWrapper}>
-            <BrandHeader
-              subtitle="Bitácora de acciones · BECK"
-              onLogout={handleLogout}
-            />
-            <Text variant="titleLarge" style={styles.title}>
-              Historial de acuerdos
-            </Text>
-            <Text style={styles.subtitle}>
-              Registro de movimientos recientes en la app: creación, edición,
-              borrado, cotizaciones y reportes.
-            </Text>
-          </View>
-        }
-        data={movimientos}
+        ListHeaderComponent={renderHeader}
+        data={visibleRegistros}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Sin movimientos</Text>
+            <Text style={styles.emptyTitle}>Sin registros</Text>
             <Text style={styles.itemMeta}>
-              Aún no hay acciones registradas.
+              Cuando realices registros en terreno aparecerán aquí.
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.headerRow}>
-                <Text style={styles.itemTitle}>{item.titulo}</Text>
-                <Chip
-                  compact
-                  style={[
-                    styles.chip,
-                    { backgroundColor: tipoColor[item.tipo] || "#0ea5e9" },
-                  ]}
-                  textStyle={styles.chipText}
-                >
-                  {item.tipo}
-                </Chip>
-              </View>
-              <Text style={styles.itemDetail}>{item.detalle}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.itemMeta}>{item.fecha}</Text>
-                <Text style={styles.itemMeta}>{item.usuario}</Text>
-              </View>
-            </Card.Content>
-          </Card>
-        )}
+        renderItem={({ item }) => {
+          const obraNombre = item.obras?.nombre || "Obra sin nombre";
+
+          return (
+            <Card style={styles.card}>
+              <Card.Content>
+                <View style={styles.headerRow}>
+                  <View style={styles.titleGroup}>
+                    <Text style={styles.itemTitle}>{obraNombre}</Text>
+                    <Text style={styles.itemMeta}>
+                      {item.obras?.codigo || "Sin código"} ·{" "}
+                      {formatDate(item.fecha)}
+                    </Text>
+                  </View>
+
+                  <Chip
+                    compact
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor:
+                          estadoColor[item.estado] || estadoColor.pendiente,
+                      },
+                    ]}
+                    textStyle={styles.chipText}
+                  >
+                    {getEstadoLabel(item.estado)}
+                  </Chip>
+                </View>
+
+                <Text style={styles.itemDetail}>
+                  {item.descripcion_material}
+                </Text>
+
+                <View style={styles.detailGrid}>
+                  <Text style={styles.detailItem}>Módulo: {item.modulo}</Text>
+                  <Text style={styles.detailItem}>Piso: {item.piso}</Text>
+                  <Text style={styles.detailItem}>
+                    Eje: {item.eje_numerico}-{item.eje_alfabetico}
+                  </Text>
+                  <Text style={styles.detailItem}>
+                    Sellos: {item.cantidad_sellos}
+                  </Text>
+                </View>
+
+                {item.observaciones ? (
+                  <Text style={styles.observaciones}>
+                    Observaciones: {item.observaciones}
+                  </Text>
+                ) : null}
+
+                {item.estado === "validado" ? (
+                  <Button
+                    mode="outlined"
+                    icon="trash-can-outline"
+                    onPress={() => hideValidatedRegistro(item.id)}
+                    style={styles.removeButton}
+                    labelStyle={styles.removeButtonLabel}
+                  >
+                    Borrar del historial
+                  </Button>
+                ) : null}
+              </Card.Content>
+            </Card>
+          );
+        }}
       />
     </SafeAreaView>
   );
@@ -96,6 +281,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f7fb",
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 80,
   },
   headerWrapper: {
     paddingHorizontal: 0,
@@ -110,7 +299,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   card: {
-    marginBottom: 10,
+    marginBottom: 12,
     borderColor: "#e2e8f0",
     borderWidth: 1,
     backgroundColor: "#ffffff",
@@ -121,32 +310,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 6,
+    gap: 10,
+  },
+  titleGroup: {
+    flex: 1,
   },
   itemTitle: {
     color: "#0f172a",
     fontWeight: "700",
     fontSize: 16,
-    flex: 1,
-    marginRight: 10,
-    flexShrink: 1,
-    flexWrap: "wrap",
   },
   itemDetail: {
     color: "#0f172a",
     fontSize: 14,
-    marginTop: 4,
-    marginBottom: 6,
-    flexWrap: "wrap",
+    marginTop: 10,
+    marginBottom: 8,
+    lineHeight: 19,
+  },
+  detailGrid: {
+    gap: 4,
+  },
+  detailItem: {
+    color: "#475569",
+    fontSize: 13,
     lineHeight: 18,
   },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 8,
+  observaciones: {
+    marginTop: 8,
+    color: "#334155",
+    fontSize: 13,
+    lineHeight: 18,
   },
   itemMeta: {
     color: "#64748b",
@@ -157,22 +350,65 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     height: 32,
     paddingHorizontal: 10,
-    marginTop: 2,
     alignSelf: "flex-start",
   },
   chipText: {
     color: "#ffffff",
     fontWeight: "700",
-    fontSize: 13,
-    textTransform: "capitalize",
+    fontSize: 12,
+  },
+  removeButton: {
+    marginTop: 14,
+    borderColor: "#dc2626",
+    borderRadius: 12,
+  },
+  removeButtonLabel: {
+    color: "#dc2626",
+    fontWeight: "700",
   },
   emptyState: {
-    paddingVertical: 24,
+    paddingVertical: 28,
     alignItems: "center",
   },
   emptyTitle: {
     color: "#0f172a",
     fontWeight: "700",
     marginBottom: 4,
+  },
+  centerBox: {
+    flex: 1,
+    backgroundColor: "#f5f7fb",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  helper: {
+    marginTop: 12,
+    color: "#475569",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  errorTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  errorText: {
+    marginTop: 10,
+    color: "#dc2626",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 18,
+    backgroundColor: "#f97316",
+    borderRadius: 14,
+  },
+  retryButtonContent: {
+    minHeight: 46,
+  },
+  retryButtonLabel: {
+    fontWeight: "700",
   },
 });

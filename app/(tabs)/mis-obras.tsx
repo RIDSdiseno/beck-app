@@ -24,8 +24,10 @@ function getEstadoLabel(estado?: string | null) {
       return "Pausada";
     case "finalizada":
       return "Finalizada";
+    case "inactiva":
+      return "Inactiva";
     default:
-      return "Sin estado";
+      return "Inactiva";
   }
 }
 
@@ -37,8 +39,10 @@ function getEstadoBg(estado?: string | null) {
       return "#f59e0b";
     case "finalizada":
       return "#64748b";
+    case "inactiva":
+      return "#dc2626";
     default:
-      return "#475569";
+      return "#dc2626";
   }
 }
 
@@ -105,6 +109,22 @@ export default function MisObrasScreen() {
     }
   };
 
+  const renderHeader = () => (
+    <>
+      <BrandHeader subtitle="Obras asignadas · BECK" onLogout={handleLogout} />
+      <Text variant="titleLarge" style={styles.title}>
+        Mis Obras
+      </Text>
+      <Text style={styles.subtitle}>
+        Selecciona la obra con la que vas a trabajar hoy.
+      </Text>
+    </>
+  );
+
+  const refreshControl = (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  );
+
   if (loading) {
     return (
       <View style={styles.centerBox}>
@@ -135,12 +155,30 @@ export default function MisObrasScreen() {
 
   if (!obras.length) {
     return (
-      <View style={styles.centerBox}>
-        <Text style={styles.emptyTitle}>No tienes obras asignadas</Text>
-        <Text style={styles.helper}>
-          Cuando el administrador te asigne una obra, aparecerá aquí.
-        </Text>
-      </View>
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <FlatList
+          data={[] as ObraApi[]}
+          keyExtractor={(item) => item.id}
+          renderItem={() => null}
+          contentContainerStyle={[
+            styles.listContent,
+            styles.emptyListContent,
+          ]}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>No tienes obras asignadas</Text>
+              <Text style={styles.helper}>
+                Cuando el administrador te asigne una obra, aparecerá aquí.
+              </Text>
+            </View>
+          }
+          refreshControl={refreshControl}
+        />
+      </SafeAreaView>
     );
   }
 
@@ -153,23 +191,8 @@ export default function MisObrasScreen() {
         data={obras}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
-          <>
-            <BrandHeader
-              subtitle="Obras asignadas · BECK"
-              onLogout={handleLogout}
-            />
-            <Text variant="titleLarge" style={styles.title}>
-              Mis Obras
-            </Text>
-            <Text style={styles.subtitle}>
-              Selecciona la obra con la que vas a trabajar hoy.
-            </Text>
-          </>
-        }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        ListHeaderComponent={renderHeader}
+        refreshControl={refreshControl}
         renderItem={({ item }) => (
           <Card style={styles.card}>
             <Card.Content>
@@ -206,7 +229,7 @@ export default function MisObrasScreen() {
               >
                 {selectingId === item.id
                   ? "Seleccionando..."
-                  : "Usar esta obra"}
+                  : "Selecciona esta obra"}
               </Button>
             </Card.Content>
           </Card>
@@ -234,6 +257,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 80,
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   card: {
     marginBottom: 14,
@@ -294,6 +320,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
+  },
+  emptyBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 80,
   },
   helper: {
     marginTop: 12,
