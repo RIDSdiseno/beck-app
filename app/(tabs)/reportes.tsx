@@ -190,6 +190,8 @@ export default function ReportesScreen() {
                 height={220}
                 fromZero
                 showBarTops
+                yAxisLabel=""
+                yAxisSuffix=""
                 chartConfig={chartConfig}
                 style={styles.chart}
               />
@@ -253,6 +255,8 @@ export default function ReportesScreen() {
                 height={220}
                 fromZero
                 showBarTops
+                yAxisLabel=""
+                yAxisSuffix=" m"
                 chartConfig={chartConfig}
                 style={styles.chart}
               />
@@ -315,9 +319,8 @@ export default function ReportesScreen() {
                   >{`BECK-${r.id.toString().padStart(3, "0")}`}</DataTable.Cell>
                   <DataTable.Cell
                     style={styles.colDescripcion}
-                    numberOfLines={1}
                   >
-                    {r.obra}
+                    <Text numberOfLines={1}>{r.obra}</Text>
                   </DataTable.Cell>
                   <DataTable.Cell numeric style={styles.colSellos}>
                     1
@@ -356,9 +359,8 @@ export default function ReportesScreen() {
                   >{`SACYR-${r.id.toString().padStart(3, "0")}`}</DataTable.Cell>
                   <DataTable.Cell
                     style={styles.colDescripcion}
-                    numberOfLines={1}
                   >
-                    {r.obra}
+                    <Text numberOfLines={1}>{r.obra}</Text>
                   </DataTable.Cell>
                   <DataTable.Cell numeric style={styles.colSellos}>
                     1

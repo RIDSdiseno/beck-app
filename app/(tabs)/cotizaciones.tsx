@@ -331,8 +331,8 @@ export default function CotizacionesScreen() {
                   <DataTable.Cell style={styles.colTipo}>
                     {c.tipo}
                   </DataTable.Cell>
-                  <DataTable.Cell style={styles.colCliente} numberOfLines={1}>
-                    {c.cliente}
+                  <DataTable.Cell style={styles.colCliente}>
+                    <Text numberOfLines={1}>{c.cliente}</Text>
                   </DataTable.Cell>
                   <DataTable.Cell style={styles.colOrigen}>
                     {c.origen}

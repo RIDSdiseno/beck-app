@@ -2,7 +2,12 @@ import { clearSession } from "@/services/auth/session";
 import { router } from "expo-router";
 import { MotiView } from "moti";
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import {
+  DimensionValue,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Card, Chip, SegmentedButtons, Text } from "react-native-paper";
 import {
   SafeAreaView,
@@ -72,7 +77,7 @@ export default function DashboardScreen() {
   const fadeIn = (delay = 0) => ({
     from: { opacity: 0, translateY: 12 },
     animate: { opacity: 1, translateY: 0 },
-    transition: { type: "timing", duration: 280, delay },
+    transition: { type: "timing" as const, duration: 280, delay },
   });
 
   const kpiCards = [
@@ -164,7 +169,10 @@ export default function DashboardScreen() {
                     <View
                       style={[
                         styles.progressFill,
-                        { width: item.progress, backgroundColor: item.color },
+                        {
+                          width: item.progress as DimensionValue,
+                          backgroundColor: item.color,
+                        },
                       ]}
                     />
                   </View>
