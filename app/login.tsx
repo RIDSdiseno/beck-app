@@ -17,6 +17,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
@@ -40,6 +41,7 @@ function isBeckEmail(value: string) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const scrollViewRef = useRef<ScrollView>(null);
   const activeInputRef = useRef<"email" | "password" | null>(null);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
@@ -135,11 +137,19 @@ export default function LoginScreen() {
   const isLoading = isMicrosoftLoading || isEmailLoading;
   const hasEmailValue = Boolean(email.trim());
   const hasEmailDomainError = hasEmailValue && !isBeckEmail(email);
+  const isAndroid = Platform.OS === "android";
+  const isShortAndroid = isAndroid && screenHeight < 740;
   const keyboardBehavior = isInputFocused
     ? Platform.OS === "ios"
       ? "padding"
       : "height"
     : undefined;
+  const topInset = isAndroid
+    ? Math.max(insets.top, 12)
+    : insets.top + 24;
+  const bottomInset = isAndroid
+    ? Math.max(insets.bottom, 72)
+    : insets.bottom + 28;
 
   return (
     <ImageBackground
@@ -153,39 +163,65 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={keyboardBehavior}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 16}
         >
           <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingTop: insets.top + 24,
-                paddingBottom: insets.bottom + 28,
+                paddingTop: topInset,
+                paddingBottom: bottomInset,
               },
             ]}
             scrollEnabled={isInputFocused}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.container}>
-              <View style={styles.logoContainer}>
+            <View
+              style={[
+                styles.container,
+                isAndroid && styles.androidContainer,
+              ]}
+            >
+              <View
+                style={[
+                  styles.logoContainer,
+                  isAndroid && styles.androidLogoContainer,
+                  isShortAndroid && styles.shortAndroidLogoContainer,
+                ]}
+              >
                 <Image
                   source={require("../assets/images/logo_beck.png")}
-                  style={styles.logo}
+                  style={[
+                    styles.logo,
+                    isAndroid && styles.androidLogo,
+                    isShortAndroid && styles.shortAndroidLogo,
+                  ]}
                   resizeMode="contain"
                 />
               </View>
 
-              <Card style={styles.card} elevation={3}>
+              <Card
+                style={[styles.card, isAndroid && styles.androidCard]}
+                elevation={3}
+              >
                 <Card.Content>
                   <Text style={styles.eyebrow}>CRM BECK</Text>
 
-                  <Text variant="headlineMedium" style={styles.title}>
+                  <Text
+                    variant="headlineMedium"
+                    style={[styles.title, isAndroid && styles.androidTitle]}
+                  >
                     Iniciar sesión
                   </Text>
 
-                  <Text style={styles.subtitle}>
+                  <Text
+                    style={[
+                      styles.subtitle,
+                      isAndroid && styles.androidSubtitle,
+                    ]}
+                  >
                     Accede con tu cuenta corporativa Microsoft o con tus
                     credenciales Beck
                   </Text>
@@ -201,6 +237,7 @@ export default function LoginScreen() {
                     textContentType="emailAddress"
                     disabled={isLoading}
                     error={hasEmailDomainError}
+                    dense={isAndroid}
                     onFocus={() => onInputFocus("email")}
                     onBlur={() => onInputBlur("email")}
                     style={styles.input}
@@ -222,6 +259,7 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     textContentType="password"
                     disabled={isLoading}
+                    dense={isAndroid}
                     onFocus={() => onInputFocus("password")}
                     onBlur={() => onInputBlur("password")}
                     style={styles.input}
@@ -247,13 +285,21 @@ export default function LoginScreen() {
                       !password
                     }
                     style={styles.button}
-                    contentStyle={styles.buttonContent}
+                    contentStyle={[
+                      styles.buttonContent,
+                      isAndroid && styles.androidButtonContent,
+                    ]}
                     labelStyle={styles.buttonLabel}
                   >
                     {isEmailLoading ? "Ingresando..." : "Ingresar"}
                   </Button>
 
-                  <View style={styles.dividerRow}>
+                  <View
+                    style={[
+                      styles.dividerRow,
+                      isAndroid && styles.androidDividerRow,
+                    ]}
+                  >
                     <Divider style={styles.divider} />
                     <Text style={styles.dividerText}>o</Text>
                     <Divider style={styles.divider} />
@@ -266,7 +312,10 @@ export default function LoginScreen() {
                     loading={isMicrosoftLoading}
                     disabled={!request || isLoading}
                     style={styles.microsoftButton}
-                    contentStyle={styles.buttonContent}
+                    contentStyle={[
+                      styles.buttonContent,
+                      isAndroid && styles.androidButtonContent,
+                    ]}
                     labelStyle={styles.buttonLabel}
                   >
                     {isMicrosoftLoading
@@ -306,9 +355,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingBottom: 56,
   },
+  androidContainer: {
+    justifyContent: "center",
+    paddingBottom: 0,
+  },
   logoContainer: {
     alignItems: "center",
     marginBottom: 32,
+  },
+  androidLogoContainer: {
+    marginBottom: 16,
+  },
+  shortAndroidLogoContainer: {
+    marginBottom: 10,
   },
   logo: {
     alignSelf: "center",
@@ -316,12 +375,24 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: "100%",
   },
+  androidLogo: {
+    height: 235,
+    maxWidth: 480,
+  },
+  shortAndroidLogo: {
+    height: 194,
+    maxWidth: 410,
+  },
   card: {
     backgroundColor: "rgba(255, 255, 255, 0.93)",
     borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.35)",
     paddingVertical: 6,
+  },
+  androidCard: {
+    borderRadius: 18,
+    paddingVertical: 0,
   },
   eyebrow: {
     textAlign: "center",
@@ -337,12 +408,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 8,
   },
+  androidTitle: {
+    fontSize: 30,
+    lineHeight: 36,
+    marginBottom: 6,
+  },
   subtitle: {
     textAlign: "center",
     color: "#475569",
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 20,
+  },
+  androidSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 14,
   },
   input: {
     backgroundColor: "#ffffff",
@@ -366,6 +447,9 @@ const styles = StyleSheet.create({
   buttonContent: {
     minHeight: 52,
   },
+  androidButtonContent: {
+    minHeight: 46,
+  },
   buttonLabel: {
     fontSize: 15,
     fontWeight: "700",
@@ -375,6 +459,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     marginVertical: 18,
+  },
+  androidDividerRow: {
+    marginVertical: 12,
   },
   divider: {
     flex: 1,
