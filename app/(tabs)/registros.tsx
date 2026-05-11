@@ -2,12 +2,23 @@ import {
   createRegistro,
   uploadRegistroFotos,
 } from "@/services/api/registrosApi";
-import { clearSession, getSelectedObra } from "@/services/auth/session";
+import {
+  clearSession,
+  getSelectedObra,
+  getSession,
+} from "@/services/auth/session";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Image, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Card, Text, TextInput } from "react-native-paper";
+import {
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { Button, Card, Checkbox, Text, TextInput } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -28,15 +39,72 @@ type FotoLocal = {
   type: string;
 };
 
+const MATERIAL_OPTIONS = [
+  "Tubería metálica",
+  "Tubería no metálica",
+  "Ducto clima circular",
+  "Ducto clima rectangular",
+  "Bandejas y escalerillas",
+];
+
+const WEEK_DAYS = ["L", "M", "M", "J", "V", "S", "D"];
+const MONTH_NAMES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+function formatDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function toApiNumber(value: string) {
+  return Number(value.replace(",", "."));
+}
+
+function buildCalendarDays(viewDate: Date) {
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const mondayFirstOffset = (firstDay.getDay() + 6) % 7;
+
+  return [
+    ...Array.from({ length: mondayFirstOffset }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
+}
+
 export default function RegistrosScreen() {
   const insets = useSafeAreaInsets();
   const [obra, setObra] = useState<ObraSeleccionada | null>(null);
+  const [currentUserName, setCurrentUserName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(formatDate(new Date()));
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [descripcionMaterial, setDescripcionMaterial] = useState("");
+  const [otroMaterial, setOtroMaterial] = useState(false);
   const [modulo, setModulo] = useState("");
   const [piso, setPiso] = useState("");
   const [ejeNumerico, setEjeNumerico] = useState("");
@@ -51,28 +119,66 @@ export default function RegistrosScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const loadSelectedObra = async () => {
+      const loadInitialData = async () => {
         const currentObra = await getSelectedObra();
+        const session = await getSession();
+        const userName = session.user?.nombre || "";
+
         setObra(currentObra);
+        setCurrentUserName(userName);
+        setNombreSellador(userName);
       };
 
-      loadSelectedObra();
+      loadInitialData();
     }, []),
   );
 
   const resetForm = () => {
+    setFecha(formatDate(new Date()));
+    setCalendarMonth(new Date());
     setDescripcionMaterial("");
+    setOtroMaterial(false);
     setModulo("");
     setPiso("");
     setEjeNumerico("");
     setEjeAlfabetico("");
     setNumeroSello("");
     setCantidadSellos("");
-    setNombreSellador("");
+    setNombreSellador(currentUserName);
     setHolgura("");
     setAccesibilidad("");
     setObservaciones("");
     setFotos([]);
+  };
+
+  const changeCalendarMonth = (offset: number) => {
+    setCalendarMonth(
+      (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
+    );
+  };
+
+  const selectCalendarDay = (day: number) => {
+    const selectedDate = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth(),
+      day,
+    );
+
+    setFecha(formatDate(selectedDate));
+    setCalendarVisible(false);
+  };
+
+  const selectMaterial = (material: string) => {
+    setDescripcionMaterial(material);
+    setOtroMaterial(false);
+  };
+
+  const toggleOtroMaterial = () => {
+    setOtroMaterial((current) => {
+      const next = !current;
+      setDescripcionMaterial(next ? "" : descripcionMaterial);
+      return next;
+    });
   };
 
   const pickFromLibrary = async () => {
@@ -187,13 +293,13 @@ export default function RegistrosScreen() {
         descripcionMaterial,
         modulo,
         piso,
-        ejeNumerico: Number(ejeNumerico),
+        ejeNumerico: toApiNumber(ejeNumerico),
         ejeAlfabetico,
         numeroSello,
-        cantidadSellos: Number(cantidadSellos),
+        cantidadSellos: toApiNumber(cantidadSellos),
         nombreSellador,
-        holgura: Number(holgura),
-        accesibilidad: Number(accesibilidad),
+        holgura: toApiNumber(holgura),
+        accesibilidad: toApiNumber(accesibilidad),
         observaciones,
       });
 
@@ -288,21 +394,17 @@ export default function RegistrosScreen() {
               <Card.Content>
                 <Text style={styles.formTitle}>Nuevo registro de terreno</Text>
 
-                <TextInput
-                  label="Fecha (YYYY-MM-DD)"
-                  value={fecha}
-                  onChangeText={setFecha}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Descripción material"
-                  value={descripcionMaterial}
-                  onChangeText={setDescripcionMaterial}
-                  mode="outlined"
-                  style={styles.input}
-                />
+                <Pressable onPress={() => setCalendarVisible(true)}>
+                  <TextInput
+                    label="Fecha"
+                    value={fecha}
+                    mode="outlined"
+                    editable={false}
+                    pointerEvents="none"
+                    right={<TextInput.Icon icon="calendar" />}
+                    style={styles.input}
+                  />
+                </Pressable>
 
                 <TextInput
                   label="Módulo"
@@ -315,17 +417,69 @@ export default function RegistrosScreen() {
                 <TextInput
                   label="Piso"
                   value={piso}
-                  onChangeText={setPiso}
+                  onChangeText={(value) => setPiso(onlyDigits(value))}
                   mode="outlined"
+                  keyboardType="numeric"
                   style={styles.input}
                 />
+
+                <TextInput
+                  label="Nombre del sellador"
+                  value={nombreSellador}
+                  mode="outlined"
+                  editable={false}
+                  style={styles.input}
+                />
+
+                <TextInput
+                  label="Cantidad"
+                  value={cantidadSellos}
+                  onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                  mode="outlined"
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+
+                <Text style={styles.fieldLabel}>Descripción de material</Text>
+                <View style={styles.materialOptions}>
+                  {MATERIAL_OPTIONS.map((material) => (
+                    <Button
+                      key={material}
+                      mode={
+                        descripcionMaterial === material && !otroMaterial
+                          ? "contained"
+                          : "outlined"
+                      }
+                      onPress={() => selectMaterial(material)}
+                      style={styles.materialButton}
+                    >
+                      {material}
+                    </Button>
+                  ))}
+                </View>
+
+                <Checkbox.Item
+                  label="Otro"
+                  status={otroMaterial ? "checked" : "unchecked"}
+                  onPress={toggleOtroMaterial}
+                  style={styles.checkboxItem}
+                />
+
+                {otroMaterial ? (
+                  <TextInput
+                    label="Ingresar descripción de material"
+                    value={descripcionMaterial}
+                    onChangeText={setDescripcionMaterial}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
 
                 <TextInput
                   label="Eje numérico"
                   value={ejeNumerico}
                   onChangeText={setEjeNumerico}
                   mode="outlined"
-                  keyboardType="numeric"
                   style={styles.input}
                 />
 
@@ -346,28 +500,10 @@ export default function RegistrosScreen() {
                 />
 
                 <TextInput
-                  label="Cantidad de sellos"
-                  value={cantidadSellos}
-                  onChangeText={setCantidadSellos}
-                  mode="outlined"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Nombre del sellador"
-                  value={nombreSellador}
-                  onChangeText={setNombreSellador}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
                   label="Holgura"
                   value={holgura}
                   onChangeText={setHolgura}
                   mode="outlined"
-                  keyboardType="numeric"
                   style={styles.input}
                 />
 
@@ -376,7 +512,6 @@ export default function RegistrosScreen() {
                   value={accesibilidad}
                   onChangeText={setAccesibilidad}
                   mode="outlined"
-                  keyboardType="numeric"
                   style={styles.input}
                 />
 
@@ -386,8 +521,8 @@ export default function RegistrosScreen() {
                   onChangeText={setObservaciones}
                   mode="outlined"
                   multiline
-                  numberOfLines={4}
-                  style={styles.input}
+                  numberOfLines={6}
+                  style={[styles.input, styles.observacionesInput]}
                 />
 
                 <Text style={styles.photosTitle}>Fotografías</Text>
@@ -441,6 +576,76 @@ export default function RegistrosScreen() {
           </>
         )}
       </ScrollView>
+      <Modal
+        visible={calendarVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCalendarVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setCalendarVisible(false)}
+        >
+          <Pressable style={styles.calendarModal}>
+            <View style={styles.calendarHeader}>
+              <Button mode="text" onPress={() => changeCalendarMonth(-1)}>
+                Anterior
+              </Button>
+              <Text style={styles.calendarTitle}>
+                {MONTH_NAMES[calendarMonth.getMonth()]}{" "}
+                {calendarMonth.getFullYear()}
+              </Text>
+              <Button mode="text" onPress={() => changeCalendarMonth(1)}>
+                Siguiente
+              </Button>
+            </View>
+
+            <View style={styles.weekRow}>
+              {WEEK_DAYS.map((day, index) => (
+                <Text key={`${day}-${index}`} style={styles.weekDay}>
+                  {day}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {buildCalendarDays(calendarMonth).map((day, index) => {
+                const dayDate = day
+                  ? formatDate(
+                      new Date(
+                        calendarMonth.getFullYear(),
+                        calendarMonth.getMonth(),
+                        day,
+                      ),
+                    )
+                  : "";
+                const isSelected = dayDate === fecha;
+
+                return (
+                  <Pressable
+                    key={`${day || "empty"}-${index}`}
+                    disabled={!day}
+                    onPress={() => day && selectCalendarDay(day)}
+                    style={[
+                      styles.calendarDay,
+                      isSelected && styles.calendarDaySelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.calendarDayText,
+                        isSelected && styles.calendarDayTextSelected,
+                      ]}
+                    >
+                      {day || ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -504,6 +709,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: "#ffffff",
   },
+  observacionesInput: {
+    minHeight: 132,
+    textAlignVertical: "top",
+  },
+  fieldLabel: {
+    marginTop: 4,
+    marginBottom: 10,
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  materialOptions: {
+    gap: 8,
+    marginBottom: 6,
+  },
+  materialButton: {
+    alignSelf: "stretch",
+    borderRadius: 12,
+  },
+  checkboxItem: {
+    paddingHorizontal: 0,
+    marginBottom: 6,
+  },
   photosTitle: {
     marginTop: 8,
     marginBottom: 10,
@@ -565,5 +793,63 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: "#16a34a",
     fontWeight: "600",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.42)",
+    justifyContent: "center",
+    padding: 18,
+  },
+  calendarModal: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 14,
+  },
+  calendarHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  calendarTitle: {
+    color: "#0f172a",
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+    textTransform: "capitalize",
+  },
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 6,
+  },
+  weekDay: {
+    color: "#64748b",
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarDay: {
+    alignItems: "center",
+    aspectRatio: 1,
+    justifyContent: "center",
+    width: `${100 / 7}%`,
+  },
+  calendarDaySelected: {
+    backgroundColor: "#f97316",
+    borderRadius: 999,
+  },
+  calendarDayText: {
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  calendarDayTextSelected: {
+    color: "#ffffff",
   },
 });

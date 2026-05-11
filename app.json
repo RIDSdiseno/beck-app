@@ -59,6 +59,12 @@
         "projectId": "9c9b4430-55be-4c2f-8536-fdb7a097bf02"
       }
     },
-    "owner": "diseno1"
+    "owner": "diseno1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9c9b4430-55be-4c2f-8536-fdb7a097bf02"
+    }
   }
 }
