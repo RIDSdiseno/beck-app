@@ -65,8 +65,13 @@ export default function TabLayout() {
 
   const currentTab = String(segments[segments.length - 1] || "index");
   const restrictedTabs = new Set(["cotizaciones", "reportes"]);
+  const jefeObraHiddenTabs = new Set(["mis-obras", "historial"]);
 
   if (!canViewAllModules(userRole) && restrictedTabs.has(currentTab)) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  if (userRole === "jefeobra" && jefeObraHiddenTabs.has(currentTab)) {
     return <Redirect href="/(tabs)" />;
   }
 
@@ -99,6 +104,7 @@ export default function TabLayout() {
                 name="mis-obras"
                 options={{
                   title: "Mis Obras",
+                  href: userRole === "jefeobra" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="office-building"
@@ -153,7 +159,7 @@ export default function TabLayout() {
                 name="historial"
                 options={{
                   title: "Historial",
-                  href: null,
+                  href: userRole === "jefeobra" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="history"

@@ -1,5 +1,9 @@
 import { clearMisObrasCache } from "@/services/api/obrasApi";
-import { clearMisRegistrosCache } from "@/services/api/registrosApi";
+import {
+  clearMisRegistrosCache,
+  getMisRegistros,
+  RegistroHistorialApi,
+} from "@/services/api/registrosApi";
 import { clearSession, getSession } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -68,12 +72,18 @@ function ProfileAction({ icon, label, onPress }: ProfileActionProps) {
 export default function PerfilScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<ProfileUser | null>(null);
+  const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       const loadUser = async () => {
         const session = await getSession();
         setUser(session.user);
+
+        if (session.user?.rol === "jefeobra") {
+          const data = await getMisRegistros(true);
+          setRegistros(data.filter((registro) => registro.estado !== "pendiente"));
+        }
       };
 
       loadUser();
@@ -145,6 +155,39 @@ export default function PerfilScreen() {
             onPress={() => router.push("/historial")}
           />
         </View>
+
+        {user?.rol === "jefeobra" ? (
+          <View style={styles.historyPanel}>
+            <Text style={styles.historyTitle}>Historial de registros actualizados</Text>
+            {registros.length ? (
+              registros.slice(0, 8).map((registro) => (
+                <View key={registro.id} style={styles.historyRow}>
+                  <View style={styles.historyInfo}>
+                    <Text style={styles.historyName}>
+                      {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
+                    </Text>
+                    <Text style={styles.historyMeta}>
+                      {registro.usuarios?.nombre || registro.nombre_sellador}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.historyStatus,
+                      registro.estado === "validado" && styles.historyValidado,
+                      registro.estado === "rechazado" && styles.historyRechazado,
+                    ]}
+                  >
+                    {registro.estado.replace("_", " ")}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.historyMeta}>
+                Aún no has enviado registros a ingeniería.
+              </Text>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -274,5 +317,58 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: "900",
+  },
+  historyPanel: {
+    backgroundColor: "#ffffff",
+    borderColor: "#eef2f7",
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 14,
+  },
+  historyTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  historyRow: {
+    alignItems: "center",
+    borderTopColor: "#e2e8f0",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 10,
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyName: {
+    color: "#0f172a",
+    fontWeight: "800",
+  },
+  historyMeta: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  historyStatus: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 999,
+    color: "#2563eb",
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    textTransform: "capitalize",
+  },
+  historyValidado: {
+    backgroundColor: "#dcfce7",
+    color: "#16a34a",
+  },
+  historyRechazado: {
+    backgroundColor: "#fee2e2",
+    color: "#dc2626",
   },
 });

@@ -53,6 +53,12 @@ export type RegistroHistorialApi = {
     cliente?: string | null;
     direccion?: string | null;
   } | null;
+  usuarios?: {
+    id: string;
+    nombre: string;
+    email: string;
+    rol: string;
+  } | null;
   fotos?: {
     id: string;
     url: string;
@@ -184,4 +190,36 @@ export async function uploadRegistroFotos(
 
   clearMisRegistrosCache();
   return result.data;
+}
+
+export async function enviarRegistroAIngenieria(
+  registroId: string,
+  payload: CreateRegistroPayload,
+) {
+  const session = await getSession();
+
+  if (!session.token) {
+    throw new Error("No hay sesión activa");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/registros/${registroId}/enviar-ingenieria`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = await readJsonResponse(response);
+
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo enviar el registro a ingeniería");
+  }
+
+  clearMisRegistrosCache();
+  return result.data as RegistroHistorialApi;
 }

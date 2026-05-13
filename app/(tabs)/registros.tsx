@@ -1,5 +1,8 @@
 import {
   createRegistro,
+  enviarRegistroAIngenieria,
+  getMisRegistros,
+  RegistroHistorialApi,
   uploadRegistroFotos,
 } from "@/services/api/registrosApi";
 import {
@@ -7,6 +10,7 @@ import {
   getSelectedObra,
   getSession,
 } from "@/services/auth/session";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -19,6 +23,7 @@ import {
   View,
 } from "react-native";
 import {
+  ActivityIndicator,
   Button,
   Card,
   Checkbox,
@@ -106,10 +111,15 @@ export default function RegistrosScreen() {
   const insets = useSafeAreaInsets();
   const [obra, setObra] = useState<ObraSeleccionada | null>(null);
   const [currentUserName, setCurrentUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loadingJefeRegistros, setLoadingJefeRegistros] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [jefeRegistros, setJefeRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [editingRegistro, setEditingRegistro] =
+    useState<RegistroHistorialApi | null>(null);
 
   const [tipoRegistro, setTipoRegistro] =
     useState<TipoRegistro>("sello_cortafuego");
@@ -150,7 +160,18 @@ export default function RegistrosScreen() {
 
         setObra(currentObra);
         setCurrentUserName(userName);
+        setUserRole(session.user?.rol || "");
         setNombreSellador(userName);
+
+        if (session.user?.rol === "jefeobra") {
+          setLoadingJefeRegistros(true);
+          try {
+            const registros = await getMisRegistros(true);
+            setJefeRegistros(registros);
+          } finally {
+            setLoadingJefeRegistros(false);
+          }
+        }
       };
 
       loadInitialData();
@@ -285,6 +306,34 @@ export default function RegistrosScreen() {
     setFotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const fillFormFromRegistro = (registro: RegistroHistorialApi) => {
+    const nextTipo =
+      registro.tipo_registro === "junta_lineal_espuma"
+        ? "junta_lineal_espuma"
+        : "sello_cortafuego";
+
+    setEditingRegistro(registro);
+    setTipoRegistro(nextTipo);
+    setFecha(String(registro.fecha || "").slice(0, 10));
+    setCalendarMonth(new Date(registro.fecha || new Date()));
+    setItemizadoBeck(registro.descripcion_material || "");
+    setOtroItemizado(false);
+    setModulo(registro.modulo || "");
+    setPiso(registro.piso || "");
+    setEjeNumerico(registro.eje_numerico || "");
+    setEjeAlfabetico(registro.eje_alfabetico || "");
+    setNumeroSello(registro.numero_sello === "N/A" ? "" : registro.numero_sello || "");
+    setCantidadSellos(String(registro.cantidad_sellos || ""));
+    setNombreSellador(registro.nombre_sellador || "");
+    setHolgura(String(registro.holgura || ""));
+    setAccesibilidad(String(registro.accesibilidad || ""));
+    setItemizadoSacyr(registro.itemizado_sacyr || "");
+    setMetrosLineales(String(registro.metros_lineales || ""));
+    setObservaciones(registro.observaciones || "");
+    setError("");
+    setSuccess("");
+  };
+
   const validateForm = () => {
     if (!obra) return "Debes seleccionar una obra antes de enviar.";
 
@@ -319,6 +368,35 @@ export default function RegistrosScreen() {
     }
 
     if (!fotos.length) return "Debes agregar al menos una foto.";
+
+    return "";
+  };
+
+  const validateJefeEditForm = () => {
+    const commonMissing =
+      !fecha.trim() ||
+      !modulo.trim() ||
+      !piso.trim() ||
+      !ejeNumerico.trim() ||
+      !ejeAlfabetico.trim() ||
+      !nombreSellador.trim();
+
+    if (commonMissing) return "Debes completar todos los campos obligatorios.";
+
+    if (isJuntaLineal) {
+      if (!metrosLineales.trim()) return "Debes ingresar la longitud en metros.";
+      if (!Number.isFinite(toApiNumber(metrosLineales)) || toApiNumber(metrosLineales) <= 0) {
+        return "La longitud debe ser mayor a 0.";
+      }
+    } else if (
+      !itemizadoBeck.trim() ||
+      !numeroSello.trim() ||
+      !cantidadSellos.trim() ||
+      !holgura.trim() ||
+      !accesibilidad.trim()
+    ) {
+      return "Debes completar todos los campos obligatorios.";
+    }
 
     return "";
   };
@@ -378,6 +456,56 @@ export default function RegistrosScreen() {
     } catch (err: any) {
       console.log("CREATE/UPLOAD REGISTRO ERROR =>", err);
       setError(err?.message || "No se pudo completar el envío.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitJefeEdit = async () => {
+    try {
+      if (!editingRegistro) return;
+
+      const validationError = validateJefeEditForm();
+      if (validationError) {
+        setError(validationError);
+        setSuccess("");
+        return;
+      }
+
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
+      await enviarRegistroAIngenieria(editingRegistro.id, {
+        obraId: editingRegistro.obras?.id || editingRegistro.id,
+        fecha,
+        descripcionMaterial: isJuntaLineal
+          ? "Junta Lineal Espuma"
+          : itemizadoBeck,
+        modulo,
+        piso,
+        ejeNumerico: ejeNumerico.trim(),
+        ejeAlfabetico,
+        numeroSello: isJuntaLineal ? "" : numeroSello,
+        cantidadSellos: isJuntaLineal ? 1 : toApiNumber(cantidadSellos),
+        nombreSellador,
+        holgura: isJuntaLineal ? 0 : toApiNumber(holgura),
+        accesibilidad: isJuntaLineal ? 1 : toApiNumber(accesibilidad),
+        observaciones,
+        itemizadoSacyr: isJuntaLineal ? undefined : itemizadoSacyr,
+        tipoRegistro,
+        metrosLineales: isJuntaLineal
+          ? toApiNumber(metrosLineales)
+          : undefined,
+      });
+
+      const registros = await getMisRegistros(true);
+      setJefeRegistros(registros);
+      setEditingRegistro(null);
+      resetForm();
+      setSuccess("Registro enviado a ingeniería.");
+    } catch (err: any) {
+      setError(err?.message || "No se pudo enviar a ingeniería.");
     } finally {
       setSaving(false);
     }
@@ -470,6 +598,244 @@ export default function RegistrosScreen() {
       </View>
     </>
   );
+
+  if (userRole === "jefeobra") {
+    const registrosPendientes = jefeRegistros.filter(
+      (registro) => registro.estado === "pendiente",
+    );
+    const historial = jefeRegistros.filter(
+      (registro) => registro.estado !== "pendiente",
+    );
+
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <ScrollView contentContainerStyle={styles.content}>
+          <BrandHeader subtitle="Registros · Jefe de obra" />
+          <Text variant="titleLarge" style={styles.title}>
+            Registros de técnicos
+          </Text>
+          <Text style={styles.subtitle}>
+            Revisa registros de usuarios terreno asignados a tus mismas obras.
+            Al editar, el registro quedará en revisión para ingeniería.
+          </Text>
+
+          {loadingJefeRegistros ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator color="#f97316" />
+              <Text style={styles.emptyText}>Cargando registros...</Text>
+            </View>
+          ) : null}
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {success ? <Text style={styles.successText}>{success}</Text> : null}
+
+          {editingRegistro ? (
+            <Card style={styles.card}>
+              <Card.Content>
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.formTitle}>Editar registro</Text>
+                    <Text style={styles.emptyText}>
+                      Técnico: {editingRegistro.usuarios?.nombre || "Sin técnico"}
+                    </Text>
+                  </View>
+                  <Button mode="text" onPress={() => setEditingRegistro(null)}>
+                    Cancelar
+                  </Button>
+                </View>
+
+                <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                <SegmentedButtons
+                  value={tipoRegistro}
+                  onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
+                  style={styles.segmented}
+                  buttons={[
+                    { value: "sello_cortafuego", label: "Sello" },
+                    { value: "junta_lineal_espuma", label: "Junta" },
+                  ]}
+                />
+
+                {renderCommonFields()}
+
+                {isJuntaLineal ? (
+                  <TextInput
+                    label="Longitud (m)"
+                    value={metrosLineales}
+                    onChangeText={setMetrosLineales}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                ) : (
+                  <>
+                    <TextInput
+                      label="Cantidad de Sellos"
+                      value={cantidadSellos}
+                      onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                      mode="outlined"
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      label="Itemizado BECK"
+                      value={itemizadoBeck}
+                      onChangeText={setItemizadoBeck}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      label="Numero del Sello"
+                      value={numeroSello}
+                      onChangeText={setNumeroSello}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      label="Holgura"
+                      value={holgura}
+                      onChangeText={setHolgura}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      label="Accesibilidad"
+                      value={accesibilidad}
+                      onChangeText={(value) => setAccesibilidad(onlyDigits(value))}
+                      mode="outlined"
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      label="Itemizado SACYR"
+                      value={itemizadoSacyr}
+                      onChangeText={setItemizadoSacyr}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                  </>
+                )}
+
+                <TextInput
+                  label="Observaciones"
+                  value={observaciones}
+                  onChangeText={setObservaciones}
+                  mode="outlined"
+                  multiline
+                  numberOfLines={6}
+                  style={[styles.input, styles.observacionesInput]}
+                />
+
+                <Button
+                  mode="contained"
+                  onPress={submitJefeEdit}
+                  loading={saving}
+                  disabled={saving}
+                  style={styles.button}
+                  contentStyle={styles.buttonContent}
+                  labelStyle={styles.buttonLabel}
+                >
+                  {saving ? "Enviando..." : "Enviar a ingeniería"}
+                </Button>
+              </Card.Content>
+            </Card>
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Pendientes por revisar</Text>
+              {registrosPendientes.length ? (
+                registrosPendientes.map((registro) => (
+                  <Card key={registro.id} style={styles.card}>
+                    <Card.Content>
+                      <View style={styles.recordHeader}>
+                        <View style={styles.recordIcon}>
+                          <MaterialCommunityIcons
+                            name={
+                              registro.tipo_registro === "junta_lineal_espuma"
+                                ? "ruler"
+                                : "fire"
+                            }
+                            size={22}
+                            color="#f97316"
+                          />
+                        </View>
+                        <View style={styles.recordInfo}>
+                          <Text style={styles.recordTitle}>
+                            {registro.tipo_registro === "junta_lineal_espuma"
+                              ? "Junta lineal espuma"
+                              : "Sello cortafuego"}
+                          </Text>
+                          <Text style={styles.recordMeta}>
+                            {registro.obras?.nombre || "Sin obra"} · Piso{" "}
+                            {registro.piso}
+                          </Text>
+                          <Text style={styles.recordMeta}>
+                            Técnico: {registro.usuarios?.nombre || registro.nombre_sellador}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.recordDetails}>
+                        <Text style={styles.recordMeta}>Eje {registro.eje_alfabetico}-{registro.eje_numerico}</Text>
+                        <Text style={styles.recordMeta}>
+                          {registro.tipo_registro === "junta_lineal_espuma"
+                            ? `${registro.metros_lineales || 0} m`
+                            : `${registro.cantidad_sellos} sellos`}
+                        </Text>
+                      </View>
+                      <Button
+                        mode="contained"
+                        onPress={() => fillFormFromRegistro(registro)}
+                        style={styles.button}
+                      >
+                        Editar registro
+                      </Button>
+                    </Card.Content>
+                  </Card>
+                ))
+              ) : (
+                <Card style={styles.card}>
+                  <Card.Content>
+                    <Text style={styles.emptyText}>
+                      No hay registros pendientes de técnicos en tus obras.
+                    </Text>
+                  </Card.Content>
+                </Card>
+              )}
+
+              <Text style={styles.sectionTitle}>Historial de registros actualizados</Text>
+              {historial.slice(0, 12).map((registro) => (
+                <Card key={registro.id} style={styles.historyCard}>
+                  <Card.Content>
+                    <View style={styles.cardHeaderRow}>
+                      <View style={styles.recordInfo}>
+                        <Text style={styles.recordTitle}>
+                          {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
+                        </Text>
+                        <Text style={styles.recordMeta}>
+                          {registro.usuarios?.nombre || registro.nombre_sellador}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.statusPill,
+                          registro.estado === "validado" && styles.statusValidado,
+                          registro.estado === "rechazado" && styles.statusRechazado,
+                        ]}
+                      >
+                        {registro.estado.replace("_", " ")}
+                      </Text>
+                    </View>
+                  </Card.Content>
+                </Card>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -961,6 +1327,83 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: "#16a34a",
     fontWeight: "600",
+  },
+  loadingBox: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 18,
+  },
+  sectionTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  recordHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  recordIcon: {
+    alignItems: "center",
+    backgroundColor: "#fff7ed",
+    borderRadius: 14,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  recordInfo: {
+    flex: 1,
+  },
+  recordTitle: {
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  recordMeta: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  recordDetails: {
+    borderTopColor: "#e2e8f0",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingTop: 10,
+  },
+  historyCard: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  statusPill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#eff6ff",
+    borderRadius: 999,
+    color: "#2563eb",
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    textTransform: "capitalize",
+  },
+  statusValidado: {
+    backgroundColor: "#dcfce7",
+    color: "#16a34a",
+  },
+  statusRechazado: {
+    backgroundColor: "#fee2e2",
+    color: "#dc2626",
   },
   modalBackdrop: {
     flex: 1,

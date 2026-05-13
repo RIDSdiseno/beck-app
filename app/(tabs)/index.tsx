@@ -49,6 +49,10 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [activeTipo, setActiveTipo] = useState<
+    "sello_cortafuego" | "junta_lineal_espuma"
+  >("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
 
   const loadDashboard = useCallback(async (forceRefresh = false) => {
@@ -59,6 +63,7 @@ export default function DashboardScreen() {
         getMisRegistros(forceRefresh),
       ]);
       setUserName(session.user?.nombre || "Usuario Beck");
+      setUserRole(session.user?.rol || "");
       setRegistros(data);
     } catch (err: any) {
       setError(err?.message || "No se pudo cargar el inicio");
@@ -124,6 +129,39 @@ export default function DashboardScreen() {
   }, [registros]);
 
   const recientes = useMemo(() => registros.slice(0, 4), [registros]);
+  const jefeObraMetrics = useMemo(() => {
+    const visibles = registros.filter((registro) =>
+      activeTipo === "junta_lineal_espuma"
+        ? registro.tipo_registro === "junta_lineal_espuma"
+        : registro.tipo_registro !== "junta_lineal_espuma",
+    );
+    const pisos = new Set(visibles.map((registro) => registro.piso).filter(Boolean));
+    const selladores = new Set(
+      visibles.map((registro) => registro.nombre_sellador).filter(Boolean),
+    );
+    const unidades = visibles.reduce((total, registro) => {
+      if (activeTipo === "junta_lineal_espuma") {
+        return total + Number(registro.metros_lineales || 0);
+      }
+      return total + Number(registro.cantidad_sellos || 0);
+    }, 0);
+    const holguras = visibles
+      .map((registro) => Number(registro.holgura || 0))
+      .filter((value) => Number.isFinite(value));
+    const promedioHolgura = holguras.length
+      ? holguras.reduce((total, value) => total + value, 0) / holguras.length
+      : 0;
+
+    return {
+      registrosVista: visibles.length,
+      unidades,
+      ponderados: unidades,
+      pisos: pisos.size,
+      selladores: selladores.size,
+      promedioFactor: 1,
+      promedioHolgura,
+    };
+  }, [activeTipo, registros]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -137,6 +175,175 @@ export default function DashboardScreen() {
         <ActivityIndicator size="large" color="#f97316" />
         <Text style={styles.helper}>Cargando inicio...</Text>
       </View>
+    );
+  }
+
+  if (userRole === "jefeobra") {
+    const isJunta = activeTipo === "junta_lineal_espuma";
+
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <BrandHeader subtitle="Inicio · Jefe de obra" />
+
+          <Text variant="titleLarge" style={styles.title}>
+            {isJunta
+              ? "Registro de junta lineal espuma"
+              : "Registro de sellos · Itemizado BECK / SACYR"}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isJunta
+              ? "Control diario de juntas lineales con fotos, longitud en metros y avance de terreno."
+              : "Control diario de sellos con fotos, factores de holgura y avance de protección pasiva."}
+          </Text>
+
+          {error ? (
+            <Card style={styles.errorCard}>
+              <Card.Content>
+                <Text style={styles.errorText}>{error}</Text>
+                <Button
+                  mode="contained"
+                  onPress={() => loadDashboard(true)}
+                  style={styles.button}
+                >
+                  Reintentar
+                </Button>
+              </Card.Content>
+            </Card>
+          ) : null}
+
+          <View style={styles.tipoTabs}>
+            <Button
+              mode={activeTipo === "sello_cortafuego" ? "contained" : "text"}
+              icon="fire"
+              onPress={() => setActiveTipo("sello_cortafuego")}
+            >
+              Sellos Cortafuego
+            </Button>
+            <Button
+              mode={activeTipo === "junta_lineal_espuma" ? "contained" : "text"}
+              icon="ruler"
+              onPress={() => setActiveTipo("junta_lineal_espuma")}
+            >
+              Junta Lineal Espuma
+            </Button>
+          </View>
+
+          <View style={styles.summaryGrid}>
+            <Card style={[styles.summaryCard, styles.summaryWarm]}>
+              <Card.Content>
+                <Text style={styles.summaryLabel}>Registros en vista</Text>
+                <Text style={styles.summaryValue}>
+                  {jefeObraMetrics.registrosVista}
+                </Text>
+                <Text style={styles.helperText}>Filtrados por tipo</Text>
+              </Card.Content>
+            </Card>
+
+            <Card style={[styles.summaryCard, styles.summaryBlue]}>
+              <Card.Content>
+                <Text style={styles.summaryLabel}>
+                  {isJunta ? "Metros lineales registrados" : "Sellos registrados"}
+                </Text>
+                <Text style={styles.summaryValue}>
+                  {isJunta
+                    ? jefeObraMetrics.unidades.toFixed(2)
+                    : Math.round(jefeObraMetrics.unidades)}
+                </Text>
+                <Text style={styles.helperText}>
+                  {isJunta ? "Metros lineales totales" : "Conteo directo de unidades"}
+                </Text>
+              </Card.Content>
+            </Card>
+
+            <Card style={[styles.summaryCard, styles.summaryGreen]}>
+              <Card.Content>
+                <Text style={styles.summaryLabel}>
+                  {isJunta ? "Metros ponderados" : "Sellos ponderados"}
+                </Text>
+                <Text style={[styles.summaryValue, styles.greenValue]}>
+                  {isJunta
+                    ? jefeObraMetrics.ponderados.toFixed(2)
+                    : jefeObraMetrics.ponderados.toFixed(1)}
+                </Text>
+                <Text style={styles.helperText}>
+                  Equivalente por factor de holgura y tipo de cielo
+                </Text>
+              </Card.Content>
+            </Card>
+          </View>
+
+          <View style={styles.smallSummaryGrid}>
+            <Card style={styles.smallSummaryCard}>
+              <Card.Content style={styles.smallSummaryContent}>
+                <MaterialCommunityIcons name="stairs" size={22} color="#ea580c" />
+                <View>
+                  <Text style={styles.helperText}>Pisos con registros</Text>
+                  <Text style={styles.smallSummaryValue}>{jefeObraMetrics.pisos}</Text>
+                </View>
+              </Card.Content>
+            </Card>
+            <Card style={styles.smallSummaryCard}>
+              <Card.Content style={styles.smallSummaryContent}>
+                <MaterialCommunityIcons
+                  name="account-group-outline"
+                  size={22}
+                  color="#3b82f6"
+                />
+                <View>
+                  <Text style={styles.helperText}>Selladores distintos</Text>
+                  <Text style={styles.smallSummaryValue}>
+                    {jefeObraMetrics.selladores}
+                  </Text>
+                </View>
+              </Card.Content>
+            </Card>
+            <Card style={styles.smallSummaryCard}>
+              <Card.Content style={styles.smallSummaryContent}>
+                <MaterialCommunityIcons name="fire" size={22} color="#ef4444" />
+                <View>
+                  <Text style={styles.helperText}>Promedio factor F</Text>
+                  <Text style={styles.smallSummaryValue}>
+                    {jefeObraMetrics.promedioFactor.toFixed(2)}
+                  </Text>
+                </View>
+              </Card.Content>
+            </Card>
+            <Card style={styles.smallSummaryCard}>
+              <Card.Content style={styles.smallSummaryContent}>
+                <MaterialCommunityIcons
+                  name="chart-bar"
+                  size={22}
+                  color="#f97316"
+                />
+                <View>
+                  <Text style={styles.helperText}>Holgura promedio (cm)</Text>
+                  <Text style={styles.smallSummaryValue}>
+                    {jefeObraMetrics.promedioHolgura.toFixed(1)}
+                  </Text>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+
+          <Button
+            mode="contained"
+            icon="clipboard-edit-outline"
+            onPress={() => router.push("/registros")}
+            style={styles.button}
+          >
+            Revisar registros de técnicos
+          </Button>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -459,5 +666,71 @@ const styles = StyleSheet.create({
     backgroundColor: "#f97316",
     borderRadius: 14,
     marginTop: 12,
+  },
+  tipoTabs: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 18,
+  },
+  summaryGrid: {
+    gap: 12,
+    marginBottom: 12,
+  },
+  summaryCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderTopWidth: 4,
+  },
+  summaryWarm: {
+    borderColor: "#facc15",
+    backgroundColor: "#fffbeb",
+  },
+  summaryBlue: {
+    borderColor: "#3b82f6",
+    backgroundColor: "#eff6ff",
+  },
+  summaryGreen: {
+    borderColor: "#22c55e",
+    backgroundColor: "#ecfdf5",
+  },
+  summaryLabel: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  summaryValue: {
+    color: "#0f172a",
+    fontSize: 32,
+    fontWeight: "900",
+    marginTop: 10,
+  },
+  greenValue: {
+    color: "#16a34a",
+  },
+  smallSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
+  },
+  smallSummaryCard: {
+    width: "48%",
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  smallSummaryContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  smallSummaryValue: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "900",
   },
 });
