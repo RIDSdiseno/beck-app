@@ -6,7 +6,7 @@ export type CreateRegistroPayload = {
   descripcionMaterial: string;
   modulo: string;
   piso: string;
-  ejeNumerico: number;
+  ejeNumerico: string;
   ejeAlfabetico: string;
   numeroSello: string;
   cantidadSellos: number;
@@ -14,6 +14,9 @@ export type CreateRegistroPayload = {
   holgura: number;
   accesibilidad: number;
   observaciones?: string;
+  itemizadoSacyr?: string;
+  tipoRegistro?: "sello_cortafuego" | "junta_lineal_espuma";
+  metrosLineales?: number;
 };
 
 export type EstadoRegistroApi =
@@ -29,7 +32,7 @@ export type RegistroHistorialApi = {
   descripcion_material: string;
   modulo: string;
   piso: string;
-  eje_numerico: number;
+  eje_numerico: string;
   eje_alfabetico: string;
   numero_sello: string;
   cantidad_sellos: number;
@@ -38,6 +41,9 @@ export type RegistroHistorialApi = {
   accesibilidad: number;
   observaciones?: string | null;
   estado: EstadoRegistroApi;
+  itemizado_sacyr?: string | null;
+  metros_lineales?: number | null;
+  tipo_registro: "sello_cortafuego" | "junta_lineal_espuma" | string;
   created_at: string;
   updated_at: string;
   obras?: {
@@ -55,6 +61,7 @@ export type RegistroHistorialApi = {
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
+let registrosCache: RegistroHistorialApi[] | null = null;
 
 async function readJsonResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
@@ -89,16 +96,27 @@ export async function createRegistro(payload: CreateRegistroPayload) {
     body: JSON.stringify(payload),
   });
 
-  const result = await response.json();
+  const result = await readJsonResponse(response);
 
-  if (!response.ok || !result.success) {
+  if (!response.ok || !result?.success) {
     throw new Error(result?.error || "No se pudo crear el registro");
   }
 
+  clearMisRegistrosCache();
   return result.data;
 }
 
-export async function getMisRegistros(): Promise<RegistroHistorialApi[]> {
+export function clearMisRegistrosCache() {
+  registrosCache = null;
+}
+
+export async function getMisRegistros(
+  forceRefresh = false,
+): Promise<RegistroHistorialApi[]> {
+  if (registrosCache && !forceRefresh) {
+    return registrosCache;
+  }
+
   const session = await getSession();
 
   if (!session.token) {
@@ -119,7 +137,8 @@ export async function getMisRegistros(): Promise<RegistroHistorialApi[]> {
     throw new Error(result?.error || "No se pudieron obtener los registros");
   }
 
-  return result.data as RegistroHistorialApi[];
+  registrosCache = result.data as RegistroHistorialApi[];
+  return registrosCache;
 }
 
 export async function uploadRegistroFotos(
@@ -157,11 +176,12 @@ export async function uploadRegistroFotos(
     },
   );
 
-  const result = await response.json();
+  const result = await readJsonResponse(response);
 
-  if (!response.ok || !result.success) {
+  if (!response.ok || !result?.success) {
     throw new Error(result?.error || "No se pudieron subir las fotos");
   }
 
+  clearMisRegistrosCache();
   return result.data;
 }

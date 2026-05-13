@@ -1,6 +1,4 @@
-import { clearSession } from "@/services/auth/session";
 import dayjs from "dayjs";
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Card, Chip, DataTable, Text, TextInput } from "react-native-paper";
@@ -141,15 +139,6 @@ export default function CotizacionesScreen() {
     );
   };
 
-  const handleLogout = async () => {
-    try {
-      await clearSession();
-      router.replace("/login");
-    } catch (error) {
-      console.log("LOGOUT ERROR", error);
-    }
-  };
-
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 2 }]}
@@ -162,10 +151,7 @@ export default function CotizacionesScreen() {
           paddingBottom: 16,
         }}
       >
-        <BrandHeader
-          subtitle="Gestión comercial · BECK"
-          onLogout={handleLogout}
-        />
+        <BrandHeader subtitle="Gestión comercial · BECK" />
         <Text variant="titleLarge" style={styles.title}>
           Cotizaciones
         </Text>

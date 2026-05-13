@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 
 export const STORAGE_KEYS = {
   token: "beck_token",
@@ -24,9 +25,9 @@ export type SelectedObra = {
 };
 
 export async function saveSession(token: string, user: SessionUser) {
-  await AsyncStorage.multiSet([
-    [STORAGE_KEYS.token, token],
-    [STORAGE_KEYS.user, JSON.stringify(user)],
+  await Promise.all([
+    SecureStore.setItemAsync(STORAGE_KEYS.token, token),
+    AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user)),
   ]);
 }
 
@@ -35,9 +36,9 @@ export async function getSession(): Promise<{
   user: SessionUser | null;
   isAuthenticated: boolean;
 }> {
-  const [[, token], [, userRaw]] = await AsyncStorage.multiGet([
-    STORAGE_KEYS.token,
-    STORAGE_KEYS.user,
+  const [token, userRaw] = await Promise.all([
+    SecureStore.getItemAsync(STORAGE_KEYS.token),
+    AsyncStorage.getItem(STORAGE_KEYS.user),
   ]);
 
   let user: SessionUser | null = null;
@@ -56,12 +57,42 @@ export async function getSession(): Promise<{
 }
 
 export async function clearSession() {
-  await AsyncStorage.multiRemove([
-    STORAGE_KEYS.token,
-    STORAGE_KEYS.user,
-    STORAGE_KEYS.obraSeleccionada,
-    STORAGE_KEYS.codeVerifier,
-    STORAGE_KEYS.redirectUri,
+  await Promise.all([
+    SecureStore.deleteItemAsync(STORAGE_KEYS.token),
+    clearMicrosoftAuthState(),
+    AsyncStorage.multiRemove([
+      STORAGE_KEYS.user,
+      STORAGE_KEYS.obraSeleccionada,
+    ]),
+  ]);
+}
+
+export async function saveMicrosoftAuthState(
+  codeVerifier: string,
+  redirectUri: string,
+) {
+  await Promise.all([
+    SecureStore.setItemAsync(STORAGE_KEYS.codeVerifier, codeVerifier),
+    SecureStore.setItemAsync(STORAGE_KEYS.redirectUri, redirectUri),
+  ]);
+}
+
+export async function getMicrosoftAuthState() {
+  const [codeVerifier, redirectUri] = await Promise.all([
+    SecureStore.getItemAsync(STORAGE_KEYS.codeVerifier),
+    SecureStore.getItemAsync(STORAGE_KEYS.redirectUri),
+  ]);
+
+  return {
+    codeVerifier,
+    redirectUri,
+  };
+}
+
+export async function clearMicrosoftAuthState() {
+  await Promise.all([
+    SecureStore.deleteItemAsync(STORAGE_KEYS.codeVerifier),
+    SecureStore.deleteItemAsync(STORAGE_KEYS.redirectUri),
   ]);
 }
 

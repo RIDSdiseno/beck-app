@@ -63,12 +63,11 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
 
-  const showAllModules = canViewAllModules(userRole);
   const currentTab = String(segments[segments.length - 1] || "index");
-  const restrictedTabs = new Set(["index", "cotizaciones", "reportes"]);
+  const restrictedTabs = new Set(["cotizaciones", "reportes"]);
 
-  if (!showAllModules && restrictedTabs.has(currentTab)) {
-    return <Redirect href="/mis-obras" />;
+  if (!canViewAllModules(userRole) && restrictedTabs.has(currentTab)) {
+    return <Redirect href="/(tabs)" />;
   }
 
   return (
@@ -86,8 +85,7 @@ export default function TabLayout() {
               <Tabs.Screen
                 name="index"
                 options={{
-                  title: "Dashboard",
-                  href: showAllModules ? undefined : null,
+                  title: "Inicio",
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="view-dashboard-outline"
@@ -113,7 +111,7 @@ export default function TabLayout() {
               <Tabs.Screen
                 name="registros"
                 options={{
-                  title: "Registros",
+                  title: "Registro",
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="clipboard-text-outline"
@@ -127,7 +125,7 @@ export default function TabLayout() {
                 name="cotizaciones"
                 options={{
                   title: "Cotizaciones",
-                  href: showAllModules ? undefined : null,
+                  href: null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="file-document-edit-outline"
@@ -141,7 +139,7 @@ export default function TabLayout() {
                 name="reportes"
                 options={{
                   title: "Reportes",
-                  href: showAllModules ? undefined : null,
+                  href: null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="chart-bar-stacked"
@@ -155,9 +153,23 @@ export default function TabLayout() {
                 name="historial"
                 options={{
                   title: "Historial",
+                  href: null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="history"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="perfil"
+                options={{
+                  title: "Perfil",
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="account-circle-outline"
                       color={color}
                       size={size}
                     />

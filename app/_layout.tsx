@@ -7,6 +7,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
+import { LogBox } from "react-native";
 import { MD3LightTheme, Provider as PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -15,6 +16,10 @@ import { RegistrosProvider } from "@/context/RegistrosContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+LogBox.ignoreLogs([
+  "SafeAreaView has been deprecated and will be removed in a future release",
+]);
 
 const paperTheme = {
   ...MD3LightTheme,

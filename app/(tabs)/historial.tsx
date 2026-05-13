@@ -2,9 +2,7 @@ import {
   getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
-import { clearSession, STORAGE_KEYS } from "@/services/auth/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
@@ -86,12 +84,12 @@ export default function HistorialScreen() {
     new Set(),
   );
 
-  const loadRegistros = useCallback(async () => {
+  const loadRegistros = useCallback(async (forceRefresh = false) => {
     try {
       setError("");
       const [hiddenIds, data] = await Promise.all([
         getHiddenValidatedIds(),
-        getMisRegistros(),
+        getMisRegistros(forceRefresh),
       ]);
 
       setHiddenValidatedIds(hiddenIds);
@@ -122,7 +120,7 @@ export default function HistorialScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadRegistros();
+    await loadRegistros(true);
     setRefreshing(false);
   };
 
@@ -134,19 +132,9 @@ export default function HistorialScreen() {
     await saveHiddenValidatedIds(next);
   };
 
-  const handleLogout = async () => {
-    try {
-      await clearSession();
-      await AsyncStorage.removeItem(STORAGE_KEYS.obraSeleccionada);
-      router.replace("/login");
-    } catch (logoutError) {
-      console.log("LOGOUT ERROR", logoutError);
-    }
-  };
-
   const renderHeader = () => (
     <View style={styles.headerWrapper}>
-      <BrandHeader subtitle="Registros realizados · BECK" onLogout={handleLogout} />
+      <BrandHeader subtitle="Registros realizados · BECK" />
       <Text variant="titleLarge" style={styles.title}>
         Historial de registros
       </Text>
@@ -174,7 +162,7 @@ export default function HistorialScreen() {
 
         <Button
           mode="contained"
-          onPress={loadRegistros}
+          onPress={() => loadRegistros(true)}
           style={styles.retryButton}
           contentStyle={styles.retryButtonContent}
           labelStyle={styles.retryButtonLabel}

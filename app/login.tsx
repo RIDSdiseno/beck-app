@@ -4,9 +4,13 @@ import {
   microsoftDiscovery,
 } from "@/services/auth/microsoft";
 import { loginWithEmailPassword } from "@/services/api/authApi";
+import { clearMisObrasCache } from "@/services/api/obrasApi";
+import { clearMisRegistrosCache } from "@/services/api/registrosApi";
 import { getInitialRouteForRole } from "@/services/auth/roles";
-import { saveSession } from "@/services/auth/session";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  saveMicrosoftAuthState,
+  saveSession,
+} from "@/services/auth/session";
 import * as AuthSession from "expo-auth-session";
 import { router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
@@ -86,10 +90,7 @@ export default function LoginScreen() {
         throw new Error("No se pudo obtener el code_verifier.");
       }
 
-      await AsyncStorage.multiSet([
-        ["beck_code_verifier", codeVerifier],
-        ["beck_redirect_uri", redirectUri],
-      ]);
+      await saveMicrosoftAuthState(codeVerifier, redirectUri);
 
       const result = await promptAsync();
 
@@ -125,6 +126,8 @@ export default function LoginScreen() {
       setIsEmailLoading(true);
 
       const data = await loginWithEmailPassword(email, password);
+      clearMisObrasCache();
+      clearMisRegistrosCache();
       await saveSession(data.token, data.user);
       router.replace(getInitialRouteForRole(data.user.rol));
     } catch (err: any) {

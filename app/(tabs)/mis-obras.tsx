@@ -1,5 +1,5 @@
 import { getMisObras, ObraApi } from "@/services/api/obrasApi";
-import { clearSession, saveSelectedObra } from "@/services/auth/session";
+import { saveSelectedObra } from "@/services/auth/session";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
@@ -54,10 +54,10 @@ export default function MisObrasScreen() {
   const [obras, setObras] = useState<ObraApi[]>([]);
   const [selectingId, setSelectingId] = useState<string | null>(null);
 
-  const loadObras = useCallback(async () => {
+  const loadObras = useCallback(async (forceRefresh = false) => {
     try {
       setError("");
-      const data = await getMisObras();
+      const data = await getMisObras(forceRefresh);
       setObras(data);
     } catch (err: any) {
       setError(err?.message || "No se pudieron cargar las obras");
@@ -76,7 +76,7 @@ export default function MisObrasScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadObras();
+    await loadObras(true);
     setRefreshing(false);
   };
 
@@ -100,18 +100,9 @@ export default function MisObrasScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await clearSession();
-      router.replace("/login");
-    } catch (error) {
-      console.log("LOGOUT ERROR", error);
-    }
-  };
-
   const renderHeader = () => (
     <>
-      <BrandHeader subtitle="Obras asignadas · BECK" onLogout={handleLogout} />
+      <BrandHeader subtitle="Obras asignadas · BECK" />
       <Text variant="titleLarge" style={styles.title}>
         Mis Obras
       </Text>
@@ -142,7 +133,7 @@ export default function MisObrasScreen() {
 
         <Button
           mode="contained"
-          onPress={loadObras}
+          onPress={() => loadObras(true)}
           style={styles.retryButton}
           contentStyle={styles.retryButtonContent}
           labelStyle={styles.retryButtonLabel}

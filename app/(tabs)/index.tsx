@@ -1,246 +1,311 @@
-import { clearSession } from "@/services/auth/session";
-import { router } from "expo-router";
-import { MotiView } from "moti";
-import React, { useMemo, useState } from "react";
 import {
-  DimensionValue,
+  getMisRegistros,
+  RegistroHistorialApi,
+} from "@/services/api/registrosApi";
+import { getSession } from "@/services/auth/session";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
-import { Card, Chip, SegmentedButtons, Text } from "react-native-paper";
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Chip,
+  Text,
+} from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import { useRegistros } from "../../context/RegistrosContext";
+
+function formatDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sin fecha";
+
+  return date.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function getRegistroKind(registro: RegistroHistorialApi) {
+  return registro.tipo_registro === "junta_lineal_espuma"
+    ? "Junta Lineal"
+    : "Sello";
+}
 
 export default function DashboardScreen() {
-  const { registros } = useRegistros();
-  const [timeRange, setTimeRange] = useState("hoy");
   const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [userName, setUserName] = useState("");
+  const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
 
-  const pisos = useMemo(() => {
-    const mapa = new Map<string, number>();
-    registros.forEach((r) => {
-      mapa.set(r.piso, (mapa.get(r.piso) || 0) + 1);
-    });
-    const max = Math.max(...Array.from(mapa.values()), 1);
-    return Array.from(mapa.entries()).map(([label, sellos]) => ({
-      label,
-      sellos,
-      progress: Math.round((sellos / max) * 100),
-    }));
-  }, [registros]);
-
-  const equipos = useMemo(() => {
-    const mapa = new Map<
-      string,
-      { piso?: string; sellos: number; factor: number }
-    >();
-    registros.forEach((r) => {
-      const target = mapa.get(r.equipo) || {
-        piso: r.piso,
-        sellos: 0,
-        factor: 1,
-      };
-      target.sellos += 1;
-      target.piso = target.piso || r.piso;
-      target.factor = 1 + (target.sellos % 4) * 0.06; // mock factor
-      mapa.set(r.equipo, target);
-    });
-    return Array.from(mapa.entries()).map(([nombre, v]) => ({
-      nombre,
-      piso: v.piso || "-",
-      sellos: v.sellos,
-      factor: v.factor,
-    }));
-  }, [registros]);
-
-  const kpis = {
-    sellos: registros.length,
-    ponderados: registros.length,
-    produccionVista: registros.length,
-    frentes: equipos.length,
-  };
-
-  const handleLogout = async () => {
+  const loadDashboard = useCallback(async (forceRefresh = false) => {
     try {
-      await clearSession();
-      router.replace("/login");
-    } catch (error) {
-      console.log("LOGOUT ERROR", error);
+      setError("");
+      const [session, data] = await Promise.all([
+        getSession(),
+        getMisRegistros(forceRefresh),
+      ]);
+      setUserName(session.user?.nombre || "Usuario Beck");
+      setRegistros(data);
+    } catch (err: any) {
+      setError(err?.message || "No se pudo cargar el inicio");
     }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const init = async () => {
+        setLoading(true);
+        await loadDashboard();
+        if (isActive) setLoading(false);
+      };
+
+      init();
+
+      return () => {
+        isActive = false;
+      };
+    }, [loadDashboard]),
+  );
+
+  const metrics = useMemo(() => {
+    const sellos = registros
+      .filter((registro) => registro.tipo_registro !== "junta_lineal_espuma")
+      .reduce((total, registro) => total + (registro.cantidad_sellos || 0), 0);
+    const enRevision = registros.filter(
+      (registro) => registro.estado === "en_revision",
+    ).length;
+    const validados = registros.filter(
+      (registro) => registro.estado === "validado",
+    ).length;
+    const pendientes = registros.filter(
+      (registro) => registro.estado === "pendiente",
+    ).length;
+    const rechazados = registros.filter(
+      (registro) => registro.estado === "rechazado",
+    ).length;
+    const total = registros.length;
+    const avance = total ? Math.round((validados / total) * 100) : 0;
+
+    const obraMap = new Map<string, number>();
+    registros.forEach((registro) => {
+      const obra = registro.obras?.nombre || "Sin obra";
+      obraMap.set(obra, (obraMap.get(obra) || 0) + 1);
+    });
+    const obraPrincipal =
+      Array.from(obraMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+      "Sin actividad";
+
+    return {
+      sellos,
+      enRevision,
+      validados,
+      pendientes,
+      rechazados,
+      total,
+      avance,
+      obraPrincipal,
+    };
+  }, [registros]);
+
+  const recientes = useMemo(() => registros.slice(0, 4), [registros]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboard(true);
+    setRefreshing(false);
   };
 
-  const fadeIn = (delay = 0) => ({
-    from: { opacity: 0, translateY: 12 },
-    animate: { opacity: 1, translateY: 0 },
-    transition: { type: "timing" as const, duration: 280, delay },
-  });
-
-  const kpiCards = [
-    {
-      label: "Sellos ejecutados",
-      value: kpis.sellos,
-      color: "#22c55e",
-      helper: `Acumulado (${timeRange})`,
-      progress: "70%",
-    },
-    {
-      label: "Sellos ponderados",
-      value: kpis.ponderados,
-      color: "#f97316",
-      helper: "Incluye holgura (mock)",
-      progress: "60%",
-    },
-    {
-      label: "Produccion de la vista",
-      value: kpis.produccionVista,
-      color: "#eab308",
-      helper: "Registros en la vista",
-      progress: "40%",
-    },
-    {
-      label: "Frentes activos",
-      value: kpis.frentes,
-      color: "#38bdf8",
-      helper: "Equipos operando",
-      progress: "30%",
-    },
-  ];
+  if (loading) {
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator size="large" color="#f97316" />
+        <Text style={styles.helper}>Cargando inicio...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView
-      className="bg-[#f5f7fb]"
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
       <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: 0,
-          paddingBottom: 24,
-        }}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        <MotiView {...fadeIn(0)}>
-          <BrandHeader
-            subtitle="Obra demo - CRM BECK"
-            onLogout={handleLogout}
-          />
-        </MotiView>
+        <BrandHeader subtitle="Inicio · BECK" />
 
-        <MotiView {...fadeIn(60)}>
-          <Text variant="titleLarge" style={styles.title}>
-            Centro de mando de la obra
-          </Text>
-          <Text style={styles.subtitle}>
-            Controla el avance de sellos y juntas por rango de tiempo, piso y
-            equipo.
-          </Text>
-        </MotiView>
+        <Text variant="titleLarge" style={styles.title}>
+          Hola, {userName.split(" ")[0] || "equipo"}
+        </Text>
+        <Text style={styles.subtitle}>
+          Resumen de tus registros en terreno y el avance validado por
+          ingeniería.
+        </Text>
 
-        <MotiView {...fadeIn(90)}>
-          <SegmentedButtons
-            value={timeRange}
-            onValueChange={setTimeRange}
-            buttons={[
-              { value: "hoy", label: "Hoy" },
-              { value: "semana", label: "Semana" },
-              { value: "mes", label: "Mes" },
-              { value: "obra", label: "Obra completa" },
-            ]}
-            style={{ marginBottom: 12 }}
-          />
-        </MotiView>
+        {error ? (
+          <Card style={styles.errorCard}>
+            <Card.Content>
+              <Text style={styles.errorText}>{error}</Text>
+              <Button
+                mode="contained"
+                onPress={() => loadDashboard(true)}
+                style={styles.button}
+              >
+                Reintentar
+              </Button>
+            </Card.Content>
+          </Card>
+        ) : null}
 
         <View style={styles.kpiGrid}>
-          {kpiCards.map((item, idx) => (
-            <MotiView key={item.label} {...fadeIn(120 + idx * 60)}>
-              <Card style={[styles.kpiCard, styles.cardShadow]}>
-                <Card.Content>
-                  <Text style={styles.kpiLabel}>{item.label}</Text>
-                  <Text style={[styles.kpiValue, { color: item.color }]}>
-                    {item.value}
-                  </Text>
-                  <Text style={styles.kpiHelper}>{item.helper}</Text>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: item.progress as DimensionValue,
-                          backgroundColor: item.color,
-                        },
-                      ]}
-                    />
-                  </View>
-                </Card.Content>
-              </Card>
-            </MotiView>
-          ))}
+          <Card style={styles.kpiCard}>
+            <Card.Content>
+              <MaterialCommunityIcons
+                name="shield-check-outline"
+                size={24}
+                color="#f97316"
+              />
+              <Text style={styles.kpiValue}>{metrics.sellos}</Text>
+              <Text style={styles.kpiLabel}>Sellos realizados</Text>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.kpiCard}>
+            <Card.Content>
+              <MaterialCommunityIcons
+                name="timer-sand"
+                size={24}
+                color="#3b82f6"
+              />
+              <Text style={styles.kpiValue}>{metrics.enRevision}</Text>
+              <Text style={styles.kpiLabel}>En revisión</Text>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.kpiCard}>
+            <Card.Content>
+              <MaterialCommunityIcons
+                name="check-decagram-outline"
+                size={24}
+                color="#16a34a"
+              />
+              <Text style={styles.kpiValue}>{metrics.validados}</Text>
+              <Text style={styles.kpiLabel}>Validados</Text>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.kpiCard}>
+            <Card.Content>
+              <MaterialCommunityIcons
+                name="close-octagon-outline"
+                size={24}
+                color="#dc2626"
+              />
+              <Text style={styles.kpiValue}>{metrics.rechazados}</Text>
+              <Text style={styles.kpiLabel}>Rechazados</Text>
+            </Card.Content>
+          </Card>
         </View>
 
-        <MotiView {...fadeIn(180)}>
-          <Card style={[styles.card, styles.cardShadow]}>
-            <Card.Title title="Mapa rapido de la obra" />
-            <Card.Content>
-              <ScrollView horizontal showsHorizontalScrollIndicator>
-                {pisos.map((p) => (
-                  <Card
-                    key={p.label}
-                    style={[styles.pisoCard, styles.cardShadow]}
-                  >
-                    <Card.Content>
-                      <Text variant="labelSmall" style={{ color: "#f97316" }}>
-                        {p.label}
-                      </Text>
-                      <Text style={styles.metricValue}>{p.sellos} sellos</Text>
-                      <View style={styles.progressBar}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            {
-                              width: `${p.progress}%`,
-                              backgroundColor: "#f97316",
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.helperTextSmall}>
-                        Avance estimado: {p.progress}%
-                      </Text>
-                    </Card.Content>
-                  </Card>
-                ))}
-              </ScrollView>
-            </Card.Content>
-          </Card>
-        </MotiView>
+        <Card style={styles.card}>
+          <Card.Content>
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={styles.cardTitle}>Pulso de avance</Text>
+                <Text style={styles.helperText}>
+                  {metrics.avance}% de tus registros ya fue validado.
+                </Text>
+              </View>
+              <Chip style={styles.orangeChip} textStyle={styles.chipText}>
+                {metrics.total} registros
+              </Chip>
+            </View>
 
-        <MotiView {...fadeIn(220)}>
-          <Card style={[styles.card, styles.cardShadow]}>
-            <Card.Title title="Rendimiento por equipo" />
-            <Card.Content>
-              {equipos.map((eq, idx) => (
-                <MotiView key={eq.nombre} {...fadeIn(240 + idx * 40)}>
-                  <View style={styles.equipoRow}>
-                    <View>
-                      <Text style={styles.equipoNombre}>{eq.nombre}</Text>
-                      <Text style={styles.helperTextSmall}>
-                        {eq.piso} ・ {eq.sellos} sellos
-                      </Text>
-                    </View>
-                    <Chip style={styles.chipSecondary} compact>
-                      F prom: {eq.factor.toFixed(2)}
-                    </Chip>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.max(metrics.avance, 4)}%` },
+                ]}
+              />
+            </View>
+
+            <View style={styles.statusRow}>
+              <Text style={styles.statusItem}>Pendientes: {metrics.pendientes}</Text>
+              <Text style={styles.statusItem}>Rechazados: {metrics.rechazados}</Text>
+            </View>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text style={styles.cardTitle}>Foco sugerido</Text>
+            <Text style={styles.focusText}>
+              Tu obra con más actividad es {metrics.obraPrincipal}. Prioriza
+              revisar los registros en revisión para acelerar validaciones.
+            </Text>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.card}>
+          <Card.Content>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Últimos movimientos</Text>
+              <Button mode="text" onPress={() => router.push("/historial")}>
+                Ver historial
+              </Button>
+            </View>
+
+            {recientes.length ? (
+              recientes.map((registro) => (
+                <View key={registro.id} style={styles.recentRow}>
+                  <View style={styles.recentIcon}>
+                    <MaterialCommunityIcons
+                      name={
+                        registro.tipo_registro === "junta_lineal_espuma"
+                          ? "ruler"
+                          : "shield-outline"
+                      }
+                      size={20}
+                      color="#f97316"
+                    />
                   </View>
-                </MotiView>
-              ))}
-            </Card.Content>
-          </Card>
-        </MotiView>
+                  <View style={styles.recentInfo}>
+                    <Text style={styles.recentTitle}>
+                      {getRegistroKind(registro)} · {registro.obras?.nombre || "Sin obra"}
+                    </Text>
+                    <Text style={styles.helperText}>
+                      {formatDate(registro.fecha)} · {registro.estado.replace("_", " ")}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.helperText}>
+                Aún no tienes registros. Cuando envíes uno, aparecerá aquí.
+              </Text>
+            )}
+          </Card.Content>
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );
@@ -251,15 +316,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f7fb",
   },
+  content: {
+    paddingHorizontal: 16,
+    paddingBottom: 88,
+  },
   title: {
     color: "#0f172a",
     marginBottom: 4,
-    paddingHorizontal: 0,
   },
   subtitle: {
-    color: "#0f172a",
+    color: "#475569",
     marginBottom: 14,
-    fontWeight: "500",
+    lineHeight: 20,
   },
   kpiGrid: {
     flexDirection: "row",
@@ -268,81 +336,128 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   kpiCard: {
-    flexBasis: "48%",
+    width: "48%",
     backgroundColor: "#ffffff",
     borderColor: "#e2e8f0",
+    borderRadius: 14,
     borderWidth: 1,
-    borderRadius: 12,
   },
-  cardShadow: {
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+  kpiValue: {
+    color: "#0f172a",
+    fontSize: 26,
+    fontWeight: "800",
+    marginTop: 8,
   },
   kpiLabel: {
     color: "#475569",
     fontSize: 12,
-  },
-  kpiValue: {
-    color: "#0f172a",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  kpiHelper: {
-    color: "#475569",
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  metricValue: {
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: "700",
     marginTop: 2,
   },
-  chipSecondary: {
-    backgroundColor: "#0ea5e9",
-    borderRadius: 16,
-    alignSelf: "center",
-  },
   card: {
-    marginBottom: 12,
     backgroundColor: "#ffffff",
     borderColor: "#e2e8f0",
-    borderWidth: 1,
     borderRadius: 16,
-  },
-  pisoCard: {
-    width: 180,
-    marginRight: 10,
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
     borderWidth: 1,
-    borderRadius: 12,
+    marginBottom: 12,
   },
-  progressBar: {
-    height: 6,
-    borderRadius: 4,
+  errorCard: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  cardHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  cardTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  helperText: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  focusText: {
+    color: "#334155",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  orangeChip: {
+    backgroundColor: "#f97316",
+  },
+  chipText: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  progressTrack: {
     backgroundColor: "#e2e8f0",
-    marginTop: 6,
+    borderRadius: 999,
+    height: 10,
+    marginTop: 16,
     overflow: "hidden",
   },
   progressFill: {
+    backgroundColor: "#16a34a",
     height: "100%",
   },
-  equipoRow: {
+  statusRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
+    gap: 12,
+    marginTop: 12,
   },
-  equipoNombre: {
+  statusItem: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  recentRow: {
+    alignItems: "center",
+    borderTopColor: "#e2e8f0",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 12,
+  },
+  recentIcon: {
+    alignItems: "center",
+    backgroundColor: "#ffedd5",
+    borderRadius: 12,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  recentInfo: {
+    flex: 1,
+  },
+  recentTitle: {
     color: "#0f172a",
     fontWeight: "700",
   },
-  helperTextSmall: {
-    color: "#64748b",
-    fontSize: 11,
+  centerBox: {
+    alignItems: "center",
+    backgroundColor: "#f5f7fb",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  helper: {
+    color: "#475569",
+    marginTop: 12,
+  },
+  errorText: {
+    color: "#dc2626",
+    fontWeight: "700",
+  },
+  button: {
+    backgroundColor: "#f97316",
+    borderRadius: 14,
+    marginTop: 12,
   },
 });

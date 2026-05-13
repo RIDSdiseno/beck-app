@@ -1,11 +1,16 @@
 import { loginWithMicrosoftIdToken } from "@/services/api/authApi";
+import { clearMisObrasCache } from "@/services/api/obrasApi";
+import { clearMisRegistrosCache } from "@/services/api/registrosApi";
 import {
   getMicrosoftClientId,
   microsoftDiscovery,
 } from "@/services/auth/microsoft";
 import { getInitialRouteForRole } from "@/services/auth/roles";
-import { saveSession } from "@/services/auth/session";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  clearMicrosoftAuthState,
+  getMicrosoftAuthState,
+  saveSession,
+} from "@/services/auth/session";
 import * as AuthSession from "expo-auth-session";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -46,9 +51,7 @@ export default function AuthCallbackScreen() {
           throw new Error("Microsoft no devolvió un code válido.");
         }
 
-        const [[, codeVerifier], [, redirectUri]] = await AsyncStorage.multiGet(
-          ["beck_code_verifier", "beck_redirect_uri"],
-        );
+        const { codeVerifier, redirectUri } = await getMicrosoftAuthState();
 
         if (!codeVerifier || !redirectUri) {
           throw new Error("No se encontró la información temporal del login.");
@@ -80,21 +83,17 @@ export default function AuthCallbackScreen() {
 
         setStep("Cargando tu sesión...");
 
+        clearMisObrasCache();
+        clearMisRegistrosCache();
         await saveSession(data.token, data.user);
 
-        await AsyncStorage.multiRemove([
-          "beck_code_verifier",
-          "beck_redirect_uri",
-        ]);
+        await clearMicrosoftAuthState();
 
         router.replace(getInitialRouteForRole(data.user.rol));
       } catch (err: any) {
         console.log("AUTH CALLBACK ERROR", err);
 
-        await AsyncStorage.multiRemove([
-          "beck_code_verifier",
-          "beck_redirect_uri",
-        ]);
+        await clearMicrosoftAuthState();
 
         setError(err?.message || "No se pudo completar el inicio de sesión.");
       }
@@ -104,7 +103,7 @@ export default function AuthCallbackScreen() {
   }, [params]);
 
   const volverAlLogin = async () => {
-    await AsyncStorage.multiRemove(["beck_code_verifier", "beck_redirect_uri"]);
+    await clearMicrosoftAuthState();
     router.replace("/login");
   };
 

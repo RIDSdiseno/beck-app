@@ -7,5 +7,5 @@ export function canViewAllModules(rol?: string | null) {
 }
 
 export function getInitialRouteForRole(rol?: string | null): Href {
-  return canViewAllModules(rol) ? "/(tabs)" : "/mis-obras";
+  return "/(tabs)";
 }

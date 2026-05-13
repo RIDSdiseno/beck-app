@@ -1,5 +1,3 @@
-import { clearSession } from "@/services/auth/session";
-import { router } from "expo-router";
 import React, { useMemo } from "react";
 import {
   Dimensions,
@@ -107,15 +105,6 @@ export default function ReportesScreen() {
     };
   }, [registros]);
 
-  const handleLogout = async () => {
-    try {
-      await clearSession();
-      router.replace("/login");
-    } catch (error) {
-      console.log("LOGOUT ERROR", error);
-    }
-  };
-
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 2 }]}
@@ -128,10 +117,7 @@ export default function ReportesScreen() {
           paddingBottom: 80,
         }}
       >
-        <BrandHeader
-          subtitle="Analítica de obra · BECK"
-          onLogout={handleLogout}
-        />
+        <BrandHeader subtitle="Analítica de obra · BECK" />
         <Text variant="titleLarge" style={styles.title}>
           Reportes de obra · Sellos y junta lineal ESPUMA
         </Text>

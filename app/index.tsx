@@ -7,9 +7,7 @@ import { ActivityIndicator, Text } from "react-native-paper";
 
 export default function AppEntryScreen() {
   const [loading, setLoading] = useState(true);
-  const [redirectTo, setRedirectTo] = useState<"/login" | "/(tabs)" | "/mis-obras">(
-    "/login",
-  );
+  const [redirectTo, setRedirectTo] = useState<"/login" | "/(tabs)">("/login");
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -17,9 +15,7 @@ export default function AppEntryScreen() {
         const session = await getSession();
         setRedirectTo(
           session.isAuthenticated
-            ? (getInitialRouteForRole(session.user?.rol) as
-                | "/(tabs)"
-                | "/mis-obras")
+            ? (getInitialRouteForRole(session.user?.rol) as "/(tabs)")
             : "/login",
         );
       } catch (error) {

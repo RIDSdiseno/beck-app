@@ -3,13 +3,13 @@ import {
   uploadRegistroFotos,
 } from "@/services/api/registrosApi";
 import {
-  clearSession,
+  clearSelectedObra,
   getSelectedObra,
   getSession,
 } from "@/services/auth/session";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Image,
   Modal,
@@ -18,12 +18,22 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Button, Card, Checkbox, Text, TextInput } from "react-native-paper";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Menu,
+  SegmentedButtons,
+  Text,
+  TextInput,
+} from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+
+type TipoRegistro = "sello_cortafuego" | "junta_lineal_espuma";
 
 type ObraSeleccionada = {
   id: string;
@@ -39,9 +49,9 @@ type FotoLocal = {
   type: string;
 };
 
-const MATERIAL_OPTIONS = [
-  "Tubería metálica",
-  "Tubería no metálica",
+const ITEMIZADO_BECK_OPTIONS = [
+  "Tuberia metalica",
+  "Tuberia no metalica",
   "Ducto clima circular",
   "Ducto clima rectangular",
   "Bandejas y escalerillas",
@@ -99,12 +109,16 @@ export default function RegistrosScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
+  const [tipoRegistro, setTipoRegistro] =
+    useState<TipoRegistro>("sello_cortafuego");
   const [fecha, setFecha] = useState(formatDate(new Date()));
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const [descripcionMaterial, setDescripcionMaterial] = useState("");
-  const [otroMaterial, setOtroMaterial] = useState(false);
+  const [itemizadoBeck, setItemizadoBeck] = useState("");
+  const [itemizadoMenuVisible, setItemizadoMenuVisible] = useState(false);
+  const [otroItemizado, setOtroItemizado] = useState(false);
   const [modulo, setModulo] = useState("");
   const [piso, setPiso] = useState("");
   const [ejeNumerico, setEjeNumerico] = useState("");
@@ -114,8 +128,18 @@ export default function RegistrosScreen() {
   const [nombreSellador, setNombreSellador] = useState("");
   const [holgura, setHolgura] = useState("");
   const [accesibilidad, setAccesibilidad] = useState("");
+  const [itemizadoSacyr, setItemizadoSacyr] = useState("");
+  const [metrosLineales, setMetrosLineales] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [fotos, setFotos] = useState<FotoLocal[]>([]);
+
+  const isJuntaLineal = tipoRegistro === "junta_lineal_espuma";
+
+  const tipoRegistroLabel = useMemo(
+    () =>
+      isJuntaLineal ? "Junta Lineal Espuma" : "Sello Cortafuego",
+    [isJuntaLineal],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -134,10 +158,12 @@ export default function RegistrosScreen() {
   );
 
   const resetForm = () => {
+    setTipoRegistro("sello_cortafuego");
     setFecha(formatDate(new Date()));
     setCalendarMonth(new Date());
-    setDescripcionMaterial("");
-    setOtroMaterial(false);
+    setItemizadoBeck("");
+    setItemizadoMenuVisible(false);
+    setOtroItemizado(false);
     setModulo("");
     setPiso("");
     setEjeNumerico("");
@@ -147,13 +173,16 @@ export default function RegistrosScreen() {
     setNombreSellador(currentUserName);
     setHolgura("");
     setAccesibilidad("");
+    setItemizadoSacyr("");
+    setMetrosLineales("");
     setObservaciones("");
     setFotos([]);
   };
 
   const changeCalendarMonth = (offset: number) => {
     setCalendarMonth(
-      (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
+      (current) =>
+        new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
   };
 
@@ -168,15 +197,17 @@ export default function RegistrosScreen() {
     setCalendarVisible(false);
   };
 
-  const selectMaterial = (material: string) => {
-    setDescripcionMaterial(material);
-    setOtroMaterial(false);
+  const selectItemizadoBeck = (itemizado: string) => {
+    setItemizadoBeck(itemizado);
+    setOtroItemizado(false);
+    setItemizadoMenuVisible(false);
   };
 
-  const toggleOtroMaterial = () => {
-    setOtroMaterial((current) => {
+  const toggleOtroItemizado = () => {
+    setOtroItemizado((current) => {
       const next = !current;
-      setDescripcionMaterial(next ? "" : descripcionMaterial);
+      setItemizadoBeck(next ? "" : itemizadoBeck);
+      setItemizadoMenuVisible(false);
       return next;
     });
   };
@@ -254,35 +285,62 @@ export default function RegistrosScreen() {
     setFotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = async () => {
-    try {
-      if (!obra) {
-        setError("Debes seleccionar una obra antes de guardar.");
-        return;
+  const validateForm = () => {
+    if (!obra) return "Debes seleccionar una obra antes de enviar.";
+
+    const commonMissing =
+      !fecha.trim() ||
+      !modulo.trim() ||
+      !piso.trim() ||
+      !ejeNumerico.trim() ||
+      !ejeAlfabetico.trim() ||
+      !nombreSellador.trim();
+
+    if (commonMissing) return "Debes completar todos los campos obligatorios.";
+
+    if (isJuntaLineal) {
+      if (!metrosLineales.trim()) {
+        return "Debes ingresar la longitud en metros.";
       }
 
+      if (!Number.isFinite(toApiNumber(metrosLineales)) || toApiNumber(metrosLineales) <= 0) {
+        return "La longitud debe ser mayor a 0.";
+      }
+    } else {
       if (
-        !fecha.trim() ||
-        !descripcionMaterial.trim() ||
-        !modulo.trim() ||
-        !piso.trim() ||
-        !ejeNumerico.trim() ||
-        !ejeAlfabetico.trim() ||
+        !itemizadoBeck.trim() ||
         !numeroSello.trim() ||
         !cantidadSellos.trim() ||
-        !nombreSellador.trim() ||
         !holgura.trim() ||
         !accesibilidad.trim()
       ) {
-        setError("Debes completar todos los campos obligatorios.");
-        return;
+        return "Debes completar todos los campos obligatorios.";
       }
+    }
 
-      if (!fotos.length) {
-        setError("Debes agregar al menos una foto.");
-        return;
-      }
+    if (!fotos.length) return "Debes agregar al menos una foto.";
 
+    return "";
+  };
+
+  const openConfirm = () => {
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
+      setSuccess("");
+      return;
+    }
+
+    setError("");
+    setConfirmVisible(true);
+  };
+
+  const submitRegistro = async () => {
+    try {
+      if (!obra) return;
+
+      setConfirmVisible(false);
       setSaving(true);
       setError("");
       setSuccess("");
@@ -290,23 +348,33 @@ export default function RegistrosScreen() {
       const registro = await createRegistro({
         obraId: obra.id,
         fecha,
-        descripcionMaterial,
+        descripcionMaterial: isJuntaLineal
+          ? "Junta Lineal Espuma"
+          : itemizadoBeck,
         modulo,
         piso,
-        ejeNumerico: toApiNumber(ejeNumerico),
+        ejeNumerico: ejeNumerico.trim(),
         ejeAlfabetico,
-        numeroSello,
-        cantidadSellos: toApiNumber(cantidadSellos),
+        numeroSello: isJuntaLineal ? "" : numeroSello,
+        cantidadSellos: isJuntaLineal ? 1 : toApiNumber(cantidadSellos),
         nombreSellador,
-        holgura: toApiNumber(holgura),
-        accesibilidad: toApiNumber(accesibilidad),
+        holgura: isJuntaLineal ? 0 : toApiNumber(holgura),
+        accesibilidad: isJuntaLineal ? 1 : toApiNumber(accesibilidad),
         observaciones,
+        itemizadoSacyr: isJuntaLineal ? undefined : itemizadoSacyr,
+        tipoRegistro,
+        metrosLineales: isJuntaLineal
+          ? toApiNumber(metrosLineales)
+          : undefined,
       });
 
       await uploadRegistroFotos(registro.id, fotos);
 
       setSuccess("Registro y fotos enviados correctamente.");
+      await clearSelectedObra();
+      setObra(null);
       resetForm();
+      router.replace("/(tabs)");
     } catch (err: any) {
       console.log("CREATE/UPLOAD REGISTRO ERROR =>", err);
       setError(err?.message || "No se pudo completar el envío.");
@@ -315,14 +383,93 @@ export default function RegistrosScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await clearSession();
-      router.replace("/login");
-    } catch (error) {
-      console.log("LOGOUT ERROR", error);
-    }
-  };
+  const renderCommonFields = () => (
+    <>
+      <Pressable onPress={() => setCalendarVisible(true)}>
+        <TextInput
+          label="Fecha"
+          value={fecha}
+          mode="outlined"
+          editable={false}
+          pointerEvents="none"
+          right={<TextInput.Icon icon="calendar" />}
+          style={styles.input}
+        />
+      </Pressable>
+
+      <TextInput
+        label="Modulo / Recinto"
+        value={modulo}
+        onChangeText={setModulo}
+        mode="outlined"
+        style={styles.input}
+      />
+
+      <TextInput
+        label="Piso"
+        value={piso}
+        onChangeText={(value) => setPiso(onlyDigits(value))}
+        mode="outlined"
+        keyboardType="numeric"
+        style={styles.input}
+      />
+
+      <TextInput
+        label="Nombre del sellador"
+        value={nombreSellador}
+        mode="outlined"
+        editable={false}
+        style={styles.input}
+      />
+
+      <TextInput
+        label="Eje numerico"
+        value={ejeNumerico}
+        onChangeText={setEjeNumerico}
+        mode="outlined"
+        style={styles.input}
+      />
+
+      <TextInput
+        label="Eje alfabetico"
+        value={ejeAlfabetico}
+        onChangeText={setEjeAlfabetico}
+        mode="outlined"
+        style={styles.input}
+      />
+    </>
+  );
+
+  const renderFotos = () => (
+    <>
+      <Text style={styles.photosTitle}>Fotografias</Text>
+
+      <View style={styles.photoActions}>
+        <Button mode="outlined" onPress={pickFromLibrary}>
+          Elegir de galeria
+        </Button>
+        <Button mode="outlined" onPress={takePhoto}>
+          Tomar foto
+        </Button>
+      </View>
+
+      <View style={styles.photosGrid}>
+        {fotos.map((foto, index) => (
+          <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
+            <Image source={{ uri: foto.uri }} style={styles.photoPreview} />
+            <Button
+              mode="text"
+              onPress={() => removeFoto(index)}
+              compact
+              textColor="#dc2626"
+            >
+              Quitar
+            </Button>
+          </View>
+        ))}
+      </View>
+    </>
+  );
 
   return (
     <SafeAreaView
@@ -330,15 +477,12 @@ export default function RegistrosScreen() {
       edges={["top", "left", "right"]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <BrandHeader
-          subtitle="Registro de terreno · BECK"
-          onLogout={handleLogout}
-        />
+        <BrandHeader subtitle="Registro de terreno · BECK" />
         <Text variant="titleLarge" style={styles.title}>
           Registros
         </Text>
         <Text style={styles.subtitle}>
-          Carga avances, fotos y datos de instalación por obra seleccionada.
+          Carga avances, fotos y datos de instalacion por obra seleccionada.
         </Text>
 
         {!obra ? (
@@ -347,7 +491,7 @@ export default function RegistrosScreen() {
               <Text style={styles.emptyTitle}>No hay obra seleccionada</Text>
               <Text style={styles.emptyText}>
                 Primero debes seleccionar una obra antes de registrar
-                información.
+                informacion.
               </Text>
 
               <Button
@@ -370,7 +514,7 @@ export default function RegistrosScreen() {
                     <Text style={styles.label}>Obra seleccionada</Text>
                     <Text style={styles.value}>{obra.nombre}</Text>
 
-                    <Text style={styles.label}>Código</Text>
+                    <Text style={styles.label}>Codigo</Text>
                     <Text style={styles.value}>{obra.codigo}</Text>
 
                     <Text style={styles.label}>Estado</Text>
@@ -394,166 +538,153 @@ export default function RegistrosScreen() {
               <Card.Content>
                 <Text style={styles.formTitle}>Nuevo registro de terreno</Text>
 
-                <Pressable onPress={() => setCalendarVisible(true)}>
-                  <TextInput
-                    label="Fecha"
-                    value={fecha}
-                    mode="outlined"
-                    editable={false}
-                    pointerEvents="none"
-                    right={<TextInput.Icon icon="calendar" />}
-                    style={styles.input}
-                  />
-                </Pressable>
-
-                <TextInput
-                  label="Módulo"
-                  value={modulo}
-                  onChangeText={setModulo}
-                  mode="outlined"
-                  style={styles.input}
+                <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                <SegmentedButtons
+                  value={tipoRegistro}
+                  onValueChange={(value) => {
+                    setTipoRegistro(value as TipoRegistro);
+                    setError("");
+                    setSuccess("");
+                  }}
+                  style={styles.segmented}
+                  buttons={[
+                    {
+                      value: "sello_cortafuego",
+                      label: "Sello Cortafuego",
+                    },
+                    {
+                      value: "junta_lineal_espuma",
+                      label: "Junta Lineal Espuma",
+                    },
+                  ]}
                 />
 
-                <TextInput
-                  label="Piso"
-                  value={piso}
-                  onChangeText={(value) => setPiso(onlyDigits(value))}
-                  mode="outlined"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
+                {renderCommonFields()}
 
-                <TextInput
-                  label="Nombre del sellador"
-                  value={nombreSellador}
-                  mode="outlined"
-                  editable={false}
-                  style={styles.input}
-                />
+                {isJuntaLineal ? (
+                  <>
+                    <TextInput
+                      label="Longitud (m)"
+                      value={metrosLineales}
+                      onChangeText={setMetrosLineales}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                    />
 
-                <TextInput
-                  label="Cantidad"
-                  value={cantidadSellos}
-                  onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
-                  mode="outlined"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
+                    <TextInput
+                      label="Observaciones"
+                      value={observaciones}
+                      onChangeText={setObservaciones}
+                      mode="outlined"
+                      multiline
+                      numberOfLines={6}
+                      style={[styles.input, styles.observacionesInput]}
+                    />
 
-                <Text style={styles.fieldLabel}>Descripción de material</Text>
-                <View style={styles.materialOptions}>
-                  {MATERIAL_OPTIONS.map((material) => (
-                    <Button
-                      key={material}
-                      mode={
-                        descripcionMaterial === material && !otroMaterial
-                          ? "contained"
-                          : "outlined"
+                    {renderFotos()}
+                  </>
+                ) : (
+                  <>
+                    <TextInput
+                      label="Cantidad de Sellos"
+                      value={cantidadSellos}
+                      onChangeText={(value) =>
+                        setCantidadSellos(onlyDigits(value))
                       }
-                      onPress={() => selectMaterial(material)}
-                      style={styles.materialButton}
+                      mode="outlined"
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.fieldLabel}>Itemizado BECK</Text>
+                    <Menu
+                      visible={itemizadoMenuVisible}
+                      onDismiss={() => setItemizadoMenuVisible(false)}
+                      anchor={
+                        <Button
+                          mode="outlined"
+                          onPress={() => setItemizadoMenuVisible(true)}
+                          style={styles.dropdownButton}
+                          contentStyle={styles.dropdownContent}
+                        >
+                          {itemizadoBeck || "Seleccionar itemizado"}
+                        </Button>
+                      }
                     >
-                      {material}
-                    </Button>
-                  ))}
-                </View>
+                      {ITEMIZADO_BECK_OPTIONS.map((itemizado) => (
+                        <Menu.Item
+                          key={itemizado}
+                          title={itemizado}
+                          onPress={() => selectItemizadoBeck(itemizado)}
+                        />
+                      ))}
+                    </Menu>
 
-                <Checkbox.Item
-                  label="Otro"
-                  status={otroMaterial ? "checked" : "unchecked"}
-                  onPress={toggleOtroMaterial}
-                  style={styles.checkboxItem}
-                />
+                    <Checkbox.Item
+                      label="Otro"
+                      status={otroItemizado ? "checked" : "unchecked"}
+                      onPress={toggleOtroItemizado}
+                      style={styles.checkboxItem}
+                    />
 
-                {otroMaterial ? (
-                  <TextInput
-                    label="Ingresar descripción de material"
-                    value={descripcionMaterial}
-                    onChangeText={setDescripcionMaterial}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                ) : null}
-
-                <TextInput
-                  label="Eje numérico"
-                  value={ejeNumerico}
-                  onChangeText={setEjeNumerico}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Eje alfabético"
-                  value={ejeAlfabetico}
-                  onChangeText={setEjeAlfabetico}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Número de sello"
-                  value={numeroSello}
-                  onChangeText={setNumeroSello}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Holgura"
-                  value={holgura}
-                  onChangeText={setHolgura}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Accesibilidad"
-                  value={accesibilidad}
-                  onChangeText={setAccesibilidad}
-                  mode="outlined"
-                  style={styles.input}
-                />
-
-                <TextInput
-                  label="Observaciones"
-                  value={observaciones}
-                  onChangeText={setObservaciones}
-                  mode="outlined"
-                  multiline
-                  numberOfLines={6}
-                  style={[styles.input, styles.observacionesInput]}
-                />
-
-                <Text style={styles.photosTitle}>Fotografías</Text>
-
-                <View style={styles.photoActions}>
-                  <Button mode="outlined" onPress={pickFromLibrary}>
-                    Elegir de galería
-                  </Button>
-                  <Button mode="outlined" onPress={takePhoto}>
-                    Tomar foto
-                  </Button>
-                </View>
-
-                <View style={styles.photosGrid}>
-                  {fotos.map((foto, index) => (
-                    <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
-                      <Image
-                        source={{ uri: foto.uri }}
-                        style={styles.photoPreview}
+                    {otroItemizado ? (
+                      <TextInput
+                        label="Ingresar Itemizado BECK"
+                        value={itemizadoBeck}
+                        onChangeText={setItemizadoBeck}
+                        mode="outlined"
+                        style={styles.input}
                       />
-                      <Button
-                        mode="text"
-                        onPress={() => removeFoto(index)}
-                        compact
-                        textColor="#dc2626"
-                      >
-                        Quitar
-                      </Button>
-                    </View>
-                  ))}
-                </View>
+                    ) : null}
+
+                    <TextInput
+                      label="Numero del Sello"
+                      value={numeroSello}
+                      onChangeText={setNumeroSello}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+
+                    <TextInput
+                      label="Holgura"
+                      value={holgura}
+                      onChangeText={setHolgura}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                    />
+
+                    <TextInput
+                      label="Accesibilidad"
+                      value={accesibilidad}
+                      onChangeText={(value) => setAccesibilidad(onlyDigits(value))}
+                      mode="outlined"
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+
+                    <TextInput
+                      label="Itemizado SACYR"
+                      value={itemizadoSacyr}
+                      onChangeText={setItemizadoSacyr}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+
+                    <TextInput
+                      label="Observaciones"
+                      value={observaciones}
+                      onChangeText={setObservaciones}
+                      mode="outlined"
+                      multiline
+                      numberOfLines={6}
+                      style={[styles.input, styles.observacionesInput]}
+                    />
+
+                    {renderFotos()}
+                  </>
+                )}
 
                 {error ? <Text style={styles.errorText}>{error}</Text> : null}
                 {success ? (
@@ -562,20 +693,21 @@ export default function RegistrosScreen() {
 
                 <Button
                   mode="contained"
-                  onPress={onSubmit}
+                  onPress={openConfirm}
                   loading={saving}
                   disabled={saving}
                   style={styles.button}
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.buttonLabel}
                 >
-                  {saving ? "Enviando..." : "Guardar registro y fotos"}
+                  {saving ? "Enviando..." : "Enviar Registro"}
                 </Button>
               </Card.Content>
             </Card>
           </>
         )}
       </ScrollView>
+
       <Modal
         visible={calendarVisible}
         transparent
@@ -646,6 +778,38 @@ export default function RegistrosScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={confirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setConfirmVisible(false)}
+        >
+          <Pressable style={styles.confirmModal}>
+            <Text style={styles.confirmTitle}>Enviar registro</Text>
+            <Text style={styles.confirmText}>
+              Estas seguro en enviar el registro de {tipoRegistroLabel}? Despues
+              no podras modificarlo.
+            </Text>
+            <View style={styles.confirmActions}>
+              <Button mode="outlined" onPress={() => setConfirmVisible(false)}>
+                Cancelar
+              </Button>
+              <Button
+                mode="contained"
+                onPress={submitRegistro}
+                buttonColor="#f97316"
+              >
+                Enviar
+              </Button>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -705,6 +869,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  segmented: {
+    marginBottom: 14,
+  },
   input: {
     marginBottom: 12,
     backgroundColor: "#ffffff",
@@ -720,13 +887,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
-  materialOptions: {
-    gap: 8,
-    marginBottom: 6,
-  },
-  materialButton: {
+  dropdownButton: {
     alignSelf: "stretch",
     borderRadius: 12,
+    marginBottom: 6,
+  },
+  dropdownContent: {
+    minHeight: 48,
+    justifyContent: "flex-start",
   },
   checkboxItem: {
     paddingHorizontal: 0,
@@ -804,6 +972,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 14,
+  },
+  confirmModal: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 18,
+  },
+  confirmTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  confirmText: {
+    color: "#475569",
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
   },
   calendarHeader: {
     alignItems: "center",
