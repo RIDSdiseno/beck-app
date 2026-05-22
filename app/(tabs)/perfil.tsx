@@ -8,8 +8,8 @@ import { clearSession, getSession } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Avatar, Button, Text } from "react-native-paper";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Avatar, Button, Card, Chip, Text } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -51,6 +51,41 @@ function getInitials(name?: string) {
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "B";
 }
 
+const estadoColor = {
+  pendiente: "#f59e0b",
+  en_revision: "#3b82f6",
+  validado: "#16a34a",
+  rechazado: "#dc2626",
+} as const;
+
+function getEstadoLabel(estado: RegistroHistorialApi["estado"]) {
+  switch (estado) {
+    case "pendiente":
+      return "Pendiente";
+    case "en_revision":
+      return "En revisión";
+    case "validado":
+      return "Validado";
+    case "rechazado":
+      return "Rechazado";
+    default:
+      return "Pendiente";
+  }
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sin fecha";
+
+  return date.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 type ProfileActionProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -73,21 +108,27 @@ export default function PerfilScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [refreshingHistory, setRefreshingHistory] = useState(false);
+
+  const loadProfile = useCallback(async (forceRefresh = false) => {
+    const session = await getSession();
+    setUser(session.user);
+
+    if (session.user?.rol === "jefeobra" || session.user?.rol === "terreno") {
+      const data = await getMisRegistros(forceRefresh);
+      setRegistros(
+        session.user?.rol === "jefeobra"
+          ? data.filter((registro) => registro.estado !== "pendiente")
+          : data,
+      );
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const loadUser = async () => {
-        const session = await getSession();
-        setUser(session.user);
-
-        if (session.user?.rol === "jefeobra") {
-          const data = await getMisRegistros(true);
-          setRegistros(data.filter((registro) => registro.estado !== "pendiente"));
-        }
-      };
-
-      loadUser();
-    }, []),
+      loadProfile();
+    }, [loadProfile]),
   );
 
   const handleLogout = async () => {
@@ -100,6 +141,136 @@ export default function PerfilScreen() {
       console.log("LOGOUT ERROR", error);
     }
   };
+
+  const handleHistoryPress = () => {
+    if (user?.rol === "terreno" || user?.rol === "jefeobra") {
+      setShowHistory(true);
+      return;
+    }
+
+    router.push("/historial");
+  };
+
+  const refreshHistory = async () => {
+    setRefreshingHistory(true);
+    await loadProfile(true);
+    setRefreshingHistory(false);
+  };
+
+  if (showHistory && (user?.rol === "jefeobra" || user?.rol === "terreno")) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingHistory}
+              onRefresh={refreshHistory}
+            />
+          }
+        >
+          <BrandHeader subtitle="Registros realizados · BECK" />
+          <View style={styles.historyScreenHeader}>
+            <View style={styles.historyScreenTitleGroup}>
+              <Text variant="titleLarge" style={styles.title}>
+                {user?.rol === "jefeobra"
+                  ? "Historial de registros actualizados"
+                  : "Historial de registros"}
+              </Text>
+              <Text style={styles.subtitle}>
+                Revisa el estado de los registros y actualiza la lista para ver
+                cambios recientes.
+              </Text>
+            </View>
+            <Button mode="text" onPress={() => setShowHistory(false)}>
+              Volver
+            </Button>
+          </View>
+
+          {registros.length ? (
+            registros.map((item) => {
+              const obraNombre = item.obras?.nombre || "Obra sin nombre";
+              const isJunta = item.tipo_registro === "junta_lineal_espuma";
+
+              return (
+                <Card key={item.id} style={styles.historyFullCard}>
+                  <Card.Content>
+                    <View style={styles.historyCardHeader}>
+                      <View style={styles.historyTitleGroup}>
+                        <Text style={styles.historyItemTitle}>{obraNombre}</Text>
+                        <Text style={styles.historyItemMeta}>
+                          {item.obras?.codigo || "Sin código"} ·{" "}
+                          {formatDate(item.fecha)}
+                        </Text>
+                      </View>
+
+                      <Chip
+                        compact
+                        style={[
+                          styles.historyChip,
+                          {
+                            backgroundColor:
+                              estadoColor[item.estado] || estadoColor.pendiente,
+                          },
+                        ]}
+                        textStyle={styles.historyChipText}
+                      >
+                        {getEstadoLabel(item.estado)}
+                      </Chip>
+                    </View>
+
+                    <Text style={styles.historyItemDetail}>
+                      {item.descripcion_material}
+                    </Text>
+
+                    <View style={styles.historyDetailGrid}>
+                      <Text style={styles.historyDetailItem}>
+                        Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}
+                      </Text>
+                      <Text style={styles.historyDetailItem}>
+                        Módulo: {item.modulo}
+                      </Text>
+                      <Text style={styles.historyDetailItem}>Piso: {item.piso}</Text>
+                      <Text style={styles.historyDetailItem}>
+                        Eje: {item.eje_numerico}-{item.eje_alfabetico}
+                      </Text>
+                      <Text style={styles.historyDetailItem}>
+                        {isJunta
+                          ? `Metros lineales: ${item.metros_lineales || 0}`
+                          : `Sellos: ${item.cantidad_sellos}`}
+                      </Text>
+                      <Text style={styles.historyDetailItem}>
+                        Responsable:{" "}
+                        {item.usuarios?.nombre || item.nombre_sellador}
+                      </Text>
+                    </View>
+
+                    {item.observaciones ? (
+                      <Text style={styles.historyObservaciones}>
+                        Observaciones: {item.observaciones}
+                      </Text>
+                    ) : null}
+                  </Card.Content>
+                </Card>
+              );
+            })
+          ) : (
+            <View style={styles.historyEmptyState}>
+              <Text style={styles.historyEmptyTitle}>Sin registros</Text>
+              <Text style={styles.historyItemMeta}>
+                {user?.rol === "jefeobra"
+                  ? "Cuando envíes registros a ingeniería aparecerán aquí."
+                  : "Cuando realices registros en terreno aparecerán aquí."}
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -152,42 +323,10 @@ export default function PerfilScreen() {
           <ProfileAction
             icon="clipboard-text-clock-outline"
             label="Historial de Registro"
-            onPress={() => router.push("/historial")}
+            onPress={handleHistoryPress}
           />
         </View>
 
-        {user?.rol === "jefeobra" ? (
-          <View style={styles.historyPanel}>
-            <Text style={styles.historyTitle}>Historial de registros actualizados</Text>
-            {registros.length ? (
-              registros.slice(0, 8).map((registro) => (
-                <View key={registro.id} style={styles.historyRow}>
-                  <View style={styles.historyInfo}>
-                    <Text style={styles.historyName}>
-                      {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
-                    </Text>
-                    <Text style={styles.historyMeta}>
-                      {registro.usuarios?.nombre || registro.nombre_sellador}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.historyStatus,
-                      registro.estado === "validado" && styles.historyValidado,
-                      registro.estado === "rechazado" && styles.historyRechazado,
-                    ]}
-                  >
-                    {registro.estado.replace("_", " ")}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.historyMeta}>
-                Aún no has enviado registros a ingeniería.
-              </Text>
-            )}
-          </View>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -370,5 +509,84 @@ const styles = StyleSheet.create({
   historyRechazado: {
     backgroundColor: "#fee2e2",
     color: "#dc2626",
+  },
+  historyScreenHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  historyScreenTitleGroup: {
+    flex: 1,
+  },
+  historyFullCard: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  historyCardHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  historyTitleGroup: {
+    flex: 1,
+  },
+  historyItemTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  historyItemMeta: {
+    color: "#64748b",
+    flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  historyItemDetail: {
+    color: "#0f172a",
+    fontSize: 14,
+    lineHeight: 19,
+    marginBottom: 8,
+    marginTop: 10,
+  },
+  historyDetailGrid: {
+    gap: 4,
+  },
+  historyDetailItem: {
+    color: "#475569",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  historyObservaciones: {
+    color: "#334155",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  historyChip: {
+    alignSelf: "flex-start",
+    borderRadius: 14,
+    height: 32,
+    paddingHorizontal: 10,
+  },
+  historyChipText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  historyEmptyState: {
+    alignItems: "center",
+    paddingVertical: 28,
+  },
+  historyEmptyTitle: {
+    color: "#0f172a",
+    fontWeight: "800",
+    marginBottom: 4,
   },
 });

@@ -195,9 +195,7 @@ export default function DashboardScreen() {
           <BrandHeader subtitle="Inicio · Jefe de obra" />
 
           <Text variant="titleLarge" style={styles.title}>
-            {isJunta
-              ? "Registro de junta lineal espuma"
-              : "Registro de sellos · Itemizado BECK / SACYR"}
+            Hola, {userName || "Jefe de obra"}
           </Text>
           <Text style={styles.subtitle}>
             {isJunta

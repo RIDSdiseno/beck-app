@@ -1,6 +1,9 @@
-import { getMisObras, ObraApi } from "@/services/api/obrasApi";
+import {
+  getMisObras,
+  isObraDisponible,
+  ObraApi,
+} from "@/services/api/obrasApi";
 import { saveSelectedObra } from "@/services/auth/session";
-import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
@@ -9,12 +12,14 @@ import {
   Card,
   Chip,
   Text,
+  TextInput,
 } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import RegistrosScreen from "./registros";
 
 function getEstadoLabel(estado?: string | null) {
   switch (estado) {
@@ -52,7 +57,27 @@ export default function MisObrasScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [obras, setObras] = useState<ObraApi[]>([]);
+  const [search, setSearch] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState<
+    "todas" | "activa" | "pausada"
+  >("todas");
+  const [showRegistro, setShowRegistro] = useState(false);
+  const [selectedObra, setSelectedObra] = useState<ObraApi | null>(null);
   const [selectingId, setSelectingId] = useState<string | null>(null);
+
+  const filteredObras = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return obras.filter((obra) => {
+      const matchesText =
+        !term ||
+        `${obra.nombre} ${obra.codigo || ""}`.toLowerCase().includes(term);
+      const matchesEstado =
+        estadoFiltro === "todas" || obra.estado === estadoFiltro;
+
+      return matchesText && matchesEstado;
+    });
+  }, [estadoFiltro, obras, search]);
 
   const loadObras = useCallback(async (forceRefresh = false) => {
     try {
@@ -81,6 +106,11 @@ export default function MisObrasScreen() {
   };
 
   const onSelectObra = async (obra: ObraApi) => {
+    if (!isObraDisponible(obra.estado)) {
+      setError("Esta obra no esta disponible para registros.");
+      return;
+    }
+
     try {
       setSelectingId(obra.id);
 
@@ -92,7 +122,8 @@ export default function MisObrasScreen() {
         estado: obra.estado,
       });
 
-      router.replace("/registros");
+      setSelectedObra(obra);
+      setShowRegistro(true);
     } catch (err) {
       console.log("SELECT OBRA ERROR", err);
     } finally {
@@ -102,13 +133,65 @@ export default function MisObrasScreen() {
 
   const renderHeader = () => (
     <>
-      <BrandHeader subtitle="Obras asignadas · BECK" />
+      <BrandHeader subtitle="Obras disponibles · BECK" />
       <Text variant="titleLarge" style={styles.title}>
-        Mis Obras
+        Obras disponibles
       </Text>
       <Text style={styles.subtitle}>
-        Selecciona la obra con la que vas a trabajar hoy.
+        Selecciona una obra activa o pausada para trabajar hoy.
       </Text>
+      <TextInput
+        label="Buscar por nombre o código"
+        value={search}
+        onChangeText={setSearch}
+        mode="outlined"
+        style={styles.searchInput}
+        left={<TextInput.Icon icon="magnify" />}
+      />
+      <View style={styles.filterRow}>
+        <Chip
+          selected={estadoFiltro === "todas"}
+          onPress={() => setEstadoFiltro("todas")}
+          style={[
+            styles.filterChip,
+            estadoFiltro === "todas" && styles.filterChipSelected,
+          ]}
+          textStyle={[
+            styles.filterChipText,
+            estadoFiltro === "todas" && styles.filterChipTextSelected,
+          ]}
+        >
+          Todas
+        </Chip>
+        <Chip
+          selected={estadoFiltro === "activa"}
+          onPress={() => setEstadoFiltro("activa")}
+          style={[
+            styles.filterChip,
+            estadoFiltro === "activa" && styles.filterChipSelected,
+          ]}
+          textStyle={[
+            styles.filterChipText,
+            estadoFiltro === "activa" && styles.filterChipTextSelected,
+          ]}
+        >
+          Activas
+        </Chip>
+        <Chip
+          selected={estadoFiltro === "pausada"}
+          onPress={() => setEstadoFiltro("pausada")}
+          style={[
+            styles.filterChip,
+            estadoFiltro === "pausada" && styles.filterChipSelected,
+          ]}
+          textStyle={[
+            styles.filterChipText,
+            estadoFiltro === "pausada" && styles.filterChipTextSelected,
+          ]}
+        >
+          Pausadas
+        </Chip>
+      </View>
     </>
   );
 
@@ -122,6 +205,19 @@ export default function MisObrasScreen() {
         <ActivityIndicator size="large" color="#f97316" />
         <Text style={styles.helper}>Cargando tus obras...</Text>
       </View>
+    );
+  }
+
+  if (showRegistro) {
+    return (
+      <RegistrosScreen
+        mode="form"
+        initialObra={selectedObra}
+        onChangeObra={() => {
+          setSelectedObra(null);
+          setShowRegistro(false);
+        }}
+      />
     );
   }
 
@@ -161,9 +257,9 @@ export default function MisObrasScreen() {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>No tienes obras asignadas</Text>
+              <Text style={styles.emptyTitle}>No hay obras disponibles</Text>
               <Text style={styles.helper}>
-                Cuando el administrador te asigne una obra, aparecerá aquí.
+                Cuando una obra quede activa o pausada, aparecera aqui.
               </Text>
             </View>
           }
@@ -179,10 +275,18 @@ export default function MisObrasScreen() {
       edges={["top", "left", "right"]}
     >
       <FlatList
-        data={obras}
+        data={filteredObras}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={renderHeader}
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>Sin resultados</Text>
+            <Text style={styles.helper}>
+              Prueba buscar por nombre, codigo o cambia el filtro de estado.
+            </Text>
+          </View>
+        }
         refreshControl={refreshControl}
         renderItem={({ item }) => (
           <Card style={styles.card}>
@@ -304,6 +408,32 @@ const styles = StyleSheet.create({
   selectButtonLabel: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  searchInput: {
+    marginBottom: 10,
+    backgroundColor: "#ffffff",
+  },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  filterChip: {
+    backgroundColor: "#ffffff",
+    borderColor: "#cbd5e1",
+    borderWidth: 1,
+  },
+  filterChipSelected: {
+    backgroundColor: "#0f172a",
+    borderColor: "#0f172a",
+  },
+  filterChipText: {
+    color: "#334155",
+    fontWeight: "700",
+  },
+  filterChipTextSelected: {
+    color: "#ffffff",
   },
   centerBox: {
     flex: 1,

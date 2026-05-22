@@ -1,10 +1,13 @@
 import {
   createRegistro,
+  enviarRegistroATecnico,
   enviarRegistroAIngenieria,
   getMisRegistros,
+  reenviarRegistroComoTecnico,
   RegistroHistorialApi,
   uploadRegistroFotos,
 } from "@/services/api/registrosApi";
+import { getMisObras, ObraApi } from "@/services/api/obrasApi";
 import {
   clearSelectedObra,
   getSelectedObra,
@@ -18,6 +21,7 @@ import {
   Image,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -26,6 +30,7 @@ import {
   ActivityIndicator,
   Button,
   Card,
+  Chip,
   Checkbox,
   Menu,
   SegmentedButtons,
@@ -107,17 +112,43 @@ function buildCalendarDays(viewDate: Date) {
   ];
 }
 
-export default function RegistrosScreen() {
+type RegistrosScreenProps = {
+  mode?: "list" | "form";
+  initialObra?: ObraSeleccionada | null;
+  onChangeObra?: () => void;
+};
+
+export default function RegistrosScreen({
+  mode = "list",
+  initialObra = null,
+  onChangeObra,
+}: RegistrosScreenProps = {}) {
   const insets = useSafeAreaInsets();
-  const [obra, setObra] = useState<ObraSeleccionada | null>(null);
+  const [obra, setObra] = useState<ObraSeleccionada | null>(initialObra);
   const [currentUserName, setCurrentUserName] = useState("");
   const [userRole, setUserRole] = useState("");
   const [saving, setSaving] = useState(false);
+  const [refreshingTecnicoRegistros, setRefreshingTecnicoRegistros] =
+    useState(false);
+  const [refreshingJefeRegistros, setRefreshingJefeRegistros] =
+    useState(false);
   const [loadingJefeRegistros, setLoadingJefeRegistros] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [jefeRegistros, setJefeRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [jefeObras, setJefeObras] = useState<ObraApi[]>([]);
+  const [jefeObraSearch, setJefeObraSearch] = useState("");
+  const [jefeRegistroSearch, setJefeRegistroSearch] = useState("");
+  const [jefeEstadoFiltro, setJefeEstadoFiltro] = useState<
+    "todos" | "pendiente" | "rechazado"
+  >("todos");
+  const [tecnicoRegistroSearch, setTecnicoRegistroSearch] = useState("");
+  const [tecnicoEstadoFiltro, setTecnicoEstadoFiltro] = useState<
+    "todos" | "pendiente" | "rechazado"
+  >("todos");
+  const [selectedJefeObraId, setSelectedJefeObraId] = useState<string | null>(null);
+  const [tecnicoRegistros, setTecnicoRegistros] = useState<RegistroHistorialApi[]>([]);
   const [editingRegistro, setEditingRegistro] =
     useState<RegistroHistorialApi | null>(null);
 
@@ -144,6 +175,7 @@ export default function RegistrosScreen() {
   const [fotos, setFotos] = useState<FotoLocal[]>([]);
 
   const isJuntaLineal = tipoRegistro === "junta_lineal_espuma";
+  const isFormMode = mode === "form";
 
   const tipoRegistroLabel = useMemo(
     () =>
@@ -151,31 +183,172 @@ export default function RegistrosScreen() {
     [isJuntaLineal],
   );
 
+  const selectedJefeObra = useMemo(
+    () => jefeObras.find((item) => item.id === selectedJefeObraId) ?? null,
+    [jefeObras, selectedJefeObraId],
+  );
+
+  const filteredJefeObras = useMemo(() => {
+    const term = jefeObraSearch.trim().toLowerCase();
+    if (!term) return jefeObras;
+
+    return jefeObras.filter((item) =>
+      `${item.nombre} ${item.codigo || ""}`.toLowerCase().includes(term),
+    );
+  }, [jefeObras, jefeObraSearch]);
+
+  const jefeRegistrosPorObra = useMemo(
+    () =>
+      selectedJefeObraId
+        ? jefeRegistros.filter((registro) => registro.obras?.id === selectedJefeObraId)
+        : [],
+    [jefeRegistros, selectedJefeObraId],
+  );
+
+  const filteredJefeRegistros = useMemo(() => {
+    const term = jefeRegistroSearch.trim().toLowerCase();
+    const visibles = jefeRegistrosPorObra.filter(
+      (registro) =>
+        (registro.estado === "pendiente" || registro.estado === "rechazado") &&
+        (jefeEstadoFiltro === "todos" || registro.estado === jefeEstadoFiltro),
+    );
+
+    if (!term) return visibles;
+
+    return visibles.filter((registro) =>
+      `${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.tipo_registro}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [jefeEstadoFiltro, jefeRegistroSearch, jefeRegistrosPorObra]);
+
+  const tecnicoRechazados = useMemo(
+    () => tecnicoRegistros.filter((registro) => registro.estado === "rechazado"),
+    [tecnicoRegistros],
+  );
+
+  const tecnicoPendientes = useMemo(
+    () => tecnicoRegistros.filter((registro) => registro.estado === "pendiente"),
+    [tecnicoRegistros],
+  );
+
+  const filteredTecnicoRegistros = useMemo(() => {
+    const term = tecnicoRegistroSearch.trim().toLowerCase();
+    const visibles = [...tecnicoRechazados, ...tecnicoPendientes].filter(
+      (registro) =>
+        tecnicoEstadoFiltro === "todos" ||
+        registro.estado === tecnicoEstadoFiltro,
+    );
+    if (!term) return visibles;
+
+    return visibles.filter((registro) =>
+      `${registro.obras?.nombre || ""} ${registro.piso || ""}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [
+    tecnicoEstadoFiltro,
+    tecnicoPendientes,
+    tecnicoRechazados,
+    tecnicoRegistroSearch,
+  ]);
+
+  const refreshTecnicoRegistros = useCallback(async () => {
+    try {
+      setRefreshingTecnicoRegistros(true);
+      setError("");
+      const registros = await getMisRegistros(true, { scope: "registro" });
+      setTecnicoRegistros(registros);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron obtener los registros");
+    } finally {
+      setRefreshingTecnicoRegistros(false);
+    }
+  }, []);
+
+  const refreshJefeObraData = useCallback(async () => {
+    try {
+      setRefreshingJefeRegistros(true);
+      setError("");
+      const [obrasDisponibles, registros] = await Promise.all([
+        getMisObras(true),
+        getMisRegistros(true),
+      ]);
+      setJefeObras(obrasDisponibles);
+      setJefeRegistros(registros);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron obtener los registros");
+    } finally {
+      setRefreshingJefeRegistros(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const loadInitialData = async () => {
-        const currentObra = await getSelectedObra();
+        try {
         const session = await getSession();
         const userName = session.user?.nombre || "";
+        const role = session.user?.rol || "";
 
-        setObra(currentObra);
         setCurrentUserName(userName);
-        setUserRole(session.user?.rol || "");
+        setUserRole(role);
         setNombreSellador(userName);
 
-        if (session.user?.rol === "jefeobra") {
+        if (role === "jefeobra") {
           setLoadingJefeRegistros(true);
           try {
-            const registros = await getMisRegistros(true);
+            const [obrasDisponibles, registros] = await Promise.all([
+              getMisObras(),
+              getMisRegistros(),
+            ]);
+
+            setJefeObras(obrasDisponibles);
             setJefeRegistros(registros);
           } finally {
             setLoadingJefeRegistros(false);
           }
+
+          return;
+        }
+
+        if (role === "terreno") {
+          const registros = await getMisRegistros(false, { scope: "registro" });
+          setTecnicoRegistros(registros);
+        }
+
+        const currentObra = initialObra ?? (await getSelectedObra());
+
+        if (currentObra) {
+          const obrasDisponibles = initialObra ? [] : await getMisObras();
+          const obraActualizada = initialObra
+            ? initialObra
+            : obrasDisponibles.find((item) => item.id === currentObra.id);
+
+          if (!obraActualizada) {
+            await clearSelectedObra();
+            setObra(null);
+            setError(
+              "La obra seleccionada ya no esta disponible porque esta inactiva o finalizada.",
+            );
+          } else {
+            setObra(obraActualizada);
+            setError("");
+          }
+        } else {
+          setObra(null);
+        }
+
+        } catch (err: any) {
+          console.log("LOAD REGISTROS ERROR =>", err);
+          setError(err?.message || "No se pudieron obtener los registros");
+        } finally {
+          setLoadingJefeRegistros(false);
         }
       };
 
       loadInitialData();
-    }, []),
+    }, [initialObra]),
   );
 
   const resetForm = () => {
@@ -313,6 +486,15 @@ export default function RegistrosScreen() {
         : "sello_cortafuego";
 
     setEditingRegistro(registro);
+    if (registro.obras) {
+      setObra({
+        id: registro.obras.id,
+        nombre: registro.obras.nombre,
+        codigo: registro.obras.codigo,
+        descripcion: null,
+        estado: "activa",
+      });
+    }
     setTipoRegistro(nextTipo);
     setFecha(String(registro.fecha || "").slice(0, 10));
     setCalendarMonth(new Date(registro.fecha || new Date()));
@@ -448,11 +630,13 @@ export default function RegistrosScreen() {
 
       await uploadRegistroFotos(registro.id, fotos);
 
+      const registros = await getMisRegistros(true, { scope: "registro" });
+      setTecnicoRegistros(registros);
       setSuccess("Registro y fotos enviados correctamente.");
       await clearSelectedObra();
       setObra(null);
       resetForm();
-      router.replace("/(tabs)");
+      router.replace("/registros");
     } catch (err: any) {
       console.log("CREATE/UPLOAD REGISTRO ERROR =>", err);
       setError(err?.message || "No se pudo completar el envío.");
@@ -506,6 +690,73 @@ export default function RegistrosScreen() {
       setSuccess("Registro enviado a ingeniería.");
     } catch (err: any) {
       setError(err?.message || "No se pudo enviar a ingeniería.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitTecnicoReenvio = async () => {
+    try {
+      if (!editingRegistro || !obra) return;
+
+      const validationError = validateJefeEditForm();
+      if (validationError) {
+        setError(validationError);
+        setSuccess("");
+        return;
+      }
+
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
+      await reenviarRegistroComoTecnico(editingRegistro.id, {
+        obraId: obra.id,
+        fecha,
+        descripcionMaterial: isJuntaLineal
+          ? "Junta Lineal Espuma"
+          : itemizadoBeck,
+        modulo,
+        piso,
+        ejeNumerico: ejeNumerico.trim(),
+        ejeAlfabetico,
+        numeroSello: isJuntaLineal ? "" : numeroSello,
+        cantidadSellos: isJuntaLineal ? 1 : toApiNumber(cantidadSellos),
+        nombreSellador,
+        holgura: isJuntaLineal ? 0 : toApiNumber(holgura),
+        accesibilidad: isJuntaLineal ? 1 : toApiNumber(accesibilidad),
+        observaciones,
+        itemizadoSacyr: isJuntaLineal ? undefined : itemizadoSacyr,
+        tipoRegistro,
+        metrosLineales: isJuntaLineal
+          ? toApiNumber(metrosLineales)
+          : undefined,
+      });
+
+      const registros = await getMisRegistros(true, { scope: "registro" });
+      setTecnicoRegistros(registros);
+      setEditingRegistro(null);
+      resetForm();
+      setSuccess("Registro corregido y enviado al jefe de obra.");
+    } catch (err: any) {
+      setError(err?.message || "No se pudo reenviar el registro.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEnviarTecnico = async (registro: RegistroHistorialApi) => {
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
+      await enviarRegistroATecnico(registro.id);
+      const registros = await getMisRegistros(true);
+      setJefeRegistros(registros);
+      setSuccess("Registro enviado al técnico para corrección.");
+    } catch (err: any) {
+      setError(err?.message || "No se pudo enviar al técnico.");
     } finally {
       setSaving(false);
     }
@@ -568,6 +819,15 @@ export default function RegistrosScreen() {
     </>
   );
 
+  const goToObras = () => {
+    if (onChangeObra) {
+      onChangeObra();
+      return;
+    }
+
+    router.replace("/mis-obras");
+  };
+
   const renderFotos = () => (
     <>
       <Text style={styles.photosTitle}>Fotografias</Text>
@@ -600,26 +860,29 @@ export default function RegistrosScreen() {
   );
 
   if (userRole === "jefeobra") {
-    const registrosPendientes = jefeRegistros.filter(
-      (registro) => registro.estado === "pendiente",
-    );
-    const historial = jefeRegistros.filter(
-      (registro) => registro.estado !== "pendiente",
-    );
-
     return (
       <SafeAreaView
         style={[styles.container, { paddingTop: insets.top + 2 }]}
         edges={["top", "left", "right"]}
       >
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            !editingRegistro ? (
+              <RefreshControl
+                refreshing={refreshingJefeRegistros}
+                onRefresh={refreshJefeObraData}
+              />
+            ) : undefined
+          }
+        >
           <BrandHeader subtitle="Registros · Jefe de obra" />
           <Text variant="titleLarge" style={styles.title}>
             Registros de técnicos
           </Text>
           <Text style={styles.subtitle}>
-            Revisa registros de usuarios terreno asignados a tus mismas obras.
-            Al editar, el registro quedará en revisión para ingeniería.
+            Busca una obra activa o pausada para revisar registros pendientes,
+            corregirlos y enviarlos a ingeniería.
           </Text>
 
           {loadingJefeRegistros ? (
@@ -742,12 +1005,90 @@ export default function RegistrosScreen() {
                 </Button>
               </Card.Content>
             </Card>
-          ) : (
+          ) : selectedJefeObra ? (
             <>
-              <Text style={styles.sectionTitle}>Pendientes por revisar</Text>
-              {registrosPendientes.length ? (
-                registrosPendientes.map((registro) => (
-                  <Card key={registro.id} style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.recordInfo}>
+                  <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
+                  <Text style={styles.recordMeta}>
+                    {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
+                    {selectedJefeObra.estado || "Sin estado"}
+                  </Text>
+                </View>
+                <Button
+                  mode="text"
+                  onPress={() => {
+                    setSelectedJefeObraId(null);
+                    setJefeRegistroSearch("");
+                    setJefeEstadoFiltro("todos");
+                  }}
+                >
+                  Volver
+                </Button>
+              </View>
+
+              <TextInput
+                label="Buscar por técnico, piso o eje"
+                value={jefeRegistroSearch}
+                onChangeText={setJefeRegistroSearch}
+                mode="outlined"
+                style={styles.input}
+                left={<TextInput.Icon icon="magnify" />}
+              />
+
+              <View style={styles.filterRow}>
+                <Chip
+                  selected={jefeEstadoFiltro === "todos"}
+                  onPress={() => setJefeEstadoFiltro("todos")}
+                  style={[
+                    styles.filterChip,
+                    jefeEstadoFiltro === "todos" && styles.filterChipSelected,
+                  ]}
+                  textStyle={[
+                    styles.filterChipText,
+                    jefeEstadoFiltro === "todos" && styles.filterChipTextSelected,
+                  ]}
+                >
+                  Todos
+                </Chip>
+                <Chip
+                  selected={jefeEstadoFiltro === "pendiente"}
+                  onPress={() => setJefeEstadoFiltro("pendiente")}
+                  style={[
+                    styles.filterChip,
+                    jefeEstadoFiltro === "pendiente" &&
+                      styles.filterChipSelected,
+                  ]}
+                  textStyle={[
+                    styles.filterChipText,
+                    jefeEstadoFiltro === "pendiente" &&
+                      styles.filterChipTextSelected,
+                  ]}
+                >
+                  Pendientes
+                </Chip>
+                <Chip
+                  selected={jefeEstadoFiltro === "rechazado"}
+                  onPress={() => setJefeEstadoFiltro("rechazado")}
+                  style={[
+                    styles.filterChip,
+                    jefeEstadoFiltro === "rechazado" &&
+                      styles.filterChipSelected,
+                  ]}
+                  textStyle={[
+                    styles.filterChipText,
+                    jefeEstadoFiltro === "rechazado" &&
+                      styles.filterChipTextSelected,
+                  ]}
+                >
+                  Rechazados
+                </Chip>
+              </View>
+
+              <Text style={styles.sectionTitle}>Registros de la obra</Text>
+              {filteredJefeRegistros.length ? (
+                filteredJefeRegistros.map((registro) => (
+                  <Card key={registro.id} style={styles.historyCard}>
                     <Card.Content>
                       <View style={styles.recordHeader}>
                         <View style={styles.recordIcon}>
@@ -768,29 +1109,45 @@ export default function RegistrosScreen() {
                               : "Sello cortafuego"}
                           </Text>
                           <Text style={styles.recordMeta}>
-                            {registro.obras?.nombre || "Sin obra"} · Piso{" "}
-                            {registro.piso}
+                            Piso {registro.piso} · Eje {registro.eje_alfabetico}-{registro.eje_numerico}
                           </Text>
                           <Text style={styles.recordMeta}>
                             Técnico: {registro.usuarios?.nombre || registro.nombre_sellador}
                           </Text>
                         </View>
-                      </View>
-                      <View style={styles.recordDetails}>
-                        <Text style={styles.recordMeta}>Eje {registro.eje_alfabetico}-{registro.eje_numerico}</Text>
-                        <Text style={styles.recordMeta}>
-                          {registro.tipo_registro === "junta_lineal_espuma"
-                            ? `${registro.metros_lineales || 0} m`
-                            : `${registro.cantidad_sellos} sellos`}
+                        <Text
+                          style={[
+                            styles.statusPill,
+                            registro.estado === "rechazado" &&
+                              styles.statusRechazado,
+                          ]}
+                        >
+                          {registro.estado.replace("_", " ")}
                         </Text>
                       </View>
-                      <Button
-                        mode="contained"
-                        onPress={() => fillFormFromRegistro(registro)}
-                        style={styles.button}
-                      >
-                        Editar registro
-                      </Button>
+
+                      <View style={styles.actionRow}>
+                        <Button
+                          mode={registro.estado === "pendiente" ? "contained" : "outlined"}
+                          onPress={() => fillFormFromRegistro(registro)}
+                          style={styles.inlineButton}
+                        >
+                          {registro.estado === "pendiente"
+                            ? "Editar y enviar"
+                            : "Editar"}
+                        </Button>
+                        {registro.estado === "rechazado" ? (
+                          <Button
+                            mode="contained"
+                            onPress={() => handleEnviarTecnico(registro)}
+                            loading={saving}
+                            disabled={saving}
+                            style={styles.inlineButton}
+                          >
+                            Enviar a técnico
+                          </Button>
+                        ) : null}
+                      </View>
                     </Card.Content>
                   </Card>
                 ))
@@ -798,38 +1155,55 @@ export default function RegistrosScreen() {
                 <Card style={styles.card}>
                   <Card.Content>
                     <Text style={styles.emptyText}>
-                      No hay registros pendientes de técnicos en tus obras.
+                      No hay registros pendientes o rechazados para esta obra.
                     </Text>
                   </Card.Content>
                 </Card>
               )}
+            </>
+          ) : (
+            <>
+              <TextInput
+                label="Buscar obra"
+                value={jefeObraSearch}
+                onChangeText={setJefeObraSearch}
+                mode="outlined"
+                style={styles.input}
+                left={<TextInput.Icon icon="magnify" />}
+              />
 
-              <Text style={styles.sectionTitle}>Historial de registros actualizados</Text>
-              {historial.slice(0, 12).map((registro) => (
-                <Card key={registro.id} style={styles.historyCard}>
+              <Text style={styles.sectionTitle}>Obras disponibles</Text>
+              {filteredJefeObras.map((item) => (
+                <Card
+                  key={item.id}
+                  style={[
+                    styles.card,
+                    selectedJefeObraId === item.id && styles.selectedCard,
+                  ]}
+                >
                   <Card.Content>
                     <View style={styles.cardHeaderRow}>
                       <View style={styles.recordInfo}>
-                        <Text style={styles.recordTitle}>
-                          {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
-                        </Text>
+                        <Text style={styles.recordTitle}>{item.nombre}</Text>
                         <Text style={styles.recordMeta}>
-                          {registro.usuarios?.nombre || registro.nombre_sellador}
+                          {item.codigo || "Sin codigo"} · {item.estado || "Sin estado"}
                         </Text>
                       </View>
-                      <Text
-                        style={[
-                          styles.statusPill,
-                          registro.estado === "validado" && styles.statusValidado,
-                          registro.estado === "rechazado" && styles.statusRechazado,
-                        ]}
+                      <Button
+                        mode={selectedJefeObraId === item.id ? "contained" : "outlined"}
+                        onPress={() => {
+                          setSelectedJefeObraId(item.id);
+                          setJefeRegistroSearch("");
+                          setJefeEstadoFiltro("todos");
+                        }}
                       >
-                        {registro.estado.replace("_", " ")}
-                      </Text>
+                        Ver registros
+                      </Button>
                     </View>
                   </Card.Content>
                 </Card>
               ))}
+
             </>
           )}
         </ScrollView>
@@ -842,7 +1216,17 @@ export default function RegistrosScreen() {
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          userRole === "terreno" && !isFormMode && !editingRegistro ? (
+            <RefreshControl
+              refreshing={refreshingTecnicoRegistros}
+              onRefresh={refreshTecnicoRegistros}
+            />
+          ) : undefined
+        }
+      >
         <BrandHeader subtitle="Registro de terreno · BECK" />
         <Text variant="titleLarge" style={styles.title}>
           Registros
@@ -851,7 +1235,230 @@ export default function RegistrosScreen() {
           Carga avances, fotos y datos de instalacion por obra seleccionada.
         </Text>
 
-        {!obra ? (
+        {userRole === "terreno" && !isFormMode && !editingRegistro ? (
+          <>
+            <TextInput
+              label="Buscar por obra o piso"
+              value={tecnicoRegistroSearch}
+              onChangeText={setTecnicoRegistroSearch}
+              mode="outlined"
+              style={styles.input}
+              left={<TextInput.Icon icon="magnify" />}
+            />
+            <View style={styles.filterRow}>
+              <Chip
+                selected={tecnicoEstadoFiltro === "todos"}
+                onPress={() => setTecnicoEstadoFiltro("todos")}
+                style={[
+                  styles.filterChip,
+                  tecnicoEstadoFiltro === "todos" && styles.filterChipSelected,
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  tecnicoEstadoFiltro === "todos" &&
+                    styles.filterChipTextSelected,
+                ]}
+              >
+                Todos
+              </Chip>
+              <Chip
+                selected={tecnicoEstadoFiltro === "pendiente"}
+                onPress={() => setTecnicoEstadoFiltro("pendiente")}
+                style={[
+                  styles.filterChip,
+                  tecnicoEstadoFiltro === "pendiente" &&
+                    styles.filterChipSelected,
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  tecnicoEstadoFiltro === "pendiente" &&
+                    styles.filterChipTextSelected,
+                ]}
+              >
+                Pendientes
+              </Chip>
+              <Chip
+                selected={tecnicoEstadoFiltro === "rechazado"}
+                onPress={() => setTecnicoEstadoFiltro("rechazado")}
+                style={[
+                  styles.filterChip,
+                  tecnicoEstadoFiltro === "rechazado" &&
+                    styles.filterChipSelected,
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  tecnicoEstadoFiltro === "rechazado" &&
+                    styles.filterChipTextSelected,
+                ]}
+              >
+                Rechazados
+              </Chip>
+            </View>
+
+            <Text style={styles.sectionTitle}>Registros pendientes</Text>
+            {filteredTecnicoRegistros.map((registro) => (
+              <Card key={registro.id} style={styles.historyCard}>
+                <Card.Content>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.recordInfo}>
+                      <Text style={styles.recordTitle}>
+                        {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
+                      </Text>
+                      <Text style={styles.recordMeta}>
+                        {registro.tipo_registro === "junta_lineal_espuma"
+                          ? "Junta lineal espuma"
+                          : "Sello cortafuego"}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.statusPill,
+                        registro.estado === "rechazado" && styles.statusRechazado,
+                      ]}
+                    >
+                      {registro.estado.replace("_", " ")}
+                    </Text>
+                  </View>
+                  {registro.estado === "rechazado" ? (
+                    <Button
+                      mode="contained"
+                      onPress={() => fillFormFromRegistro(registro)}
+                      style={styles.button}
+                    >
+                      Corregir registro
+                    </Button>
+                  ) : null}
+                </Card.Content>
+              </Card>
+            ))}
+            {!filteredTecnicoRegistros.length ? (
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text style={styles.emptyText}>
+                    No tienes registros pendientes ni correcciones habilitadas.
+                  </Text>
+                </Card.Content>
+              </Card>
+            ) : null}
+          </>
+        ) : null}
+
+        {editingRegistro && userRole === "terreno" ? (
+          <Card style={styles.card}>
+            <Card.Content>
+              <View style={styles.cardHeaderRow}>
+                <View>
+                  <Text style={styles.formTitle}>Corregir registro rechazado</Text>
+                  <Text style={styles.emptyText}>
+                    Al reenviarlo quedará pendiente para jefe de obra.
+                  </Text>
+                </View>
+                <Button mode="text" onPress={() => setEditingRegistro(null)}>
+                  Cancelar
+                </Button>
+              </View>
+
+              <Text style={styles.fieldLabel}>Tipo de registro</Text>
+              <SegmentedButtons
+                value={tipoRegistro}
+                onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
+                style={styles.segmented}
+                buttons={[
+                  { value: "sello_cortafuego", label: "Sello" },
+                  { value: "junta_lineal_espuma", label: "Junta" },
+                ]}
+              />
+
+              {renderCommonFields()}
+
+              {isJuntaLineal ? (
+                <TextInput
+                  label="Longitud (m)"
+                  value={metrosLineales}
+                  onChangeText={setMetrosLineales}
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                />
+              ) : (
+                <>
+                  <TextInput
+                    label="Cantidad de Sellos"
+                    value={cantidadSellos}
+                    onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="Itemizado BECK"
+                    value={itemizadoBeck}
+                    onChangeText={setItemizadoBeck}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="Numero del Sello"
+                    value={numeroSello}
+                    onChangeText={setNumeroSello}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="Holgura"
+                    value={holgura}
+                    onChangeText={setHolgura}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="Accesibilidad"
+                    value={accesibilidad}
+                    onChangeText={(value) => setAccesibilidad(onlyDigits(value))}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="Itemizado SACYR"
+                    value={itemizadoSacyr}
+                    onChangeText={setItemizadoSacyr}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                </>
+              )}
+
+              <TextInput
+                label="Observaciones"
+                value={observaciones}
+                onChangeText={setObservaciones}
+                mode="outlined"
+                multiline
+                numberOfLines={6}
+                style={[styles.input, styles.observacionesInput]}
+              />
+
+              {renderFotos()}
+
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {success ? <Text style={styles.successText}>{success}</Text> : null}
+
+              <Button
+                mode="contained"
+                onPress={submitTecnicoReenvio}
+                loading={saving}
+                disabled={saving}
+                style={styles.button}
+                contentStyle={styles.buttonContent}
+                labelStyle={styles.buttonLabel}
+              >
+                {saving ? "Reenviando..." : "Reenviar al jefe de obra"}
+              </Button>
+            </Card.Content>
+          </Card>
+        ) : isFormMode && !obra ? (
           <Card style={styles.card}>
             <Card.Content>
               <Text style={styles.emptyTitle}>No hay obra seleccionada</Text>
@@ -862,7 +1469,7 @@ export default function RegistrosScreen() {
 
               <Button
                 mode="contained"
-                onPress={() => router.replace("/mis-obras")}
+                onPress={goToObras}
                 style={styles.button}
                 contentStyle={styles.buttonContent}
                 labelStyle={styles.buttonLabel}
@@ -871,7 +1478,7 @@ export default function RegistrosScreen() {
               </Button>
             </Card.Content>
           </Card>
-        ) : (
+        ) : isFormMode && obra ? (
           <>
             <Card style={styles.card}>
               <Card.Content>
@@ -891,7 +1498,7 @@ export default function RegistrosScreen() {
 
                   <Button
                     mode="outlined"
-                    onPress={() => router.replace("/mis-obras")}
+                    onPress={goToObras}
                     style={styles.changeButton}
                   >
                     Cambiar obra
@@ -1071,7 +1678,7 @@ export default function RegistrosScreen() {
               </Card.Content>
             </Card>
           </>
-        )}
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -1206,6 +1813,10 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     marginBottom: 14,
   },
+  selectedCard: {
+    borderColor: "#f97316",
+    backgroundColor: "#fff7ed",
+  },
   cardHeaderRow: {
     gap: 16,
   },
@@ -1328,6 +1939,28 @@ const styles = StyleSheet.create({
     color: "#16a34a",
     fontWeight: "600",
   },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  filterChip: {
+    backgroundColor: "#ffffff",
+    borderColor: "#cbd5e1",
+    borderWidth: 1,
+  },
+  filterChipSelected: {
+    backgroundColor: "#0f172a",
+    borderColor: "#0f172a",
+  },
+  filterChipText: {
+    color: "#334155",
+    fontWeight: "700",
+  },
+  filterChipTextSelected: {
+    color: "#ffffff",
+  },
   loadingBox: {
     alignItems: "center",
     backgroundColor: "#ffffff",
@@ -1377,6 +2010,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 12,
     paddingTop: 10,
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 12,
+  },
+  inlineButton: {
+    borderRadius: 12,
+    flexGrow: 1,
   },
   historyCard: {
     backgroundColor: "#ffffff",

@@ -11,6 +11,10 @@ export type ObraApi = {
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 let obrasCache: ObraApi[] | null = null;
 
+export function isObraDisponible(estado?: string | null) {
+  return estado === "activa" || estado === "pausada";
+}
+
 async function readJsonResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
   const bodyText = await response.text();
@@ -57,6 +61,8 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
     throw new Error(result?.error || "No se pudieron obtener las obras");
   }
 
-  obrasCache = result.data as ObraApi[];
+  obrasCache = (result.data as ObraApi[]).filter((obra) =>
+    isObraDisponible(obra.estado),
+  );
   return obrasCache;
 }

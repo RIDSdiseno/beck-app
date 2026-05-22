@@ -41,6 +41,7 @@ export type RegistroHistorialApi = {
   accesibilidad: number;
   observaciones?: string | null;
   estado: EstadoRegistroApi;
+  devuelto_a_tecnico?: boolean;
   itemizado_sacyr?: string | null;
   metros_lineales?: number | null;
   tipo_registro: "sello_cortafuego" | "junta_lineal_espuma" | string;
@@ -67,7 +68,21 @@ export type RegistroHistorialApi = {
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
-let registrosCache: RegistroHistorialApi[] | null = null;
+const registrosCache = new Map<string, RegistroHistorialApi[]>();
+
+type GetMisRegistrosParams = {
+  obraId?: string;
+  estado?: EstadoRegistroApi;
+  scope?: "registro" | "historial";
+};
+
+function getRegistrosCacheKey(params?: GetMisRegistrosParams) {
+  return JSON.stringify({
+    obraId: params?.obraId ?? "",
+    estado: params?.estado ?? "",
+    scope: params?.scope ?? "",
+  });
+}
 
 async function readJsonResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
@@ -113,14 +128,18 @@ export async function createRegistro(payload: CreateRegistroPayload) {
 }
 
 export function clearMisRegistrosCache() {
-  registrosCache = null;
+  registrosCache.clear();
 }
 
 export async function getMisRegistros(
   forceRefresh = false,
+  params?: GetMisRegistrosParams,
 ): Promise<RegistroHistorialApi[]> {
-  if (registrosCache && !forceRefresh) {
-    return registrosCache;
+  const cacheKey = getRegistrosCacheKey(params);
+  const cached = registrosCache.get(cacheKey);
+
+  if (cached && !forceRefresh) {
+    return cached;
   }
 
   const session = await getSession();
@@ -129,7 +148,13 @@ export async function getMisRegistros(
     throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/registros/mis-registros`, {
+  const query = new URLSearchParams();
+  if (params?.obraId) query.set("obraId", params.obraId);
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.scope) query.set("scope", params.scope);
+  const queryString = query.toString();
+
+  const response = await fetch(`${API_BASE_URL}/api/registros/mis-registros${queryString ? `?${queryString}` : ""}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${session.token}`,
@@ -143,8 +168,9 @@ export async function getMisRegistros(
     throw new Error(result?.error || "No se pudieron obtener los registros");
   }
 
-  registrosCache = result.data as RegistroHistorialApi[];
-  return registrosCache;
+  const data = result.data as RegistroHistorialApi[];
+  registrosCache.set(cacheKey, data);
+  return data;
 }
 
 export async function uploadRegistroFotos(
@@ -218,6 +244,66 @@ export async function enviarRegistroAIngenieria(
 
   if (!response.ok || !result?.success) {
     throw new Error(result?.error || "No se pudo enviar el registro a ingeniería");
+  }
+
+  clearMisRegistrosCache();
+  return result.data as RegistroHistorialApi;
+}
+
+export async function reenviarRegistroComoTecnico(
+  registroId: string,
+  payload: CreateRegistroPayload,
+) {
+  const session = await getSession();
+
+  if (!session.token) {
+    throw new Error("No hay sesión activa");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/registros/${registroId}/reenviar-tecnico`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = await readJsonResponse(response);
+
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo reenviar el registro");
+  }
+
+  clearMisRegistrosCache();
+  return result.data as RegistroHistorialApi;
+}
+
+export async function enviarRegistroATecnico(registroId: string) {
+  const session = await getSession();
+
+  if (!session.token) {
+    throw new Error("No hay sesión activa");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/registros/${registroId}/enviar-tecnico`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  const result = await readJsonResponse(response);
+
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo enviar el registro al técnico");
   }
 
   clearMisRegistrosCache();
