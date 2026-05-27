@@ -180,6 +180,9 @@ export async function uploadRegistroFotos(
     name: string;
     type: string;
   }[],
+  options?: {
+    replaceExisting?: boolean;
+  },
 ) {
   const session = await getSession();
 
@@ -197,8 +200,9 @@ export async function uploadRegistroFotos(
     } as any);
   });
 
+  const replaceQuery = options?.replaceExisting ? "?replace=true" : "";
   const response = await fetch(
-    `${API_BASE_URL}/api/registros/${registroId}/fotos`,
+    `${API_BASE_URL}/api/registros/${registroId}/fotos${replaceQuery}`,
     {
       method: "POST",
       headers: {

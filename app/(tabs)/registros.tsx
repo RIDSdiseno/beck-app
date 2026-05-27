@@ -512,6 +512,7 @@ export default function RegistrosScreen({
     setItemizadoSacyr(registro.itemizado_sacyr || "");
     setMetrosLineales(String(registro.metros_lineales || ""));
     setObservaciones(registro.observaciones || "");
+    setFotos([]);
     setError("");
     setSuccess("");
   };
@@ -659,6 +660,12 @@ export default function RegistrosScreen({
       setSaving(true);
       setError("");
       setSuccess("");
+
+      if (fotos.length) {
+        await uploadRegistroFotos(editingRegistro.id, fotos, {
+          replaceExisting: true,
+        });
+      }
 
       await enviarRegistroAIngenieria(editingRegistro.id, {
         obraId: editingRegistro.obras?.id || editingRegistro.id,
@@ -828,9 +835,32 @@ export default function RegistrosScreen({
     router.replace("/mis-obras");
   };
 
-  const renderFotos = () => (
+  const renderFotos = (options?: {
+    existingFotos?: RegistroHistorialApi["fotos"];
+    replacementMode?: boolean;
+  }) => (
     <>
       <Text style={styles.photosTitle}>Fotografias</Text>
+
+      {options?.existingFotos?.length ? (
+        <>
+          <Text style={styles.photosHint}>Fotografias actuales</Text>
+          <View style={styles.photosGrid}>
+            {options.existingFotos.map((foto) => (
+              <View key={foto.id} style={styles.photoItem}>
+                <Image source={{ uri: foto.url }} style={styles.photoPreview} />
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {options?.replacementMode ? (
+        <Text style={styles.photosHint}>
+          Si agregas una foto nueva, reemplazara las fotografias actuales al
+          enviar a ingenieria.
+        </Text>
+      ) : null}
 
       <View style={styles.photoActions}>
         <Button mode="outlined" onPress={pickFromLibrary}>
@@ -841,21 +871,28 @@ export default function RegistrosScreen({
         </Button>
       </View>
 
-      <View style={styles.photosGrid}>
-        {fotos.map((foto, index) => (
-          <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
-            <Image source={{ uri: foto.uri }} style={styles.photoPreview} />
-            <Button
-              mode="text"
-              onPress={() => removeFoto(index)}
-              compact
-              textColor="#dc2626"
-            >
-              Quitar
-            </Button>
+      {fotos.length ? (
+        <>
+          {options?.replacementMode ? (
+            <Text style={styles.photosHint}>Nuevas fotografias</Text>
+          ) : null}
+          <View style={styles.photosGrid}>
+            {fotos.map((foto, index) => (
+              <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
+                <Image source={{ uri: foto.uri }} style={styles.photoPreview} />
+                <Button
+                  mode="text"
+                  onPress={() => removeFoto(index)}
+                  compact
+                  textColor="#dc2626"
+                >
+                  Quitar
+                </Button>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        </>
+      ) : null}
     </>
   );
 
@@ -991,6 +1028,11 @@ export default function RegistrosScreen({
                   numberOfLines={6}
                   style={[styles.input, styles.observacionesInput]}
                 />
+
+                {renderFotos({
+                  existingFotos: editingRegistro.fotos,
+                  replacementMode: true,
+                })}
 
                 <Button
                   mode="contained"
@@ -1883,6 +1925,12 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 16,
     fontWeight: "700",
+  },
+  photosHint: {
+    color: "#64748b",
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 10,
   },
   photoActions: {
     flexDirection: "row",
