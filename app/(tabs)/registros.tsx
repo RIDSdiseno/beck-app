@@ -70,9 +70,30 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   CampoConfiguracionRegistro,
   boolean
 > = {
+  codigoBeck: false,
+  itemizadoBeck: true,
+  itemizadoMandante: false,
+  fechaEjecucionSello: true,
+  diaSemana: true,
+  piso: true,
+  ejeAlfabetico: true,
+  ejeNumerico: true,
+  nombreSellador: true,
+  foto: true,
+  recinto: true,
+  modulo: true,
+  numeroSello: true,
+  cantidadSellos: true,
+  holgura: true,
+  factorPorHolguras: false,
   cieloModular: true,
+  cantidadSellosConFactores: false,
   aislacion: true,
+  cantidadSellosAislacion: false,
   reparacionTabique: true,
+  cantidadFinal: false,
+  observaciones: true,
+  folio: false,
 };
 
 const ITEMIZADO_BECK_OPTIONS = [
@@ -268,11 +289,17 @@ export default function RegistrosScreen({
       isJuntaLineal ? "Junta Lineal Espuma" : "Sello Cortafuego",
     [isJuntaLineal],
   );
+  const isTerrenoRegistroList =
+    userRole === "terreno" && !isFormMode && !editingRegistro;
 
   const selectedJefeObra = useMemo(
     () => jefeObras.find((item) => item.id === selectedJefeObraId) ?? null,
     [jefeObras, selectedJefeObraId],
   );
+  const isJefeObraObrasList =
+    userRole === "jefeobra" && !editingRegistro && !selectedJefeObra;
+  const isJefeObraRegistrosList =
+    userRole === "jefeobra" && !editingRegistro && Boolean(selectedJefeObra);
 
   const filteredJefeObras = useMemo(() => {
     const term = jefeObraSearch.trim().toLowerCase();
@@ -705,19 +732,25 @@ export default function RegistrosScreen({
     if (!obra) return "Debes seleccionar una obra antes de enviar.";
 
     const commonMissing =
-      !fecha.trim() ||
-      !recinto.trim() ||
-      !modulo.trim() ||
-      !piso.trim() ||
-      !ejeNumerico.trim() ||
-      !ejeAlfabetico.trim() ||
-      !nombreSellador.trim();
+      (campoConfiguradoVisible("fechaEjecucionSello") && !fecha.trim()) ||
+      (campoConfiguradoVisible("recinto") && !recinto.trim()) ||
+      (campoConfiguradoVisible("modulo") && !modulo.trim()) ||
+      (campoConfiguradoVisible("piso") && !piso.trim()) ||
+      (campoConfiguradoVisible("ejeNumerico") && !ejeNumerico.trim()) ||
+      (campoConfiguradoVisible("ejeAlfabetico") && !ejeAlfabetico.trim()) ||
+      (campoConfiguradoVisible("nombreSellador") && !nombreSellador.trim());
 
     if (commonMissing) return "Debes completar todos los campos obligatorios.";
-    if (!/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)) {
+    if (
+      campoConfiguradoVisible("ejeAlfabetico") &&
+      !/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)
+    ) {
       return "El Eje Alfabético debe tener el formato F-G.";
     }
-    if (!/^\d-\d$/.test(ejeNumerico)) {
+    if (
+      campoConfiguradoVisible("ejeNumerico") &&
+      !/^\d-\d$/.test(ejeNumerico)
+    ) {
       return "El Eje Numérico debe tener el formato 8-9.";
     }
 
@@ -731,10 +764,10 @@ export default function RegistrosScreen({
       }
     } else {
       if (
-        !itemizadoBeck.trim() ||
-        !numeroSello.trim() ||
-        !cantidadSellos.trim() ||
-        !holgura.trim() ||
+        (campoConfiguradoVisible("itemizadoBeck") && !itemizadoBeck.trim()) ||
+        (campoConfiguradoVisible("numeroSello") && !numeroSello.trim()) ||
+        (campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
+        (campoConfiguradoVisible("holgura") && !holgura.trim()) ||
         (campoConfiguradoVisible("cieloModular") && !accesibilidad.trim()) ||
         (campoConfiguradoVisible("aislacion") && !aislacion.trim()) ||
         (campoConfiguradoVisible("reparacionTabique") &&
@@ -744,26 +777,34 @@ export default function RegistrosScreen({
       }
     }
 
-    if (!fotos.length) return "Debes agregar al menos una foto.";
+    if (campoConfiguradoVisible("foto") && !fotos.length) {
+      return "Debes agregar al menos una foto.";
+    }
 
     return "";
   };
 
   const validateJefeEditForm = () => {
     const commonMissing =
-      !fecha.trim() ||
-      !recinto.trim() ||
-      !modulo.trim() ||
-      !piso.trim() ||
-      !ejeNumerico.trim() ||
-      !ejeAlfabetico.trim() ||
-      !nombreSellador.trim();
+      (campoConfiguradoVisible("fechaEjecucionSello") && !fecha.trim()) ||
+      (campoConfiguradoVisible("recinto") && !recinto.trim()) ||
+      (campoConfiguradoVisible("modulo") && !modulo.trim()) ||
+      (campoConfiguradoVisible("piso") && !piso.trim()) ||
+      (campoConfiguradoVisible("ejeNumerico") && !ejeNumerico.trim()) ||
+      (campoConfiguradoVisible("ejeAlfabetico") && !ejeAlfabetico.trim()) ||
+      (campoConfiguradoVisible("nombreSellador") && !nombreSellador.trim());
 
     if (commonMissing) return "Debes completar todos los campos obligatorios.";
-    if (!/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)) {
+    if (
+      campoConfiguradoVisible("ejeAlfabetico") &&
+      !/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)
+    ) {
       return "El Eje Alfabético debe tener el formato F-G.";
     }
-    if (!/^\d-\d$/.test(ejeNumerico)) {
+    if (
+      campoConfiguradoVisible("ejeNumerico") &&
+      !/^\d-\d$/.test(ejeNumerico)
+    ) {
       return "El Eje Numérico debe tener el formato 8-9.";
     }
 
@@ -773,10 +814,10 @@ export default function RegistrosScreen({
         return "La longitud debe ser mayor a 0.";
       }
     } else if (
-      !itemizadoBeck.trim() ||
-      !numeroSello.trim() ||
-      !cantidadSellos.trim() ||
-      !holgura.trim() ||
+      (campoConfiguradoVisible("itemizadoBeck") && !itemizadoBeck.trim()) ||
+      (campoConfiguradoVisible("numeroSello") && !numeroSello.trim()) ||
+      (campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
+      (campoConfiguradoVisible("holgura") && !holgura.trim()) ||
       (campoConfiguradoVisible("cieloModular") && !accesibilidad.trim()) ||
       (campoConfiguradoVisible("aislacion") && !aislacion.trim()) ||
       (campoConfiguradoVisible("reparacionTabique") &&
@@ -812,22 +853,32 @@ export default function RegistrosScreen({
 
       const registro = await createRegistro({
         obraId: obra.id,
-        fecha,
+        ...getPayloadCommonFields(),
         descripcionMaterial: isJuntaLineal
           ? "Junta Lineal Espuma"
-          : itemizadoBeck,
-        itemizadoBeck: isJuntaLineal ? undefined : itemizadoBeck,
-        recinto,
-        moduloEdificio: modulo,
-        modulo,
-        piso,
-        ejeNumerico: ejeNumerico.trim(),
-        ejeAlfabetico,
-        numeroSello: isJuntaLineal ? "" : numeroSello,
-        cantidadSellos: isJuntaLineal ? 1 : toApiNumber(cantidadSellos),
-        nombreSellador,
-        holgura: isJuntaLineal ? 0 : toApiNumber(holgura),
-        factorHolguras: isJuntaLineal ? undefined : factorValue(holgura),
+          : campoConfiguradoVisible("itemizadoBeck")
+            ? itemizadoBeck
+            : "No aplica",
+        itemizadoBeck:
+          isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
+            ? undefined
+            : itemizadoBeck,
+        numeroSello:
+          isJuntaLineal || !campoConfiguradoVisible("numeroSello")
+            ? "No aplica"
+            : numeroSello,
+        cantidadSellos:
+          isJuntaLineal || !campoConfiguradoVisible("cantidadSellos")
+            ? 1
+            : toApiNumber(cantidadSellos),
+        holgura:
+          isJuntaLineal || !campoConfiguradoVisible("holgura")
+            ? 0
+            : toApiNumber(holgura),
+        factorHolguras:
+          isJuntaLineal || !campoConfiguradoVisible("holgura")
+            ? undefined
+            : factorValue(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
             ? 1
@@ -846,8 +897,13 @@ export default function RegistrosScreen({
           reparacionTabique.trim()
             ? toApiNumber(reparacionTabique)
             : undefined,
-        observaciones,
-        itemizadoSacyr: isJuntaLineal ? undefined : itemizadoSacyr,
+        observaciones: campoConfiguradoVisible("observaciones")
+          ? observaciones
+          : undefined,
+        itemizadoSacyr:
+          isJuntaLineal || !campoConfiguradoVisible("itemizadoMandante")
+            ? undefined
+            : itemizadoSacyr,
         tipoRegistro,
         metrosLineales: isJuntaLineal
           ? toApiNumber(metrosLineales)
@@ -894,22 +950,32 @@ export default function RegistrosScreen({
 
       await enviarRegistroAIngenieria(editingRegistro.id, {
         obraId: editingRegistro.obras?.id || editingRegistro.id,
-        fecha,
+        ...getPayloadCommonFields(),
         descripcionMaterial: isJuntaLineal
           ? "Junta Lineal Espuma"
-          : itemizadoBeck,
-        itemizadoBeck: isJuntaLineal ? undefined : itemizadoBeck,
-        recinto,
-        moduloEdificio: modulo,
-        modulo,
-        piso,
-        ejeNumerico: ejeNumerico.trim(),
-        ejeAlfabetico,
-        numeroSello: isJuntaLineal ? "" : numeroSello,
-        cantidadSellos: isJuntaLineal ? 1 : toApiNumber(cantidadSellos),
-        nombreSellador,
-        holgura: isJuntaLineal ? 0 : toApiNumber(holgura),
-        factorHolguras: isJuntaLineal ? undefined : factorValue(holgura),
+          : campoConfiguradoVisible("itemizadoBeck")
+            ? itemizadoBeck
+            : "No aplica",
+        itemizadoBeck:
+          isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
+            ? undefined
+            : itemizadoBeck,
+        numeroSello:
+          isJuntaLineal || !campoConfiguradoVisible("numeroSello")
+            ? "No aplica"
+            : numeroSello,
+        cantidadSellos:
+          isJuntaLineal || !campoConfiguradoVisible("cantidadSellos")
+            ? 1
+            : toApiNumber(cantidadSellos),
+        holgura:
+          isJuntaLineal || !campoConfiguradoVisible("holgura")
+            ? 0
+            : toApiNumber(holgura),
+        factorHolguras:
+          isJuntaLineal || !campoConfiguradoVisible("holgura")
+            ? undefined
+            : factorValue(holgura),
         accesibilidad:
           isJuntaLineal
             ? 1
@@ -930,9 +996,14 @@ export default function RegistrosScreen({
           reparacionTabique.trim()
             ? toApiNumber(reparacionTabique)
             : undefined,
-        folio,
-        observaciones,
-        itemizadoSacyr: isJuntaLineal ? undefined : itemizadoSacyr,
+        folio: campoConfiguradoVisible("folio") ? folio : undefined,
+        observaciones: campoConfiguradoVisible("observaciones")
+          ? observaciones
+          : undefined,
+        itemizadoSacyr:
+          isJuntaLineal || !campoConfiguradoVisible("itemizadoMandante")
+            ? undefined
+            : itemizadoSacyr,
         tipoRegistro,
         metrosLineales: isJuntaLineal
           ? toApiNumber(metrosLineales)
@@ -955,19 +1026,7 @@ export default function RegistrosScreen({
     try {
       if (!editingRegistro || !obra) return;
 
-      const validationError =
-        validateJefeEditForm() ||
-        (!isJuntaLineal &&
-        ((campoConfiguradoVisible("aislacion") && !aislacion.trim()) ||
-          (campoConfiguradoVisible("reparacionTabique") &&
-            !reparacionTabique.trim()))
-          ? "Debes completar todos los campos obligatorios."
-          : "") ||
-        (!/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)
-          ? "El Eje Alfabético debe tener el formato F-G."
-          : !/^\d-\d$/.test(ejeNumerico)
-            ? "El Eje Numérico debe tener el formato 8-9."
-            : "");
+      const validationError = validateJefeEditForm();
       if (validationError) {
         setError(validationError);
         setSuccess("");
@@ -980,22 +1039,32 @@ export default function RegistrosScreen({
 
       await reenviarRegistroComoTecnico(editingRegistro.id, {
         obraId: obra.id,
-        fecha,
+        ...getPayloadCommonFields(),
         descripcionMaterial: isJuntaLineal
           ? "Junta Lineal Espuma"
-          : itemizadoBeck,
-        itemizadoBeck: isJuntaLineal ? undefined : itemizadoBeck,
-        recinto,
-        moduloEdificio: modulo,
-        modulo,
-        piso,
-        ejeNumerico: ejeNumerico.trim(),
-        ejeAlfabetico,
-        numeroSello: isJuntaLineal ? "" : numeroSello,
-        cantidadSellos: isJuntaLineal ? 1 : toApiNumber(cantidadSellos),
-        nombreSellador,
-        holgura: isJuntaLineal ? 0 : toApiNumber(holgura),
-        factorHolguras: isJuntaLineal ? undefined : factorValue(holgura),
+          : campoConfiguradoVisible("itemizadoBeck")
+            ? itemizadoBeck
+            : "No aplica",
+        itemizadoBeck:
+          isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
+            ? undefined
+            : itemizadoBeck,
+        numeroSello:
+          isJuntaLineal || !campoConfiguradoVisible("numeroSello")
+            ? "No aplica"
+            : numeroSello,
+        cantidadSellos:
+          isJuntaLineal || !campoConfiguradoVisible("cantidadSellos")
+            ? 1
+            : toApiNumber(cantidadSellos),
+        holgura:
+          isJuntaLineal || !campoConfiguradoVisible("holgura")
+            ? 0
+            : toApiNumber(holgura),
+        factorHolguras:
+          isJuntaLineal || !campoConfiguradoVisible("holgura")
+            ? undefined
+            : factorValue(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
             ? 1
@@ -1014,8 +1083,13 @@ export default function RegistrosScreen({
           reparacionTabique.trim()
             ? toApiNumber(reparacionTabique)
             : undefined,
-        observaciones,
-        itemizadoSacyr: isJuntaLineal ? undefined : itemizadoSacyr,
+        observaciones: campoConfiguradoVisible("observaciones")
+          ? observaciones
+          : undefined,
+        itemizadoSacyr:
+          isJuntaLineal || !campoConfiguradoVisible("itemizadoMandante")
+            ? undefined
+            : itemizadoSacyr,
         tipoRegistro,
         metrosLineales: isJuntaLineal
           ? toApiNumber(metrosLineales)
@@ -1053,78 +1127,109 @@ export default function RegistrosScreen({
 
   const renderCommonFields = () => (
     <>
-      <Pressable onPress={() => setCalendarVisible(true)}>
+      {campoConfiguradoVisible("fechaEjecucionSello") ? (
+        <Pressable onPress={() => setCalendarVisible(true)}>
+          <TextInput
+            label="Fecha ejecución de sello"
+            value={fecha}
+            mode="outlined"
+            editable={false}
+            pointerEvents="none"
+            right={<TextInput.Icon icon="calendar" />}
+            style={styles.input}
+          />
+        </Pressable>
+      ) : null}
+
+      {campoConfiguradoVisible("diaSemana") ? (
         <TextInput
-          label="Fecha ejecución de sello"
-          value={fecha}
+          label="Día"
+          value={getDiaSemana(fecha)}
           mode="outlined"
           editable={false}
-          pointerEvents="none"
-          right={<TextInput.Icon icon="calendar" />}
           style={styles.input}
         />
-      </Pressable>
+      ) : null}
 
-      <TextInput
-        label="Día"
-        value={getDiaSemana(fecha)}
-        mode="outlined"
-        editable={false}
-        style={styles.input}
-      />
+      {campoConfiguradoVisible("recinto") ? (
+        <TextInput
+          label="Recinto"
+          value={recinto}
+          onChangeText={setRecinto}
+          mode="outlined"
+          style={styles.input}
+        />
+      ) : null}
 
-      <TextInput
-        label="Recinto"
-        value={recinto}
-        onChangeText={setRecinto}
-        mode="outlined"
-        style={styles.input}
-      />
+      {campoConfiguradoVisible("modulo") ? (
+        <TextInput
+          label="Módulo o edificio"
+          value={modulo}
+          onChangeText={setModulo}
+          mode="outlined"
+          style={styles.input}
+        />
+      ) : null}
 
-      <TextInput
-        label="Módulo o edificio"
-        value={modulo}
-        onChangeText={setModulo}
-        mode="outlined"
-        style={styles.input}
-      />
+      {campoConfiguradoVisible("piso") ? (
+        <TextInput
+          label="Piso"
+          value={piso}
+          onChangeText={(value) => setPiso(onlyDigits(value))}
+          mode="outlined"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+      ) : null}
 
-      <TextInput
-        label="Piso"
-        value={piso}
-        onChangeText={(value) => setPiso(onlyDigits(value))}
-        mode="outlined"
-        keyboardType="numeric"
-        style={styles.input}
-      />
+      {campoConfiguradoVisible("nombreSellador") ? (
+        <TextInput
+          label="Nombre sellador"
+          value={nombreSellador}
+          mode="outlined"
+          editable={false}
+          style={styles.input}
+        />
+      ) : null}
 
-      <TextInput
-        label="Nombre sellador"
-        value={nombreSellador}
-        mode="outlined"
-        editable={false}
-        style={styles.input}
-      />
+      {campoConfiguradoVisible("ejeNumerico") ? (
+        <TextInput
+          label="Eje Numérico"
+          value={ejeNumerico}
+          onChangeText={(value) => setEjeNumerico(formatEjeNumerico(value))}
+          mode="outlined"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+      ) : null}
 
-      <TextInput
-        label="Eje Numérico"
-        value={ejeNumerico}
-        onChangeText={(value) => setEjeNumerico(formatEjeNumerico(value))}
-        mode="outlined"
-        keyboardType="numeric"
-        style={styles.input}
-      />
-
-      <TextInput
-        label="Eje Alfabético"
-        value={ejeAlfabetico}
-        onChangeText={(value) => setEjeAlfabetico(formatEjeAlfabetico(value))}
-        mode="outlined"
-        autoCapitalize="characters"
-        style={styles.input}
-      />
+      {campoConfiguradoVisible("ejeAlfabetico") ? (
+        <TextInput
+          label="Eje Alfabético"
+          value={ejeAlfabetico}
+          onChangeText={(value) => setEjeAlfabetico(formatEjeAlfabetico(value))}
+          mode="outlined"
+          autoCapitalize="characters"
+          style={styles.input}
+        />
+      ) : null}
     </>
   );
+
+  const getPayloadCommonFields = () => ({
+    fecha,
+    recinto: campoConfiguradoVisible("recinto") ? recinto : "No aplica",
+    modulo: campoConfiguradoVisible("modulo") ? modulo : "No aplica",
+    moduloEdificio: campoConfiguradoVisible("modulo") ? modulo : "No aplica",
+    piso: campoConfiguradoVisible("piso") ? piso : "0",
+    ejeNumerico: campoConfiguradoVisible("ejeNumerico")
+      ? ejeNumerico.trim()
+      : "0-0",
+    ejeAlfabetico: campoConfiguradoVisible("ejeAlfabetico")
+      ? ejeAlfabetico
+      : "A-A",
+    nombreSellador,
+  });
 
   const renderMenuField = (
     label: string,
@@ -1165,8 +1270,11 @@ export default function RegistrosScreen({
     </>
   );
 
-  const renderItemizadoTerreno = () => (
-    <>
+  const renderItemizadoTerreno = () => {
+    if (!campoConfiguradoVisible("itemizadoBeck")) return null;
+
+    return (
+      <>
       <Text style={styles.fieldLabel}>Itemizado BECK</Text>
       <Menu
         visible={itemizadoMenuVisible}
@@ -1208,7 +1316,8 @@ export default function RegistrosScreen({
         />
       ) : null}
     </>
-  );
+    );
+  };
 
   const goToObras = () => {
     if (onChangeObra) {
@@ -1222,8 +1331,11 @@ export default function RegistrosScreen({
   const renderFotos = (options?: {
     existingFotos?: RegistroHistorialApi["fotos"];
     replacementMode?: boolean;
-  }) => (
-    <>
+  }) => {
+    if (!campoConfiguradoVisible("foto")) return null;
+
+    return (
+      <>
       <Text style={styles.photosTitle}>Foto</Text>
 
       {options?.existingFotos?.length ? (
@@ -1278,7 +1390,8 @@ export default function RegistrosScreen({
         </>
       ) : null}
     </>
-  );
+    );
+  };
 
   if (userRole === "jefeobra") {
     return (
@@ -1286,9 +1399,126 @@ export default function RegistrosScreen({
         style={[styles.container, { paddingTop: insets.top + 2 }]}
         edges={["top", "left", "right"]}
       >
+        {isJefeObraObrasList ? (
+          <View style={styles.fixedHeader}>
+            <BrandHeader subtitle="Registros · Jefe de obra" />
+            <Text variant="titleLarge" style={styles.title}>
+              Registros de técnicos
+            </Text>
+            <Text style={styles.subtitle}>
+              Busca una obra activa o pausada para revisar registros pendientes,
+              corregirlos y enviarlos a ingeniería.
+            </Text>
+
+            <TextInput
+              label="Buscar obra"
+              value={jefeObraSearch}
+              onChangeText={setJefeObraSearch}
+              mode="outlined"
+              style={styles.input}
+              left={<TextInput.Icon icon="magnify" />}
+            />
+
+            <Text style={styles.sectionTitle}>Obras disponibles</Text>
+          </View>
+        ) : isJefeObraRegistrosList && selectedJefeObra ? (
+          <View style={styles.fixedHeader}>
+            <View style={styles.fixedTopRow}>
+              <View style={styles.fixedBrand}>
+                <BrandHeader subtitle="Registros · Jefe de obra" />
+              </View>
+              <Button
+                mode="text"
+                compact
+                onPress={() => {
+                  setSelectedJefeObraId(null);
+                  setJefeRegistroSearch("");
+                  setJefeEstadoFiltro("todos");
+                }}
+              >
+                Volver
+              </Button>
+            </View>
+            <Text variant="titleLarge" style={styles.title}>
+              Registros de técnicos
+            </Text>
+            <Text style={styles.subtitle}>
+              Busca una obra activa o pausada para revisar registros pendientes,
+              corregirlos y enviarlos a ingeniería.
+            </Text>
+
+            <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
+            <Text style={styles.recordMeta}>
+              Código: {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
+              {selectedJefeObra.estado || "Sin estado"}
+            </Text>
+
+            <TextInput
+              label="Buscar por técnico, piso o eje"
+              value={jefeRegistroSearch}
+              onChangeText={setJefeRegistroSearch}
+              mode="outlined"
+              style={styles.input}
+              left={<TextInput.Icon icon="magnify" />}
+            />
+
+            <View style={styles.filterRow}>
+              <Chip
+                selected={jefeEstadoFiltro === "todos"}
+                onPress={() => setJefeEstadoFiltro("todos")}
+                style={[
+                  styles.filterChip,
+                  jefeEstadoFiltro === "todos" && styles.filterChipSelected,
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  jefeEstadoFiltro === "todos" && styles.filterChipTextSelected,
+                ]}
+              >
+                Todos
+              </Chip>
+              <Chip
+                selected={jefeEstadoFiltro === "pendiente"}
+                onPress={() => setJefeEstadoFiltro("pendiente")}
+                style={[
+                  styles.filterChip,
+                  jefeEstadoFiltro === "pendiente" && styles.filterChipSelected,
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  jefeEstadoFiltro === "pendiente" &&
+                    styles.filterChipTextSelected,
+                ]}
+              >
+                Pendientes
+              </Chip>
+              <Chip
+                selected={jefeEstadoFiltro === "rechazado"}
+                onPress={() => setJefeEstadoFiltro("rechazado")}
+                style={[
+                  styles.filterChip,
+                  jefeEstadoFiltro === "rechazado" && styles.filterChipSelected,
+                ]}
+                textStyle={[
+                  styles.filterChipText,
+                  jefeEstadoFiltro === "rechazado" &&
+                    styles.filterChipTextSelected,
+                ]}
+              >
+                Rechazados
+              </Chip>
+            </View>
+
+            <Text style={styles.sectionTitle}>Registros de la obra</Text>
+          </View>
+        ) : null}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            (isJefeObraObrasList || isJefeObraRegistrosList) &&
+              styles.contentAfterFixedHeader,
+          ]}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           refreshControl={
@@ -1305,14 +1535,18 @@ export default function RegistrosScreen({
             )
           }
         >
-          <BrandHeader subtitle="Registros · Jefe de obra" />
-          <Text variant="titleLarge" style={styles.title}>
-            Registros de técnicos
-          </Text>
-          <Text style={styles.subtitle}>
-            Busca una obra activa o pausada para revisar registros pendientes,
-            corregirlos y enviarlos a ingeniería.
-          </Text>
+          {!isJefeObraObrasList && !isJefeObraRegistrosList ? (
+            <>
+              <BrandHeader subtitle="Registros · Jefe de obra" />
+              <Text variant="titleLarge" style={styles.title}>
+                Registros de técnicos
+              </Text>
+              <Text style={styles.subtitle}>
+                Busca una obra activa o pausada para revisar registros pendientes,
+                corregirlos y enviarlos a ingeniería.
+              </Text>
+            </>
+          ) : null}
 
           {loadingJefeRegistros ? (
             <View style={styles.loadingBox}>
@@ -1372,54 +1606,66 @@ export default function RegistrosScreen({
                   />
                 ) : (
                   <>
-                    <TextInput
-                      label="Código BECK"
-                      value={editingRegistro.codigo_beck || ""}
-                      mode="outlined"
-                      editable={false}
-                      style={styles.input}
-                    />
-                    <TextInput
-                      label="Cantidad de Sellos"
-                      value={cantidadSellos}
-                      onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
-                      mode="outlined"
-                      keyboardType="numeric"
-                      style={styles.input}
-                    />
-                    <TextInput
-                      label="Itemizado BECK"
-                      value={itemizadoBeck}
-                      onChangeText={setItemizadoBeck}
-                      mode="outlined"
-                      style={styles.input}
-                    />
-                    <TextInput
-                      label="N° del sello"
-                      value={numeroSello}
-                      onChangeText={setNumeroSello}
-                      mode="outlined"
-                      style={styles.input}
-                    />
-                    {renderMenuField(
+                    {campoConfiguradoVisible("codigoBeck") ? (
+                      <TextInput
+                        label="Código BECK"
+                        value={editingRegistro.codigo_beck || ""}
+                        mode="outlined"
+                        editable={false}
+                        style={styles.input}
+                      />
+                    ) : null}
+                    {campoConfiguradoVisible("cantidadSellos") ? (
+                      <TextInput
+                        label="Cantidad de Sellos"
+                        value={cantidadSellos}
+                        onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                        mode="outlined"
+                        keyboardType="numeric"
+                        style={styles.input}
+                      />
+                    ) : null}
+                    {campoConfiguradoVisible("itemizadoBeck") ? (
+                      <TextInput
+                        label="Itemizado BECK"
+                        value={itemizadoBeck}
+                        onChangeText={setItemizadoBeck}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
+                    {campoConfiguradoVisible("numeroSello") ? (
+                      <TextInput
+                        label="N° del sello"
+                        value={numeroSello}
+                        onChangeText={setNumeroSello}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
+                    {campoConfiguradoVisible("holgura")
+                      ? renderMenuField(
                       "Holgura (cm)",
                       holgura,
                       holguraMenuVisible,
                       setHolguraMenuVisible,
                       setHolgura,
                       HOLGURA_OPTIONS,
-                    )}
-                    <TextInput
-                      label="Factor por Holguras"
-                      value={String(
-                        holgura.trim()
-                          ? factorValue(holgura)
-                          : editingRegistro.factor_por_holguras ?? "",
-                      )}
-                      mode="outlined"
-                      editable={false}
-                      style={styles.input}
-                    />
+                        )
+                      : null}
+                    {campoConfiguradoVisible("factorPorHolguras") ? (
+                      <TextInput
+                        label="Factor por Holguras"
+                        value={String(
+                          holgura.trim()
+                            ? factorValue(holgura)
+                            : editingRegistro.factor_por_holguras ?? "",
+                        )}
+                        mode="outlined"
+                        editable={false}
+                        style={styles.input}
+                      />
+                    ) : null}
                     {campoConfiguradoVisible("cieloModular") ? (
                       renderMenuField(
                         "Cielo modular",
@@ -1430,17 +1676,19 @@ export default function RegistrosScreen({
                         CIELO_MODULAR_OPTIONS,
                       )
                     ) : null}
-                    <TextInput
-                      label="Cantidad de sellos con factores sin reparaciones"
-                      value={String(
-                        cantidadSellos.trim() && holgura.trim()
-                          ? toApiNumber(cantidadSellos) * factorValue(holgura)
-                          : editingRegistro.cantidad_sellos_con_factores ?? "",
-                      )}
-                      mode="outlined"
-                      editable={false}
-                      style={styles.input}
-                    />
+                    {campoConfiguradoVisible("cantidadSellosConFactores") ? (
+                      <TextInput
+                        label="Cantidad de sellos con factores sin reparaciones"
+                        value={String(
+                          cantidadSellos.trim() && holgura.trim()
+                            ? toApiNumber(cantidadSellos) * factorValue(holgura)
+                            : editingRegistro.cantidad_sellos_con_factores ?? "",
+                        )}
+                        mode="outlined"
+                        editable={false}
+                        style={styles.input}
+                      />
+                    ) : null}
                     {campoConfiguradoVisible("aislacion") ? (
                       renderMenuField(
                         "Aislación",
@@ -1451,13 +1699,15 @@ export default function RegistrosScreen({
                         APLICA_OPTIONS,
                       )
                     ) : null}
-                    <TextInput
-                      label="Cantidad de Sellos Aislación"
-                      value={String(editingRegistro.cantidad_sellos_aislacion ?? "")}
-                      mode="outlined"
-                      editable={false}
-                      style={styles.input}
-                    />
+                    {campoConfiguradoVisible("cantidadSellosAislacion") ? (
+                      <TextInput
+                        label="Cantidad de Sellos Aislación"
+                        value={String(editingRegistro.cantidad_sellos_aislacion ?? "")}
+                        mode="outlined"
+                        editable={false}
+                        style={styles.input}
+                      />
+                    ) : null}
                     {campoConfiguradoVisible("reparacionTabique") ? (
                       renderMenuField(
                         "Reparación de tabique",
@@ -1468,39 +1718,47 @@ export default function RegistrosScreen({
                         APLICA_OPTIONS,
                       )
                     ) : null}
-                    <TextInput
-                      label="Cantidad final"
-                      value={String(editingRegistro.cantidad_final ?? "")}
-                      mode="outlined"
-                      editable={false}
-                      style={styles.input}
-                    />
-                    <TextInput
-                      label="Itemizado Mandante"
-                      value={itemizadoSacyr}
-                      onChangeText={setItemizadoSacyr}
-                      mode="outlined"
-                      style={styles.input}
-                    />
-                    <TextInput
-                      label="Folio"
-                      value={folio}
-                      onChangeText={setFolio}
-                      mode="outlined"
-                      style={styles.input}
-                    />
+                    {campoConfiguradoVisible("cantidadFinal") ? (
+                      <TextInput
+                        label="Cantidad final"
+                        value={String(editingRegistro.cantidad_final ?? "")}
+                        mode="outlined"
+                        editable={false}
+                        style={styles.input}
+                      />
+                    ) : null}
+                    {campoConfiguradoVisible("itemizadoMandante") ? (
+                      <TextInput
+                        label="Itemizado Mandante"
+                        value={itemizadoSacyr}
+                        onChangeText={setItemizadoSacyr}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
+                    {campoConfiguradoVisible("folio") ? (
+                      <TextInput
+                        label="Folio"
+                        value={folio}
+                        onChangeText={setFolio}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
                   </>
                 )}
 
-                <TextInput
-                  label="Observaciones"
-                  value={observaciones}
-                  onChangeText={setObservaciones}
-                  mode="outlined"
-                  multiline
-                  numberOfLines={6}
-                  style={[styles.input, styles.observacionesInput]}
-                />
+                {campoConfiguradoVisible("observaciones") ? (
+                  <TextInput
+                    label="Observaciones"
+                    value={observaciones}
+                    onChangeText={setObservaciones}
+                    mode="outlined"
+                    multiline
+                    numberOfLines={6}
+                    style={[styles.input, styles.observacionesInput]}
+                  />
+                ) : null}
 
                 {renderFotos({
                   existingFotos: editingRegistro.fotos,
@@ -1522,85 +1780,90 @@ export default function RegistrosScreen({
             </Card>
           ) : selectedJefeObra ? (
             <>
-              <View style={styles.cardHeaderRow}>
-                <View style={styles.recordInfo}>
-                  <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
-                  <Text style={styles.recordMeta}>
-                    {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
-                    {selectedJefeObra.estado || "Sin estado"}
-                  </Text>
-                </View>
-                <Button
-                  mode="text"
-                  onPress={() => {
-                    setSelectedJefeObraId(null);
-                    setJefeRegistroSearch("");
-                    setJefeEstadoFiltro("todos");
-                  }}
-                >
-                  Volver
-                </Button>
-              </View>
+              {!isJefeObraRegistrosList ? (
+                <>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.recordInfo}>
+                      <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
+                      <Text style={styles.recordMeta}>
+                        {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
+                        {selectedJefeObra.estado || "Sin estado"}
+                      </Text>
+                    </View>
+                    <Button
+                      mode="text"
+                      onPress={() => {
+                        setSelectedJefeObraId(null);
+                        setJefeRegistroSearch("");
+                        setJefeEstadoFiltro("todos");
+                      }}
+                    >
+                      Volver
+                    </Button>
+                  </View>
 
-              <TextInput
-                label="Buscar por técnico, piso o eje"
-                value={jefeRegistroSearch}
-                onChangeText={setJefeRegistroSearch}
-                mode="outlined"
-                style={styles.input}
-                left={<TextInput.Icon icon="magnify" />}
-              />
+                  <TextInput
+                    label="Buscar por técnico, piso o eje"
+                    value={jefeRegistroSearch}
+                    onChangeText={setJefeRegistroSearch}
+                    mode="outlined"
+                    style={styles.input}
+                    left={<TextInput.Icon icon="magnify" />}
+                  />
 
-              <View style={styles.filterRow}>
-                <Chip
-                  selected={jefeEstadoFiltro === "todos"}
-                  onPress={() => setJefeEstadoFiltro("todos")}
-                  style={[
-                    styles.filterChip,
-                    jefeEstadoFiltro === "todos" && styles.filterChipSelected,
-                  ]}
-                  textStyle={[
-                    styles.filterChipText,
-                    jefeEstadoFiltro === "todos" && styles.filterChipTextSelected,
-                  ]}
-                >
-                  Todos
-                </Chip>
-                <Chip
-                  selected={jefeEstadoFiltro === "pendiente"}
-                  onPress={() => setJefeEstadoFiltro("pendiente")}
-                  style={[
-                    styles.filterChip,
-                    jefeEstadoFiltro === "pendiente" &&
-                      styles.filterChipSelected,
-                  ]}
-                  textStyle={[
-                    styles.filterChipText,
-                    jefeEstadoFiltro === "pendiente" &&
-                      styles.filterChipTextSelected,
-                  ]}
-                >
-                  Pendientes
-                </Chip>
-                <Chip
-                  selected={jefeEstadoFiltro === "rechazado"}
-                  onPress={() => setJefeEstadoFiltro("rechazado")}
-                  style={[
-                    styles.filterChip,
-                    jefeEstadoFiltro === "rechazado" &&
-                      styles.filterChipSelected,
-                  ]}
-                  textStyle={[
-                    styles.filterChipText,
-                    jefeEstadoFiltro === "rechazado" &&
-                      styles.filterChipTextSelected,
-                  ]}
-                >
-                  Rechazados
-                </Chip>
-              </View>
+                  <View style={styles.filterRow}>
+                    <Chip
+                      selected={jefeEstadoFiltro === "todos"}
+                      onPress={() => setJefeEstadoFiltro("todos")}
+                      style={[
+                        styles.filterChip,
+                        jefeEstadoFiltro === "todos" && styles.filterChipSelected,
+                      ]}
+                      textStyle={[
+                        styles.filterChipText,
+                        jefeEstadoFiltro === "todos" &&
+                          styles.filterChipTextSelected,
+                      ]}
+                    >
+                      Todos
+                    </Chip>
+                    <Chip
+                      selected={jefeEstadoFiltro === "pendiente"}
+                      onPress={() => setJefeEstadoFiltro("pendiente")}
+                      style={[
+                        styles.filterChip,
+                        jefeEstadoFiltro === "pendiente" &&
+                          styles.filterChipSelected,
+                      ]}
+                      textStyle={[
+                        styles.filterChipText,
+                        jefeEstadoFiltro === "pendiente" &&
+                          styles.filterChipTextSelected,
+                      ]}
+                    >
+                      Pendientes
+                    </Chip>
+                    <Chip
+                      selected={jefeEstadoFiltro === "rechazado"}
+                      onPress={() => setJefeEstadoFiltro("rechazado")}
+                      style={[
+                        styles.filterChip,
+                        jefeEstadoFiltro === "rechazado" &&
+                          styles.filterChipSelected,
+                      ]}
+                      textStyle={[
+                        styles.filterChipText,
+                        jefeEstadoFiltro === "rechazado" &&
+                          styles.filterChipTextSelected,
+                      ]}
+                    >
+                      Rechazados
+                    </Chip>
+                  </View>
 
-              <Text style={styles.sectionTitle}>Registros de la obra</Text>
+                  <Text style={styles.sectionTitle}>Registros de la obra</Text>
+                </>
+              ) : null}
               {filteredJefeRegistros.length ? (
                 filteredJefeRegistros.map((registro) => (
                   <Card key={registro.id} style={styles.historyCard}>
@@ -1678,16 +1941,20 @@ export default function RegistrosScreen({
             </>
           ) : (
             <>
-              <TextInput
-                label="Buscar obra"
-                value={jefeObraSearch}
-                onChangeText={setJefeObraSearch}
-                mode="outlined"
-                style={styles.input}
-                left={<TextInput.Icon icon="magnify" />}
-              />
+              {!isJefeObraObrasList ? (
+                <>
+                  <TextInput
+                    label="Buscar obra"
+                    value={jefeObraSearch}
+                    onChangeText={setJefeObraSearch}
+                    mode="outlined"
+                    style={styles.input}
+                    left={<TextInput.Icon icon="magnify" />}
+                  />
 
-              <Text style={styles.sectionTitle}>Obras disponibles</Text>
+                  <Text style={styles.sectionTitle}>Obras disponibles</Text>
+                </>
+              ) : null}
               {filteredJefeObras.map((item) => (
                 <Card
                   key={item.id}
@@ -1732,9 +1999,78 @@ export default function RegistrosScreen({
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
+      {isTerrenoRegistroList ? (
+        <View style={styles.fixedHeader}>
+          <BrandHeader subtitle="Registro de terreno · BECK" />
+          <Text variant="titleLarge" style={styles.title}>
+            Registros
+          </Text>
+          <Text style={styles.subtitle}>
+            Carga avances, fotos y datos de instalacion por obra seleccionada.
+          </Text>
+
+          <TextInput
+            label="Buscar por obra o piso"
+            value={tecnicoRegistroSearch}
+            onChangeText={setTecnicoRegistroSearch}
+            mode="outlined"
+            style={styles.input}
+            left={<TextInput.Icon icon="magnify" />}
+          />
+          <View style={styles.filterRow}>
+            <Chip
+              selected={tecnicoEstadoFiltro === "todos"}
+              onPress={() => setTecnicoEstadoFiltro("todos")}
+              style={[
+                styles.filterChip,
+                tecnicoEstadoFiltro === "todos" && styles.filterChipSelected,
+              ]}
+              textStyle={[
+                styles.filterChipText,
+                tecnicoEstadoFiltro === "todos" && styles.filterChipTextSelected,
+              ]}
+            >
+              Todos
+            </Chip>
+            <Chip
+              selected={tecnicoEstadoFiltro === "pendiente"}
+              onPress={() => setTecnicoEstadoFiltro("pendiente")}
+              style={[
+                styles.filterChip,
+                tecnicoEstadoFiltro === "pendiente" && styles.filterChipSelected,
+              ]}
+              textStyle={[
+                styles.filterChipText,
+                tecnicoEstadoFiltro === "pendiente" &&
+                  styles.filterChipTextSelected,
+              ]}
+            >
+              Pendientes
+            </Chip>
+            <Chip
+              selected={tecnicoEstadoFiltro === "rechazado"}
+              onPress={() => setTecnicoEstadoFiltro("rechazado")}
+              style={[
+                styles.filterChip,
+                tecnicoEstadoFiltro === "rechazado" && styles.filterChipSelected,
+              ]}
+              textStyle={[
+                styles.filterChipText,
+                tecnicoEstadoFiltro === "rechazado" &&
+                  styles.filterChipTextSelected,
+              ]}
+            >
+              Rechazados
+            </Chip>
+          </View>
+        </View>
+      ) : null}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          isTerrenoRegistroList && styles.contentAfterFixedHeader,
+        ]}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -1751,74 +2087,20 @@ export default function RegistrosScreen({
           ) : undefined
         }
       >
-        <BrandHeader subtitle="Registro de terreno · BECK" />
-        <Text variant="titleLarge" style={styles.title}>
-          Registros
-        </Text>
-        <Text style={styles.subtitle}>
-          Carga avances, fotos y datos de instalacion por obra seleccionada.
-        </Text>
+        {!isTerrenoRegistroList ? (
+          <>
+            <BrandHeader subtitle="Registro de terreno · BECK" />
+            <Text variant="titleLarge" style={styles.title}>
+              Registros
+            </Text>
+            <Text style={styles.subtitle}>
+              Carga avances, fotos y datos de instalacion por obra seleccionada.
+            </Text>
+          </>
+        ) : null}
 
         {userRole === "terreno" && !isFormMode && !editingRegistro ? (
           <>
-            <TextInput
-              label="Buscar por obra o piso"
-              value={tecnicoRegistroSearch}
-              onChangeText={setTecnicoRegistroSearch}
-              mode="outlined"
-              style={styles.input}
-              left={<TextInput.Icon icon="magnify" />}
-            />
-            <View style={styles.filterRow}>
-              <Chip
-                selected={tecnicoEstadoFiltro === "todos"}
-                onPress={() => setTecnicoEstadoFiltro("todos")}
-                style={[
-                  styles.filterChip,
-                  tecnicoEstadoFiltro === "todos" && styles.filterChipSelected,
-                ]}
-                textStyle={[
-                  styles.filterChipText,
-                  tecnicoEstadoFiltro === "todos" &&
-                    styles.filterChipTextSelected,
-                ]}
-              >
-                Todos
-              </Chip>
-              <Chip
-                selected={tecnicoEstadoFiltro === "pendiente"}
-                onPress={() => setTecnicoEstadoFiltro("pendiente")}
-                style={[
-                  styles.filterChip,
-                  tecnicoEstadoFiltro === "pendiente" &&
-                    styles.filterChipSelected,
-                ]}
-                textStyle={[
-                  styles.filterChipText,
-                  tecnicoEstadoFiltro === "pendiente" &&
-                    styles.filterChipTextSelected,
-                ]}
-              >
-                Pendientes
-              </Chip>
-              <Chip
-                selected={tecnicoEstadoFiltro === "rechazado"}
-                onPress={() => setTecnicoEstadoFiltro("rechazado")}
-                style={[
-                  styles.filterChip,
-                  tecnicoEstadoFiltro === "rechazado" &&
-                    styles.filterChipSelected,
-                ]}
-                textStyle={[
-                  styles.filterChipText,
-                  tecnicoEstadoFiltro === "rechazado" &&
-                    styles.filterChipTextSelected,
-                ]}
-              >
-                Rechazados
-              </Chip>
-            </View>
-
             <Text style={styles.sectionTitle}>Registros pendientes</Text>
             {filteredTecnicoRegistros.map((registro) => (
               <Card key={registro.id} style={styles.historyCard}>
@@ -1915,30 +2197,36 @@ export default function RegistrosScreen({
                 />
               ) : (
                 <>
-                  <TextInput
-                    label="Cantidad de Sellos"
-                    value={cantidadSellos}
-                    onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
-                    mode="outlined"
-                    keyboardType="numeric"
-                    style={styles.input}
-                  />
+                  {campoConfiguradoVisible("cantidadSellos") ? (
+                    <TextInput
+                      label="Cantidad de Sellos"
+                      value={cantidadSellos}
+                      onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                      mode="outlined"
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                  ) : null}
                   {renderItemizadoTerreno()}
-                  <TextInput
-                    label="N° del sello"
-                    value={numeroSello}
-                    onChangeText={setNumeroSello}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  {renderMenuField(
-                    "Holgura (cm)",
-                    holgura,
-                    holguraMenuVisible,
-                    setHolguraMenuVisible,
-                    setHolgura,
-                    HOLGURA_OPTIONS,
-                  )}
+                  {campoConfiguradoVisible("numeroSello") ? (
+                    <TextInput
+                      label="N° del sello"
+                      value={numeroSello}
+                      onChangeText={setNumeroSello}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                  ) : null}
+                  {campoConfiguradoVisible("holgura")
+                    ? renderMenuField(
+                        "Holgura (cm)",
+                        holgura,
+                        holguraMenuVisible,
+                        setHolguraMenuVisible,
+                        setHolgura,
+                        HOLGURA_OPTIONS,
+                      )
+                    : null}
                   {campoConfiguradoVisible("cieloModular") ? (
                     renderMenuField(
                       "Cielo modular",
@@ -1972,15 +2260,17 @@ export default function RegistrosScreen({
                 </>
               )}
 
-              <TextInput
-                label="Observaciones"
-                value={observaciones}
-                onChangeText={setObservaciones}
-                mode="outlined"
-                multiline
-                numberOfLines={6}
-                style={[styles.input, styles.observacionesInput]}
-              />
+              {campoConfiguradoVisible("observaciones") ? (
+                <TextInput
+                  label="Observaciones"
+                  value={observaciones}
+                  onChangeText={setObservaciones}
+                  mode="outlined"
+                  multiline
+                  numberOfLines={6}
+                  style={[styles.input, styles.observacionesInput]}
+                />
+              ) : null}
 
               {renderFotos()}
 
@@ -2097,49 +2387,57 @@ export default function RegistrosScreen({
                       style={styles.input}
                     />
 
-                    <TextInput
-                      label="Observaciones"
-                      value={observaciones}
-                      onChangeText={setObservaciones}
-                      mode="outlined"
-                      multiline
-                      numberOfLines={6}
-                      style={[styles.input, styles.observacionesInput]}
-                    />
+                    {campoConfiguradoVisible("observaciones") ? (
+                      <TextInput
+                        label="Observaciones"
+                        value={observaciones}
+                        onChangeText={setObservaciones}
+                        mode="outlined"
+                        multiline
+                        numberOfLines={6}
+                        style={[styles.input, styles.observacionesInput]}
+                      />
+                    ) : null}
 
                     {renderFotos()}
                   </>
                 ) : (
                   <>
-                    <TextInput
-                      label="Cantidad de Sellos"
-                      value={cantidadSellos}
-                      onChangeText={(value) =>
-                        setCantidadSellos(onlyDigits(value))
-                      }
-                      mode="outlined"
-                      keyboardType="numeric"
-                      style={styles.input}
-                    />
+                    {campoConfiguradoVisible("cantidadSellos") ? (
+                      <TextInput
+                        label="Cantidad de Sellos"
+                        value={cantidadSellos}
+                        onChangeText={(value) =>
+                          setCantidadSellos(onlyDigits(value))
+                        }
+                        mode="outlined"
+                        keyboardType="numeric"
+                        style={styles.input}
+                      />
+                    ) : null}
 
                     {renderItemizadoTerreno()}
 
-                    <TextInput
-                      label="N° del sello"
-                      value={numeroSello}
-                      onChangeText={setNumeroSello}
-                      mode="outlined"
-                      style={styles.input}
-                    />
+                    {campoConfiguradoVisible("numeroSello") ? (
+                      <TextInput
+                        label="N° del sello"
+                        value={numeroSello}
+                        onChangeText={setNumeroSello}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
 
-                    {renderMenuField(
-                      "Holgura (cm)",
-                      holgura,
-                      holguraMenuVisible,
-                      setHolguraMenuVisible,
-                      setHolgura,
-                      HOLGURA_OPTIONS,
-                    )}
+                    {campoConfiguradoVisible("holgura")
+                      ? renderMenuField(
+                          "Holgura (cm)",
+                          holgura,
+                          holguraMenuVisible,
+                          setHolguraMenuVisible,
+                          setHolgura,
+                          HOLGURA_OPTIONS,
+                        )
+                      : null}
 
                     {campoConfiguradoVisible("cieloModular") ? (
                       renderMenuField(
@@ -2174,15 +2472,17 @@ export default function RegistrosScreen({
                       )
                     ) : null}
 
-                    <TextInput
-                      label="Observaciones"
-                      value={observaciones}
-                      onChangeText={setObservaciones}
-                      mode="outlined"
-                      multiline
-                      numberOfLines={6}
-                      style={[styles.input, styles.observacionesInput]}
-                    />
+                    {campoConfiguradoVisible("observaciones") ? (
+                      <TextInput
+                        label="Observaciones"
+                        value={observaciones}
+                        onChangeText={setObservaciones}
+                        mode="outlined"
+                        multiline
+                        numberOfLines={6}
+                        style={[styles.input, styles.observacionesInput]}
+                      />
+                    ) : null}
 
                     {renderFotos()}
                   </>
@@ -2327,6 +2627,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 80,
+  },
+  contentAfterFixedHeader: {
+    paddingTop: 4,
+  },
+  fixedHeader: {
+    backgroundColor: "#f5f7fb",
+    paddingBottom: 8,
+    paddingHorizontal: 16,
+  },
+  fixedTopRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  fixedBrand: {
+    flex: 1,
   },
   title: {
     color: "#0f172a",

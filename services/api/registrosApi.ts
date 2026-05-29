@@ -97,8 +97,9 @@ type GetMisRegistrosParams = {
   scope?: "registro" | "historial";
 };
 
-function getRegistrosCacheKey(params?: GetMisRegistrosParams) {
+function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
   return JSON.stringify({
+    userId,
     obraId: params?.obraId ?? "",
     estado: params?.estado ?? "",
     scope: params?.scope ?? "",
@@ -156,17 +157,17 @@ export async function getMisRegistros(
   forceRefresh = false,
   params?: GetMisRegistrosParams,
 ): Promise<RegistroHistorialApi[]> {
-  const cacheKey = getRegistrosCacheKey(params);
-  const cached = registrosCache.get(cacheKey);
-
-  if (cached && !forceRefresh) {
-    return cached;
-  }
-
   const session = await getSession();
 
   if (!session.token) {
     throw new Error("No hay sesión activa");
+  }
+
+  const cacheKey = getRegistrosCacheKey(session.user?.id || session.token, params);
+  const cached = registrosCache.get(cacheKey);
+
+  if (cached && !forceRefresh) {
+    return cached;
   }
 
   const query = new URLSearchParams();

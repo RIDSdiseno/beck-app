@@ -156,15 +156,46 @@ export default function PerfilScreen() {
     await loadProfile(true);
     setRefreshingHistory(false);
   };
+  const isFixedProfileHeader =
+    user?.rol === "terreno" || user?.rol === "jefeobra";
 
   if (showHistory && (user?.rol === "jefeobra" || user?.rol === "terreno")) {
+    const isFixedHistoryHeader =
+      user?.rol === "terreno" || user?.rol === "jefeobra";
+    const historyTitle =
+      user?.rol === "jefeobra"
+        ? "Historial de registros actualizados"
+        : "Historial de registros";
+
     return (
       <SafeAreaView
         style={[styles.container, { paddingTop: insets.top + 2 }]}
         edges={["top", "left", "right"]}
       >
+        {isFixedHistoryHeader ? (
+          <View style={styles.fixedHeader}>
+            <View style={styles.fixedTopRow}>
+              <View style={styles.fixedBrand}>
+                <BrandHeader subtitle="Registros realizados · BECK" />
+              </View>
+              <Button mode="text" onPress={() => setShowHistory(false)}>
+                Volver
+              </Button>
+            </View>
+            <Text variant="titleLarge" style={styles.title}>
+              {historyTitle}
+            </Text>
+            <Text style={styles.subtitle}>
+              Revisa el estado de los registros y actualiza la lista para ver
+              cambios recientes.
+            </Text>
+          </View>
+        ) : null}
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            isFixedHistoryHeader && styles.contentAfterFixedHeader,
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshingHistory}
@@ -172,23 +203,25 @@ export default function PerfilScreen() {
             />
           }
         >
-          <BrandHeader subtitle="Registros realizados · BECK" />
-          <View style={styles.historyScreenHeader}>
-            <View style={styles.historyScreenTitleGroup}>
-              <Text variant="titleLarge" style={styles.title}>
-                {user?.rol === "jefeobra"
-                  ? "Historial de registros actualizados"
-                  : "Historial de registros"}
-              </Text>
-              <Text style={styles.subtitle}>
-                Revisa el estado de los registros y actualiza la lista para ver
-                cambios recientes.
-              </Text>
-            </View>
-            <Button mode="text" onPress={() => setShowHistory(false)}>
-              Volver
-            </Button>
-          </View>
+          {!isFixedHistoryHeader ? (
+            <>
+              <BrandHeader subtitle="Registros realizados · BECK" />
+              <View style={styles.historyScreenHeader}>
+                <View style={styles.historyScreenTitleGroup}>
+                  <Text variant="titleLarge" style={styles.title}>
+                    Historial de registros actualizados
+                  </Text>
+                  <Text style={styles.subtitle}>
+                    Revisa el estado de los registros y actualiza la lista para ver
+                    cambios recientes.
+                  </Text>
+                </View>
+                <Button mode="text" onPress={() => setShowHistory(false)}>
+                  Volver
+                </Button>
+              </View>
+            </>
+          ) : null}
 
           {registros.length ? (
             registros.map((item) => {
@@ -277,12 +310,34 @@ export default function PerfilScreen() {
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <BrandHeader subtitle="Perfil · BECK" />
-        <Text variant="titleLarge" style={styles.title}>
-          Perfil
-        </Text>
-        <Text style={styles.subtitle}>Sesion activa del tecnico.</Text>
+      {isFixedProfileHeader ? (
+        <View style={styles.fixedHeader}>
+          <BrandHeader subtitle="Perfil · BECK" />
+          <Text variant="titleLarge" style={styles.title}>
+            Perfil
+          </Text>
+          <Text style={styles.subtitle}>
+            {user?.rol === "jefeobra"
+              ? "Sesion activa del jefe de obra."
+              : "Sesion activa del tecnico."}
+          </Text>
+        </View>
+      ) : null}
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          isFixedProfileHeader && styles.contentAfterFixedHeader,
+        ]}
+      >
+        {!isFixedProfileHeader ? (
+          <>
+            <BrandHeader subtitle="Perfil · BECK" />
+            <Text variant="titleLarge" style={styles.title}>
+              Perfil
+            </Text>
+            <Text style={styles.subtitle}>Sesion activa del tecnico.</Text>
+          </>
+        ) : null}
 
         <View style={styles.profileCard}>
           <Avatar.Text
@@ -341,6 +396,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 88,
     paddingTop: 0,
+  },
+  contentAfterFixedHeader: {
+    paddingTop: 4,
+  },
+  fixedHeader: {
+    backgroundColor: "#f5f7fb",
+    paddingBottom: 8,
+    paddingHorizontal: 16,
+  },
+  fixedTopRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  fixedBrand: {
+    flex: 1,
   },
   title: {
     color: "#0f172a",

@@ -186,12 +186,7 @@ export default function DashboardScreen() {
         style={[styles.container, { paddingTop: insets.top + 2 }]}
         edges={["top", "left", "right"]}
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
+        <View style={styles.fixedHeader}>
           <BrandHeader subtitle="Inicio · Jefe de obra" />
 
           <Text variant="titleLarge" style={styles.title}>
@@ -202,21 +197,6 @@ export default function DashboardScreen() {
               ? "Control diario de juntas lineales con fotos, longitud en metros y avance de terreno."
               : "Control diario de sellos con fotos, factores de holgura y avance de protección pasiva."}
           </Text>
-
-          {error ? (
-            <Card style={styles.errorCard}>
-              <Card.Content>
-                <Text style={styles.errorText}>{error}</Text>
-                <Button
-                  mode="contained"
-                  onPress={() => loadDashboard(true)}
-                  style={styles.button}
-                >
-                  Reintentar
-                </Button>
-              </Card.Content>
-            </Card>
-          ) : null}
 
           <View style={styles.tipoTabs}>
             <Button
@@ -234,6 +214,31 @@ export default function DashboardScreen() {
               Junta Lineal Espuma
             </Button>
           </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            styles.contentAfterFixedHeader,
+          ]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {error ? (
+            <Card style={styles.errorCard}>
+              <Card.Content>
+                <Text style={styles.errorText}>{error}</Text>
+                <Button
+                  mode="contained"
+                  onPress={() => loadDashboard(true)}
+                  style={styles.button}
+                >
+                  Reintentar
+                </Button>
+              </Card.Content>
+            </Card>
+          ) : null}
 
           <View style={styles.summaryGrid}>
             <Card style={[styles.summaryCard, styles.summaryWarm]}>
@@ -350,21 +355,42 @@ export default function DashboardScreen() {
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
+      {userRole === "terreno" ? (
+        <View style={styles.fixedHeader}>
+          <BrandHeader subtitle="Inicio · BECK" />
+
+          <Text variant="titleLarge" style={styles.title}>
+            Hola, {userName.split(" ")[0] || "equipo"}
+          </Text>
+          <Text style={styles.subtitle}>
+            Resumen de tus registros en terreno y el avance validado por
+            ingeniería.
+          </Text>
+        </View>
+      ) : null}
+
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          userRole === "terreno" && styles.contentAfterFixedHeader,
+        ]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <BrandHeader subtitle="Inicio · BECK" />
+        {userRole !== "terreno" ? (
+          <>
+            <BrandHeader subtitle="Inicio · BECK" />
 
-        <Text variant="titleLarge" style={styles.title}>
-          Hola, {userName.split(" ")[0] || "equipo"}
-        </Text>
-        <Text style={styles.subtitle}>
-          Resumen de tus registros en terreno y el avance validado por
-          ingeniería.
-        </Text>
+            <Text variant="titleLarge" style={styles.title}>
+              Hola, {userName.split(" ")[0] || "equipo"}
+            </Text>
+            <Text style={styles.subtitle}>
+              Resumen de tus registros en terreno y el avance validado por
+              ingeniería.
+            </Text>
+          </>
+        ) : null}
 
         {error ? (
           <Card style={styles.errorCard}>
@@ -524,6 +550,14 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingBottom: 88,
+  },
+  contentAfterFixedHeader: {
+    paddingTop: 4,
+  },
+  fixedHeader: {
+    backgroundColor: "#f5f7fb",
+    paddingBottom: 8,
+    paddingHorizontal: 16,
   },
   title: {
     color: "#0f172a",

@@ -65,7 +65,9 @@ export default function TabLayout() {
 
   const currentTab = String(segments[segments.length - 1] || "index");
   const restrictedTabs = new Set(["cotizaciones", "reportes"]);
-  const limitedRoleHiddenTabs = new Set(userRole === "terreno" ? ["historial"] : []);
+  const limitedRoleHiddenTabs = new Set(
+    userRole === "terreno" || userRole === "jefeobra" ? ["historial"] : [],
+  );
   const jefeObraHiddenTabs = new Set(["mis-obras"]);
 
   if (!canViewAllModules(userRole) && restrictedTabs.has(currentTab)) {
@@ -164,7 +166,10 @@ export default function TabLayout() {
                 name="historial"
                 options={{
                   title: "Historial",
-                  href: userRole === "terreno" ? null : undefined,
+                  href:
+                    userRole === "terreno" || userRole === "jefeobra"
+                      ? null
+                      : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="history"

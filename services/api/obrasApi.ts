@@ -9,18 +9,81 @@ export type ObraApi = {
 };
 
 export type CampoConfiguracionRegistro =
+  | "codigoBeck"
+  | "itemizadoBeck"
+  | "itemizadoMandante"
+  | "fechaEjecucionSello"
+  | "diaSemana"
+  | "piso"
+  | "ejeAlfabetico"
+  | "ejeNumerico"
+  | "nombreSellador"
+  | "foto"
+  | "recinto"
+  | "modulo"
+  | "numeroSello"
+  | "cantidadSellos"
+  | "holgura"
+  | "factorPorHolguras"
   | "cieloModular"
+  | "cantidadSellosConFactores"
   | "aislacion"
-  | "reparacionTabique";
+  | "cantidadSellosAislacion"
+  | "reparacionTabique"
+  | "cantidadFinal"
+  | "observaciones"
+  | "folio";
 
 export type ConfiguracionCampoRegistroApi = {
   campo: CampoConfiguracionRegistro;
+  campoOrigen?: string;
+  color?: "verde" | "azul" | "rojo";
+  configurable?: boolean;
   visible: boolean;
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
-let obrasCache: ObraApi[] | null = null;
+const obrasCache = new Map<string, ObraApi[]>();
 const configuracionRegistroCache = new Map<string, ConfiguracionCampoRegistroApi[]>();
+
+const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
+  codigoBeck: "codigoBeck",
+  itemizadoBeck: "itemizadoBeck",
+  itemizadoMandante: "itemizadoMandante",
+  fechaEjecucionSello: "fechaEjecucionSello",
+  diaSemana: "diaSemana",
+  piso: "piso",
+  eje_alfabetico: "ejeAlfabetico",
+  ejeAlfabetico: "ejeAlfabetico",
+  eje_numerico: "ejeNumerico",
+  ejeNumerico: "ejeNumerico",
+  nombreSellador: "nombreSellador",
+  foto: "foto",
+  recinto: "recinto",
+  modulo: "modulo",
+  numeroSello: "numeroSello",
+  cantidadSellos: "cantidadSellos",
+  holgura: "holgura",
+  factor_por_holguras: "factorPorHolguras",
+  factorPorHolguras: "factorPorHolguras",
+  cielo_modular: "cieloModular",
+  cieloModular: "cieloModular",
+  cantidad_sellos_con_factores: "cantidadSellosConFactores",
+  cantidadSellosConFactores: "cantidadSellosConFactores",
+  aislacion: "aislacion",
+  cantidad_sellos_aislacion: "cantidadSellosAislacion",
+  cantidadSellosAislacion: "cantidadSellosAislacion",
+  reparacion_tabique: "reparacionTabique",
+  reparacionTabique: "reparacionTabique",
+  cantidad_final: "cantidadFinal",
+  cantidadFinal: "cantidadFinal",
+  observaciones: "observaciones",
+  folio: "folio",
+};
+
+function normalizeCampoConfiguracion(campo: unknown) {
+  return typeof campo === "string" ? CAMPO_CONFIG_ALIASES[campo] : undefined;
+}
 
 export function isObraDisponible(estado?: string | null) {
   return estado === "activa" || estado === "pausada";
@@ -44,7 +107,7 @@ async function readJsonResponse(response: Response) {
 }
 
 export function clearMisObrasCache() {
-  obrasCache = null;
+  obrasCache.clear();
   configuracionRegistroCache.clear();
 }
 
@@ -53,14 +116,17 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
     configuracionRegistroCache.clear();
   }
 
-  if (obrasCache && !forceRefresh) {
-    return obrasCache;
-  }
-
   const session = await getSession();
 
   if (!session.token) {
     throw new Error("No hay sesión activa");
+  }
+
+  const cacheKey = session.user?.id || session.token;
+  const cached = obrasCache.get(cacheKey);
+
+  if (cached && !forceRefresh) {
+    return cached;
   }
 
   const response = await fetch(`${API_BASE_URL}/api/obras/mis-obras`, {
@@ -77,10 +143,11 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
     throw new Error(result?.error || "No se pudieron obtener las obras");
   }
 
-  obrasCache = (result.data as ObraApi[]).filter((obra) =>
+  const data = (result.data as ObraApi[]).filter((obra) =>
     isObraDisponible(obra.estado),
   );
-  return obrasCache;
+  obrasCache.set(cacheKey, data);
+  return data;
 }
 
 export async function getConfiguracionRegistro(
@@ -119,7 +186,12 @@ export async function getConfiguracionRegistro(
     );
   }
 
-  const data = result.data as ConfiguracionCampoRegistroApi[];
+  const data = (result.data as ConfiguracionCampoRegistroApi[])
+    .map((campo) => ({
+      ...campo,
+      campo: normalizeCampoConfiguracion(campo.campo) || campo.campo,
+    }))
+    .filter((campo) => normalizeCampoConfiguracion(campo.campo));
   configuracionRegistroCache.set(cacheKey, data);
   return data;
 }

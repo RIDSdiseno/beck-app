@@ -246,6 +246,7 @@ export default function MisObrasScreen() {
         style={[styles.container, { paddingTop: insets.top + 2 }]}
         edges={["top", "left", "right"]}
       >
+        <View style={styles.fixedHeader}>{renderHeader()}</View>
         <FlatList
           data={[] as ObraApi[]}
           keyExtractor={(item) => item.id}
@@ -254,7 +255,6 @@ export default function MisObrasScreen() {
             styles.listContent,
             styles.emptyListContent,
           ]}
-          ListHeaderComponent={renderHeader}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Text style={styles.emptyTitle}>No hay obras disponibles</Text>
@@ -274,11 +274,11 @@ export default function MisObrasScreen() {
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
+      <View style={styles.fixedHeader}>{renderHeader()}</View>
       <FlatList
         data={filteredObras}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        ListHeaderComponent={renderHeader}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyTitle}>Sin resultados</Text>
@@ -352,6 +352,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 80,
+  },
+  fixedHeader: {
+    backgroundColor: "#f5f7fb",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   emptyListContent: {
     flexGrow: 1,
