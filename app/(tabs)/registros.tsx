@@ -70,6 +70,7 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   CampoConfiguracionRegistro,
   boolean
 > = {
+  tipoRegistro: true,
   codigoBeck: false,
   itemizadoBeck: true,
   itemizadoMandante: false,
@@ -84,6 +85,7 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   modulo: true,
   numeroSello: true,
   cantidadSellos: true,
+  metrosLineales: true,
   holgura: true,
   factorPorHolguras: false,
   cieloModular: true,
@@ -158,6 +160,79 @@ function formatDate(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getRegistroEstadoLabel(estado: RegistroHistorialApi["estado"]) {
+  return estado.replace("_", " ");
+}
+
+function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
+  const hasRechazo = Boolean(
+    registro.motivo_rechazo ||
+      registro.fecha_rechazo ||
+      registro.rechazado_por ||
+      registro.registro_origen?.motivo_rechazo,
+  );
+  const isCorreccion = Boolean(registro.es_correccion || registro.registro_origen_id);
+  const motivo =
+    registro.motivo_rechazo || registro.registro_origen?.motivo_rechazo;
+  const fecha =
+    formatDisplayDate(registro.fecha_rechazo) ||
+    formatDisplayDate(registro.registro_origen?.fecha_rechazo);
+
+  if (!hasRechazo && !isCorreccion) return null;
+
+  return (
+    <View style={styles.contextBox}>
+      <View style={styles.contextHeader}>
+        <MaterialCommunityIcons
+          name={hasRechazo ? "alert-circle-outline" : "file-refresh-outline"}
+          size={18}
+          color={hasRechazo ? "#dc2626" : "#2563eb"}
+        />
+        <Text
+          style={[
+            styles.contextTitle,
+            hasRechazo ? styles.contextTitleDanger : styles.contextTitleInfo,
+          ]}
+        >
+          {hasRechazo ? "Contexto de rechazo" : "Registro de corrección"}
+        </Text>
+      </View>
+      {isCorreccion ? (
+        <Text style={styles.contextText}>
+          Corrección enlazada al registro original
+          {registro.registro_origen?.numero_sello
+            ? ` N° ${registro.registro_origen.numero_sello}`
+            : ""}.
+        </Text>
+      ) : null}
+      {motivo ? (
+        <Text style={styles.contextText}>Motivo: {motivo}</Text>
+      ) : null}
+      {registro.rechazado_por?.nombre ? (
+        <Text style={styles.contextText}>
+          Rechazado por: {registro.rechazado_por.nombre}
+        </Text>
+      ) : null}
+      {fecha ? <Text style={styles.contextText}>Fecha: {fecha}</Text> : null}
+    </View>
+  );
 }
 
 function getDiaSemana(fecha: string) {
@@ -1582,28 +1657,34 @@ export default function RegistrosScreen({
                   </Button>
                 </View>
 
-                <Text style={styles.fieldLabel}>Tipo de registro</Text>
-                <SegmentedButtons
-                  value={tipoRegistro}
-                  onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
-                  style={styles.segmented}
-                  buttons={[
-                    { value: "sello_cortafuego", label: "Sello" },
-                    { value: "junta_lineal_espuma", label: "Junta" },
-                  ]}
-                />
+                {campoConfiguradoVisible("tipoRegistro") ? (
+                  <>
+                    <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                    <SegmentedButtons
+                      value={tipoRegistro}
+                      onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
+                      style={styles.segmented}
+                      buttons={[
+                        { value: "sello_cortafuego", label: "Sello" },
+                        { value: "junta_lineal_espuma", label: "Junta" },
+                      ]}
+                    />
+                  </>
+                ) : null}
 
                 {renderCommonFields()}
 
                 {isJuntaLineal ? (
-                  <TextInput
-                    label="Longitud (m)"
-                    value={metrosLineales}
-                    onChangeText={setMetrosLineales}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                  />
+                  campoConfiguradoVisible("metrosLineales") ? (
+                    <TextInput
+                      label="Longitud (m)"
+                      value={metrosLineales}
+                      onChangeText={setMetrosLineales}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                    />
+                  ) : null
                 ) : (
                   <>
                     {campoConfiguradoVisible("codigoBeck") ? (
@@ -1900,9 +1981,11 @@ export default function RegistrosScreen({
                               styles.statusRechazado,
                           ]}
                         >
-                          {registro.estado.replace("_", " ")}
+                          {getRegistroEstadoLabel(registro.estado)}
                         </Text>
                       </View>
+
+                      <RegistroContextBox registro={registro} />
 
                       <View style={styles.actionRow}>
                         <Button
@@ -2102,41 +2185,50 @@ export default function RegistrosScreen({
         {userRole === "terreno" && !isFormMode && !editingRegistro ? (
           <>
             <Text style={styles.sectionTitle}>Registros pendientes</Text>
-            {filteredTecnicoRegistros.map((registro) => (
-              <Card key={registro.id} style={styles.historyCard}>
-                <Card.Content>
-                  <View style={styles.cardHeaderRow}>
-                    <View style={styles.recordInfo}>
-                      <Text style={styles.recordTitle}>
-                        {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
-                      </Text>
-                      <Text style={styles.recordMeta}>
-                        {registro.tipo_registro === "junta_lineal_espuma"
-                          ? "Junta lineal espuma"
-                          : "Sello cortafuego"}
+            {filteredTecnicoRegistros.map((registro) => {
+              const canEditCorrection =
+                registro.estado === "rechazado" ||
+                (registro.estado === "pendiente" &&
+                  Boolean(registro.es_correccion) &&
+                  Boolean(registro.devuelto_a_tecnico));
+
+              return (
+                <Card key={registro.id} style={styles.historyCard}>
+                  <Card.Content>
+                    <View style={styles.cardHeaderRow}>
+                      <View style={styles.recordInfo}>
+                        <Text style={styles.recordTitle}>
+                          {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
+                        </Text>
+                        <Text style={styles.recordMeta}>
+                          {registro.tipo_registro === "junta_lineal_espuma"
+                            ? "Junta lineal espuma"
+                            : "Sello cortafuego"}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.statusPill,
+                          registro.estado === "rechazado" && styles.statusRechazado,
+                        ]}
+                      >
+                        {getRegistroEstadoLabel(registro.estado)}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.statusPill,
-                        registro.estado === "rechazado" && styles.statusRechazado,
-                      ]}
-                    >
-                      {registro.estado.replace("_", " ")}
-                    </Text>
-                  </View>
-                  {registro.estado === "rechazado" ? (
-                    <Button
-                      mode="contained"
-                      onPress={() => fillFormFromRegistro(registro)}
-                      style={styles.button}
-                    >
-                      Corregir registro
-                    </Button>
-                  ) : null}
-                </Card.Content>
-              </Card>
-            ))}
+                    <RegistroContextBox registro={registro} />
+                    {canEditCorrection ? (
+                      <Button
+                        mode="contained"
+                        onPress={() => fillFormFromRegistro(registro)}
+                        style={styles.button}
+                      >
+                        Corregir registro
+                      </Button>
+                    ) : null}
+                  </Card.Content>
+                </Card>
+              );
+            })}
             {!filteredTecnicoRegistros.length ? (
               <Card style={styles.card}>
                 <Card.Content>
@@ -2173,28 +2265,34 @@ export default function RegistrosScreen({
                 </Button>
               </View>
 
-              <Text style={styles.fieldLabel}>Tipo de registro</Text>
-              <SegmentedButtons
-                value={tipoRegistro}
-                onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
-                style={styles.segmented}
-                buttons={[
-                  { value: "sello_cortafuego", label: "Sello" },
-                  { value: "junta_lineal_espuma", label: "Junta" },
-                ]}
-              />
+              {campoConfiguradoVisible("tipoRegistro") ? (
+                <>
+                  <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                  <SegmentedButtons
+                    value={tipoRegistro}
+                    onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
+                    style={styles.segmented}
+                    buttons={[
+                      { value: "sello_cortafuego", label: "Sello" },
+                      { value: "junta_lineal_espuma", label: "Junta" },
+                    ]}
+                  />
+                </>
+              ) : null}
 
               {renderCommonFields()}
 
               {isJuntaLineal ? (
-                <TextInput
-                  label="Longitud (m)"
-                  value={metrosLineales}
-                  onChangeText={setMetrosLineales}
-                  mode="outlined"
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                />
+                campoConfiguradoVisible("metrosLineales") ? (
+                  <TextInput
+                    label="Longitud (m)"
+                    value={metrosLineales}
+                    onChangeText={setMetrosLineales}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                ) : null
               ) : (
                 <>
                   {campoConfiguradoVisible("cantidadSellos") ? (
@@ -2353,46 +2451,51 @@ export default function RegistrosScreen({
               <Card.Content>
                 <Text style={styles.formTitle}>Nuevo registro de terreno</Text>
 
-                <Text style={styles.fieldLabel}>Tipo de registro</Text>
-                <SegmentedButtons
-                  value={tipoRegistro}
-                  onValueChange={(value) => {
-                    setTipoRegistro(value as TipoRegistro);
-                    setError("");
-                    setSuccess("");
-                  }}
-                  style={styles.segmented}
-                  buttons={[
-                    {
-                      value: "sello_cortafuego",
-                      label: "Sello Cortafuego",
-                    },
-                    {
-                      value: "junta_lineal_espuma",
-                      label: "Junta Lineal Espuma",
-                    },
-                  ]}
-                />
+                {campoConfiguradoVisible("tipoRegistro") ? (
+                  <>
+                    <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                    <SegmentedButtons
+                      value={tipoRegistro}
+                      onValueChange={(value) => {
+                        setTipoRegistro(value as TipoRegistro);
+                        setError("");
+                        setSuccess("");
+                      }}
+                      style={styles.segmented}
+                      buttons={[
+                        {
+                          value: "sello_cortafuego",
+                          label: "Sello Cortafuego",
+                        },
+                        {
+                          value: "junta_lineal_espuma",
+                          label: "Junta Lineal Espuma",
+                        },
+                      ]}
+                    />
+                  </>
+                ) : null}
 
                 {renderCommonFields()}
 
                 {isJuntaLineal ? (
-                  <>
-                    <TextInput
-                      label="Longitud (m)"
-                      value={metrosLineales}
-                      onChangeText={setMetrosLineales}
-                      mode="outlined"
-                      keyboardType="decimal-pad"
-                      style={styles.input}
-                    />
-
-                    {campoConfiguradoVisible("observaciones") ? (
+                  campoConfiguradoVisible("metrosLineales") ? (
+                    <>
                       <TextInput
-                        label="Observaciones"
-                        value={observaciones}
-                        onChangeText={setObservaciones}
+                        label="Longitud (m)"
+                        value={metrosLineales}
+                        onChangeText={setMetrosLineales}
                         mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                      />
+
+                      {campoConfiguradoVisible("observaciones") ? (
+                        <TextInput
+                          label="Observaciones"
+                          value={observaciones}
+                          onChangeText={setObservaciones}
+                          mode="outlined"
                         multiline
                         numberOfLines={6}
                         style={[styles.input, styles.observacionesInput]}
@@ -2400,7 +2503,8 @@ export default function RegistrosScreen({
                     ) : null}
 
                     {renderFotos()}
-                  </>
+                    </>
+                  ) : null
                 ) : (
                   <>
                     {campoConfiguradoVisible("cantidadSellos") ? (
@@ -2870,6 +2974,35 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
     marginTop: 12,
+  },
+  contextBox: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+    marginTop: 12,
+    padding: 10,
+  },
+  contextHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  contextTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  contextTitleDanger: {
+    color: "#dc2626",
+  },
+  contextTitleInfo: {
+    color: "#2563eb",
+  },
+  contextText: {
+    color: "#475569",
+    fontSize: 12,
+    lineHeight: 17,
   },
   inlineButton: {
     borderRadius: 12,
