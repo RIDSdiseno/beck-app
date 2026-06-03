@@ -2,7 +2,7 @@
   "expo": {
     "name": "Beck App",
     "slug": "beckapp",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "beckcrmapp",
@@ -58,15 +58,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9c9b4430-55be-4c2f-8536-fdb7a097bf02"
+        "projectId": "f5f84148-22c0-48ed-b27f-2cf06ac3704a"
       }
     },
-    "owner": "diseno1",
+    "owner": "beck1",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/9c9b4430-55be-4c2f-8536-fdb7a097bf02"
+      "url": "https://u.expo.dev/f5f84148-22c0-48ed-b27f-2cf06ac3704a"
     }
   }
 }

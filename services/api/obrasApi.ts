@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@/services/api/config";
+import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
 
 export type ObraApi = {
@@ -9,6 +11,7 @@ export type ObraApi = {
 };
 
 export type CampoConfiguracionRegistro =
+  | "tipoRegistro"
   | "codigoBeck"
   | "itemizadoBeck"
   | "itemizadoMandante"
@@ -23,6 +26,7 @@ export type CampoConfiguracionRegistro =
   | "modulo"
   | "numeroSello"
   | "cantidadSellos"
+  | "metrosLineales"
   | "holgura"
   | "factorPorHolguras"
   | "cieloModular"
@@ -42,11 +46,12 @@ export type ConfiguracionCampoRegistroApi = {
   visible: boolean;
 };
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 const obrasCache = new Map<string, ObraApi[]>();
 const configuracionRegistroCache = new Map<string, ConfiguracionCampoRegistroApi[]>();
 
 const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
+  tipo_registro: "tipoRegistro",
+  tipoRegistro: "tipoRegistro",
   codigoBeck: "codigoBeck",
   itemizadoBeck: "itemizadoBeck",
   itemizadoMandante: "itemizadoMandante",
@@ -63,6 +68,8 @@ const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
   modulo: "modulo",
   numeroSello: "numeroSello",
   cantidadSellos: "cantidadSellos",
+  metros_lineales: "metrosLineales",
+  metrosLineales: "metrosLineales",
   holgura: "holgura",
   factor_por_holguras: "factorPorHolguras",
   factorPorHolguras: "factorPorHolguras",
@@ -129,7 +136,7 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
     return cached;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/obras/mis-obras`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/obras/mis-obras`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${session.token}`,
@@ -167,7 +174,7 @@ export async function getConfiguracionRegistro(
     throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/api/obras/${obraId}/configuracion-registro`,
     {
       method: "GET",

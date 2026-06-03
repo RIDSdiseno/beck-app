@@ -24,6 +24,50 @@ export type SelectedObra = {
   estado?: string | null;
 };
 
+function decodeBase64Url(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+  let output = "";
+  let buffer = 0;
+  let bits = 0;
+
+  for (const char of padded) {
+    if (char === "=") break;
+
+    const index = chars.indexOf(char);
+    if (index < 0) continue;
+
+    buffer = (buffer << 6) | index;
+    bits += 6;
+
+    if (bits >= 8) {
+      bits -= 8;
+      output += String.fromCharCode((buffer >> bits) & 0xff);
+    }
+  }
+
+  return output;
+}
+
+function isJwtExpired(token: string) {
+  const [, payload] = token.split(".");
+
+  if (!payload) return false;
+
+  try {
+    const decoded = JSON.parse(decodeBase64Url(payload)) as { exp?: number };
+
+    if (!decoded.exp) return false;
+
+    const expirationMs = decoded.exp * 1000;
+    return Date.now() >= expirationMs;
+  } catch {
+    return false;
+  }
+}
+
 export async function saveSession(token: string, user: SessionUser) {
   await Promise.all([
     SecureStore.setItemAsync(STORAGE_KEYS.token, token),
@@ -47,6 +91,16 @@ export async function getSession(): Promise<{
     user = userRaw ? (JSON.parse(userRaw) as SessionUser) : null;
   } catch {
     user = null;
+  }
+
+  if (token && isJwtExpired(token)) {
+    await clearSession();
+
+    return {
+      token: null,
+      user: null,
+      isAuthenticated: false,
+    };
   }
 
   return {

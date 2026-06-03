@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@/services/api/config";
+import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
 
 export type CreateRegistroPayload = {
@@ -63,6 +65,13 @@ export type RegistroHistorialApi = {
   observaciones?: string | null;
   estado: EstadoRegistroApi;
   devuelto_a_tecnico?: boolean;
+  corregido_at?: string | null;
+  fecha_rechazo?: string | null;
+  motivo_rechazo?: string | null;
+  rechazado_por_id?: string | null;
+  reenviado_revision_at?: string | null;
+  es_correccion?: boolean;
+  registro_origen_id?: string | null;
   itemizado_sacyr?: string | null;
   metros_lineales?: number | null;
   tipo_registro: "sello_cortafuego" | "junta_lineal_espuma" | string;
@@ -81,6 +90,20 @@ export type RegistroHistorialApi = {
     email: string;
     rol: string;
   } | null;
+  rechazado_por?: {
+    id: string;
+    nombre: string;
+    email?: string | null;
+    rol?: string | null;
+  } | null;
+  registro_origen?: {
+    id: string;
+    estado?: EstadoRegistroApi | string;
+    numero_sello?: string | null;
+    descripcion_material?: string | null;
+    motivo_rechazo?: string | null;
+    fecha_rechazo?: string | null;
+  } | null;
   fotos?: {
     id: string;
     url: string;
@@ -88,7 +111,6 @@ export type RegistroHistorialApi = {
   }[];
 };
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 const registrosCache = new Map<string, RegistroHistorialApi[]>();
 
 type GetMisRegistrosParams = {
@@ -130,7 +152,7 @@ export async function createRegistro(payload: CreateRegistroPayload) {
     throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/registros`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/registros`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${session.token}`,
@@ -176,7 +198,7 @@ export async function getMisRegistros(
   if (params?.scope) query.set("scope", params.scope);
   const queryString = query.toString();
 
-  const response = await fetch(`${API_BASE_URL}/api/registros/mis-registros${queryString ? `?${queryString}` : ""}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/registros/mis-registros${queryString ? `?${queryString}` : ""}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${session.token}`,
@@ -223,7 +245,7 @@ export async function uploadRegistroFotos(
   });
 
   const replaceQuery = options?.replaceExisting ? "?replace=true" : "";
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/${registroId}/fotos${replaceQuery}`,
     {
       method: "POST",
@@ -254,7 +276,7 @@ export async function enviarRegistroAIngenieria(
     throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/${registroId}/enviar-ingenieria`,
     {
       method: "PUT",
@@ -286,7 +308,7 @@ export async function reenviarRegistroComoTecnico(
     throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/${registroId}/reenviar-tecnico`,
     {
       method: "PUT",
@@ -315,7 +337,7 @@ export async function enviarRegistroATecnico(registroId: string) {
     throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/${registroId}/enviar-tecnico`,
     {
       method: "PUT",

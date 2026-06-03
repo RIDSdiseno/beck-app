@@ -1,11 +1,27 @@
 {
+  "cli": {
+    "appVersionSource": "local"
+  },
   "build": {
     "preview": {
+      "channel": "production",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://beck-mobile-backend-production.up.railway.app",
+        "EXPO_PUBLIC_AZURE_CLIENT_ID": "b09cdac0-ac8d-4d2f-b0c9-4b285e5254ec",
+        "EXPO_PUBLIC_AZURE_TENANT_ID": "ec8b5cfa-4e7a-4c24-99d8-7f758fee7ff5"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://beck-mobile-backend-production.up.railway.app",
+        "EXPO_PUBLIC_AZURE_CLIENT_ID": "b09cdac0-ac8d-4d2f-b0c9-4b285e5254ec",
+        "EXPO_PUBLIC_AZURE_TENANT_ID": "ec8b5cfa-4e7a-4c24-99d8-7f758fee7ff5"
+      },
       "android": {
         "buildType": "app-bundle"
       }

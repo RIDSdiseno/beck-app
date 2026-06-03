@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@/services/api/config";
+
 export type LoginResponse = {
   token: string;
   user: {
@@ -7,8 +9,6 @@ export type LoginResponse = {
     rol: string;
   };
 };
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
 
 async function readApiResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
