@@ -21,7 +21,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Keyboard,
@@ -181,7 +181,34 @@ function getRegistroEstadoLabel(estado: RegistroHistorialApi["estado"]) {
   return estado.replace("_", " ");
 }
 
+function isCorreccionEditable(registro: RegistroHistorialApi) {
+  return (
+    registro.estado === "pendiente" &&
+    Boolean(registro.es_correccion) &&
+    Boolean(registro.devuelto_a_tecnico || registro.registro_origen_id)
+  );
+}
+
+function shouldShowRejectionContext(registro: RegistroHistorialApi) {
+  return registro.estado === "rechazado" || isCorreccionEditable(registro);
+}
+
+function preferirCopiasCorreccion(registros: RegistroHistorialApi[]) {
+  const originalesConCopia = new Set(
+    registros
+      .map((registro) => registro.registro_origen_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  return registros.filter(
+    (registro) =>
+      !(registro.estado === "rechazado" && originalesConCopia.has(registro.id)),
+  );
+}
+
 function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
+  if (!shouldShowRejectionContext(registro)) return null;
+
   const hasRechazo = Boolean(
     registro.motivo_rechazo ||
       registro.fecha_rechazo ||
@@ -301,6 +328,7 @@ export default function RegistrosScreen({
   const [loadingJefeRegistros, setLoadingJefeRegistros] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [jefeRegistros, setJefeRegistros] = useState<RegistroHistorialApi[]>([]);
   const [jefeObras, setJefeObras] = useState<ObraApi[]>([]);
@@ -354,6 +382,36 @@ export default function RegistrosScreen({
   const [loadingConfiguracionRegistro, setLoadingConfiguracionRegistro] =
     useState(Boolean(initialObra && mode === "form"));
 
+  const clearSuccessMessage = useCallback(() => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+
+    setSuccess("");
+  }, []);
+
+  const showSuccessMessage = useCallback(
+    (message: string) => {
+      clearSuccessMessage();
+      setSuccess(message);
+      successTimerRef.current = setTimeout(() => {
+        setSuccess("");
+        successTimerRef.current = null;
+      }, 3500);
+    },
+    [clearSuccessMessage],
+  );
+
+  useEffect(
+    () => () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const isJuntaLineal = tipoRegistro === "junta_lineal_espuma";
   const isFormMode = mode === "form";
   const campoConfiguradoVisible = (campo: CampoConfiguracionRegistro) =>
@@ -395,11 +453,20 @@ export default function RegistrosScreen({
 
   const filteredJefeRegistros = useMemo(() => {
     const term = jefeRegistroSearch.trim().toLowerCase();
-    const visibles = jefeRegistrosPorObra.filter(
-      (registro) =>
-        (registro.estado === "pendiente" || registro.estado === "rechazado") &&
-        (jefeEstadoFiltro === "todos" || registro.estado === jefeEstadoFiltro),
-    );
+    const registrosSinDuplicar = preferirCopiasCorreccion(jefeRegistrosPorObra);
+    const visibles = registrosSinDuplicar.filter((registro) => {
+      const isCorreccion = isCorreccionEditable(registro);
+      const esEstadoVisible =
+        registro.estado === "pendiente" ||
+        registro.estado === "rechazado" ||
+        isCorreccion;
+      const pasaFiltro =
+        jefeEstadoFiltro === "todos" ||
+        registro.estado === jefeEstadoFiltro ||
+        (jefeEstadoFiltro === "rechazado" && isCorreccion);
+
+      return esEstadoVisible && pasaFiltro;
+    });
 
     if (!term) return visibles;
 
@@ -410,23 +477,32 @@ export default function RegistrosScreen({
     );
   }, [jefeEstadoFiltro, jefeRegistroSearch, jefeRegistrosPorObra]);
 
-  const tecnicoRechazados = useMemo(
-    () => tecnicoRegistros.filter((registro) => registro.estado === "rechazado"),
+  const tecnicoRegistrosSinDuplicar = useMemo(
+    () => preferirCopiasCorreccion(tecnicoRegistros),
     [tecnicoRegistros],
   );
 
+  const tecnicoRechazados = useMemo(
+    () => tecnicoRegistrosSinDuplicar.filter((registro) => registro.estado === "rechazado"),
+    [tecnicoRegistrosSinDuplicar],
+  );
+
   const tecnicoPendientes = useMemo(
-    () => tecnicoRegistros.filter((registro) => registro.estado === "pendiente"),
-    [tecnicoRegistros],
+    () => tecnicoRegistrosSinDuplicar.filter((registro) => registro.estado === "pendiente"),
+    [tecnicoRegistrosSinDuplicar],
   );
 
   const filteredTecnicoRegistros = useMemo(() => {
     const term = tecnicoRegistroSearch.trim().toLowerCase();
-    const visibles = [...tecnicoRechazados, ...tecnicoPendientes].filter(
-      (registro) =>
+    const visibles = [...tecnicoRechazados, ...tecnicoPendientes].filter((registro) => {
+      const isCorreccion = isCorreccionEditable(registro);
+
+      return (
         tecnicoEstadoFiltro === "todos" ||
-        registro.estado === tecnicoEstadoFiltro,
-    );
+        registro.estado === tecnicoEstadoFiltro ||
+        (tecnicoEstadoFiltro === "rechazado" && isCorreccion)
+      );
+    });
     if (!term) return visibles;
 
     return visibles.filter((registro) =>
@@ -445,6 +521,7 @@ export default function RegistrosScreen({
     try {
       setRefreshingTecnicoRegistros(true);
       setError("");
+      clearSuccessMessage();
       const registros = await getMisRegistros(true, { scope: "registro" });
       setTecnicoRegistros(registros);
     } catch (err: any) {
@@ -452,12 +529,13 @@ export default function RegistrosScreen({
     } finally {
       setRefreshingTecnicoRegistros(false);
     }
-  }, []);
+  }, [clearSuccessMessage]);
 
   const refreshJefeObraData = useCallback(async () => {
     try {
       setRefreshingJefeRegistros(true);
       setError("");
+      clearSuccessMessage();
       const [obrasDisponibles, registros] = await Promise.all([
         getMisObras(true),
         getMisRegistros(true),
@@ -469,7 +547,7 @@ export default function RegistrosScreen({
     } finally {
       setRefreshingJefeRegistros(false);
     }
-  }, []);
+  }, [clearSuccessMessage]);
 
   const refreshConfiguracionFormulario = useCallback(async () => {
     const obraId =
@@ -482,6 +560,7 @@ export default function RegistrosScreen({
     try {
       setRefreshingConfiguracionRegistro(true);
       setError("");
+      clearSuccessMessage();
       const configuracion = await getConfiguracionRegistro(
         obraId,
         rolConfiguracion,
@@ -558,6 +637,7 @@ export default function RegistrosScreen({
     useCallback(() => {
       const loadInitialData = async () => {
         try {
+        clearSuccessMessage();
         const session = await getSession();
         const userName = session.user?.nombre || "";
         const role = session.user?.rol || "";
@@ -619,7 +699,7 @@ export default function RegistrosScreen({
       };
 
       loadInitialData();
-    }, [initialObra]),
+    }, [clearSuccessMessage, initialObra]),
   );
 
   const resetForm = () => {
@@ -989,7 +1069,7 @@ export default function RegistrosScreen({
 
       const registros = await getMisRegistros(true, { scope: "registro" });
       setTecnicoRegistros(registros);
-      setSuccess("Registro y fotos enviados correctamente.");
+      showSuccessMessage("Registro y fotos enviados correctamente.");
       await clearSelectedObra();
       setObra(null);
       resetForm();
@@ -1089,7 +1169,7 @@ export default function RegistrosScreen({
       setJefeRegistros(registros);
       setEditingRegistro(null);
       resetForm();
-      setSuccess("Registro enviado a ingeniería.");
+      showSuccessMessage("Registro enviado a ingeniería.");
     } catch (err: any) {
       setError(err?.message || "No se pudo enviar a ingeniería.");
     } finally {
@@ -1175,7 +1255,7 @@ export default function RegistrosScreen({
       setTecnicoRegistros(registros);
       setEditingRegistro(null);
       resetForm();
-      setSuccess("Registro corregido y enviado al jefe de obra.");
+      showSuccessMessage("Registro corregido y enviado al jefe de obra.");
     } catch (err: any) {
       setError(err?.message || "No se pudo reenviar el registro.");
     } finally {
@@ -1192,7 +1272,7 @@ export default function RegistrosScreen({
       await enviarRegistroATecnico(registro.id);
       const registros = await getMisRegistros(true);
       setJefeRegistros(registros);
-      setSuccess("Registro enviado al técnico para corrección.");
+      showSuccessMessage("Registro enviado al técnico para corrección.");
     } catch (err: any) {
       setError(err?.message || "No se pudo enviar al técnico.");
     } finally {
@@ -1749,7 +1829,7 @@ export default function RegistrosScreen({
                     ) : null}
                     {campoConfiguradoVisible("cieloModular") ? (
                       renderMenuField(
-                        "Cielo modular",
+                        "Accesibilidad",
                         accesibilidad,
                         cieloModularMenuVisible,
                         setCieloModularMenuVisible,
@@ -2188,9 +2268,7 @@ export default function RegistrosScreen({
             {filteredTecnicoRegistros.map((registro) => {
               const canEditCorrection =
                 registro.estado === "rechazado" ||
-                (registro.estado === "pendiente" &&
-                  Boolean(registro.es_correccion) &&
-                  Boolean(registro.devuelto_a_tecnico));
+                isCorreccionEditable(registro);
 
               return (
                 <Card key={registro.id} style={styles.historyCard}>
@@ -2327,7 +2405,7 @@ export default function RegistrosScreen({
                     : null}
                   {campoConfiguradoVisible("cieloModular") ? (
                     renderMenuField(
-                      "Cielo modular",
+                      "Accesibilidad",
                       accesibilidad,
                       cieloModularMenuVisible,
                       setCieloModularMenuVisible,
@@ -2545,7 +2623,7 @@ export default function RegistrosScreen({
 
                     {campoConfiguradoVisible("cieloModular") ? (
                       renderMenuField(
-                        "Cielo modular",
+                        "Accesibilidad",
                         accesibilidad,
                         cieloModularMenuVisible,
                         setCieloModularMenuVisible,

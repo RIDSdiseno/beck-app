@@ -73,6 +73,7 @@ const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
   holgura: "holgura",
   factor_por_holguras: "factorPorHolguras",
   factorPorHolguras: "factorPorHolguras",
+  accesibilidad: "cieloModular",
   cielo_modular: "cieloModular",
   cieloModular: "cieloModular",
   cantidad_sellos_con_factores: "cantidadSellosConFactores",
