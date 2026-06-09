@@ -101,7 +101,21 @@ function formatDateTime(value?: string | null) {
   });
 }
 
+function isCorreccionEditable(registro: RegistroHistorialApi) {
+  return (
+    registro.estado === "pendiente" &&
+    Boolean(registro.es_correccion) &&
+    Boolean(registro.devuelto_a_tecnico || registro.registro_origen_id)
+  );
+}
+
+function shouldShowRejectionContext(registro: RegistroHistorialApi) {
+  return registro.estado === "rechazado" || isCorreccionEditable(registro);
+}
+
 function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
+  if (!shouldShowRejectionContext(registro)) return null;
+
   const hasRechazo = Boolean(
     registro.motivo_rechazo ||
       registro.fecha_rechazo ||
