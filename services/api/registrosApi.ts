@@ -45,6 +45,7 @@ export type RegistroHistorialApi = {
   codigo_beck?: string | null;
   recinto?: string | null;
   foto_url?: string | null;
+  fotos_urls?: string[] | null;
   modulo: string;
   piso: string;
   eje_numerico: string;
@@ -103,6 +104,13 @@ export type RegistroHistorialApi = {
     descripcion_material?: string | null;
     motivo_rechazo?: string | null;
     fecha_rechazo?: string | null;
+    foto_url?: string | null;
+    fotos_urls?: string[] | null;
+    fotos?: {
+      id: string;
+      url: string;
+      created_at: string;
+    }[];
   } | null;
   fotos?: {
     id: string;

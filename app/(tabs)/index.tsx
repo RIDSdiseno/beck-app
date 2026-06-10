@@ -187,10 +187,10 @@ export default function DashboardScreen() {
         edges={["top", "left", "right"]}
       >
         <View style={styles.fixedHeader}>
-          <BrandHeader subtitle="Inicio · Jefe de obra" />
+          <BrandHeader subtitle="Inicio · Supervisor" />
 
           <Text variant="titleLarge" style={styles.title}>
-            Hola, {userName || "Jefe de obra"}
+            Hola, {userName || "Supervisor"}
           </Text>
           <Text style={styles.subtitle}>
             {isJunta
@@ -343,7 +343,7 @@ export default function DashboardScreen() {
             onPress={() => router.push("/registros")}
             style={styles.button}
           >
-            Revisar registros de técnicos
+            Revisar registros de Operarios
           </Button>
         </ScrollView>
       </SafeAreaView>
