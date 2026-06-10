@@ -20,6 +20,7 @@ import {
   getSession,
 } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -69,39 +70,34 @@ type FotoLocal = {
 
 const MAX_REGISTRO_FOTOS = 10;
 const FALLBACK_IMAGE_TYPE = "image/jpeg";
-const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/heic": "heic",
-  "image/heif": "heif",
-};
-
-function getImageExtension(value?: string | null) {
-  const match = value?.match(/\.([a-zA-Z0-9]+)(?:\?|#|$)/);
-  return match?.[1]?.toLowerCase();
-}
-
-function normalizeFotoAsset(
+const UPLOAD_IMAGE_MAX_SIZE = 1600;
+const UPLOAD_IMAGE_QUALITY = 0.65;
+async function normalizeFotoAsset(
   asset: ImagePicker.ImagePickerAsset,
   index: number,
   prefix: string,
-): FotoLocal {
-  const type =
-    asset.mimeType && asset.mimeType.startsWith("image/")
-      ? asset.mimeType
-      : FALLBACK_IMAGE_TYPE;
-  const extension =
-    getImageExtension(asset.fileName) ||
-    IMAGE_EXTENSION_BY_MIME[type] ||
-    getImageExtension(asset.uri) ||
-    "jpg";
+): Promise<FotoLocal> {
+  const maxDimension = Math.max(asset.width || 0, asset.height || 0);
+  const resizeAction =
+    maxDimension > UPLOAD_IMAGE_MAX_SIZE
+      ? asset.width && asset.width >= (asset.height || 0)
+        ? { resize: { width: UPLOAD_IMAGE_MAX_SIZE } }
+        : { resize: { height: UPLOAD_IMAGE_MAX_SIZE } }
+      : null;
+
+  const processed = await ImageManipulator.manipulateAsync(
+    asset.uri,
+    resizeAction ? [resizeAction] : [],
+    {
+      compress: UPLOAD_IMAGE_QUALITY,
+      format: ImageManipulator.SaveFormat.JPEG,
+    },
+  );
 
   return {
-    uri: asset.uri,
-    name: asset.fileName || `${prefix}-${Date.now()}-${index}.${extension}`,
-    type,
+    uri: processed.uri,
+    name: `${prefix}-${Date.now()}-${index}.jpg`,
+    type: FALLBACK_IMAGE_TYPE,
   };
 }
 
@@ -871,8 +867,10 @@ export default function RegistrosScreen({
 
       if (result.canceled) return;
 
-      const nuevasFotos = result.assets.map((asset, index) =>
-        normalizeFotoAsset(asset, index, "foto"),
+      const nuevasFotos = await Promise.all(
+        result.assets.map((asset, index) =>
+          normalizeFotoAsset(asset, index, "foto"),
+        ),
       );
 
       addFotos(nuevasFotos);
@@ -901,7 +899,7 @@ export default function RegistrosScreen({
 
       const asset = result.assets[0];
 
-      const nuevaFoto = normalizeFotoAsset(asset, 0, "camara");
+      const nuevaFoto = await normalizeFotoAsset(asset, 0, "camara");
 
       addFotos([nuevaFoto]);
     } catch (err) {
