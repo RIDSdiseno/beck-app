@@ -1,5 +1,6 @@
 import {
   createRegistro,
+  deleteRegistroPendiente,
   enviarRegistroATecnico,
   enviarRegistroAIngenieria,
   getMisRegistros,
@@ -1007,7 +1008,7 @@ export default function RegistrosScreen({
       }
     }
 
-    if (campoConfiguradoVisible("foto") && !fotos.length) {
+    if (!fotos.length) {
       return "Debes agregar al menos una foto.";
     }
 
@@ -1073,6 +1074,8 @@ export default function RegistrosScreen({
   };
 
   const submitRegistro = async () => {
+    let registroCreadoId: string | null = null;
+
     try {
       if (!obra) return;
 
@@ -1139,25 +1142,31 @@ export default function RegistrosScreen({
           ? toApiNumber(metrosLineales)
           : undefined,
       });
+      registroCreadoId = registro.id;
 
-      if (fotos.length) {
-        await uploadRegistroFotos(registro.id, fotos);
-      }
+      await uploadRegistroFotos(registro.id, fotos);
 
       const registros = await getMisRegistros(true, { scope: "registro" });
       setTecnicoRegistros(registros);
-      showSuccessMessage(
-        fotos.length
-          ? "Registro y fotos enviados correctamente."
-          : "Registro enviado correctamente.",
-      );
+      showSuccessMessage("Registro y fotos enviados correctamente.");
       await clearSelectedObra();
       setObra(null);
       resetForm();
       router.replace("/registros");
     } catch (err: any) {
       console.log("CREATE/UPLOAD REGISTRO ERROR =>", err);
-      setError(err?.message || "No se pudo completar el envío.");
+      if (registroCreadoId) {
+        try {
+          await deleteRegistroPendiente(registroCreadoId);
+        } catch (deleteError) {
+          console.log("ROLLBACK REGISTRO ERROR =>", deleteError);
+        }
+      }
+      setError(
+        registroCreadoId
+          ? "No se pudieron subir las fotos. El registro no fue guardado, intenta nuevamente."
+          : err?.message || "No se pudo completar el envío.",
+      );
     } finally {
       setSaving(false);
     }

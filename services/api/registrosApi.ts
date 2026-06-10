@@ -179,6 +179,31 @@ export async function createRegistro(payload: CreateRegistroPayload) {
   return result.data;
 }
 
+export async function deleteRegistroPendiente(registroId: string) {
+  const session = await getSession();
+
+  if (!session.token) {
+    throw new Error("No hay sesión activa");
+  }
+
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/registros/${registroId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${session.token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const result = await readJsonResponse(response);
+
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo eliminar el registro");
+  }
+
+  clearMisRegistrosCache();
+  return result.data;
+}
+
 export function clearMisRegistrosCache() {
   registrosCache.clear();
 }
@@ -242,6 +267,34 @@ export async function uploadRegistroFotos(
     throw new Error("No hay sesión activa");
   }
 
+  const uploadedFotos = [];
+
+  for (const [index, foto] of fotos.entries()) {
+    const replaceExisting = Boolean(options?.replaceExisting && index === 0);
+    const result = await uploadRegistroFotosRequest(
+      session.token,
+      registroId,
+      [foto],
+      replaceExisting,
+    );
+
+    uploadedFotos.push(...result);
+  }
+
+  clearMisRegistrosCache();
+  return uploadedFotos;
+}
+
+async function uploadRegistroFotosRequest(
+  token: string,
+  registroId: string,
+  fotos: {
+    uri: string;
+    name: string;
+    type: string;
+  }[],
+  replaceExisting: boolean,
+) {
   const formData = new FormData();
 
   fotos.forEach((foto) => {
@@ -252,13 +305,13 @@ export async function uploadRegistroFotos(
     } as any);
   });
 
-  const replaceQuery = options?.replaceExisting ? "?replace=true" : "";
+  const replaceQuery = replaceExisting ? "?replace=true" : "";
   const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/${registroId}/fotos${replaceQuery}`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${session.token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: formData,
     },
@@ -270,7 +323,6 @@ export async function uploadRegistroFotos(
     throw new Error(result?.error || "No se pudieron subir las fotos");
   }
 
-  clearMisRegistrosCache();
   return result.data;
 }
 
