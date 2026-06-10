@@ -15,6 +15,10 @@ import {
   ObraApi,
 } from "@/services/api/obrasApi";
 import {
+  getItemizadoOpciones,
+  ItemizadoOpcionApi,
+} from "@/services/api/itemizadoOpcionesApi";
+import {
   clearSelectedObra,
   getSelectedObra,
   getSession,
@@ -418,7 +422,14 @@ export default function RegistrosScreen({
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [itemizadoBeck, setItemizadoBeck] = useState("");
+  const [itemizadoCodigoBeck, setItemizadoCodigoBeck] = useState("");
   const [itemizadoMenuVisible, setItemizadoMenuVisible] = useState(false);
+  const [itemizadoSelectorVisible, setItemizadoSelectorVisible] = useState(false);
+  const [itemizadoSearch, setItemizadoSearch] = useState("");
+  const [itemizadoElementoPenetra, setItemizadoElementoPenetra] = useState("");
+  const [itemizadoMaterialidad, setItemizadoMaterialidad] = useState("");
+  const [itemizadoOpciones, setItemizadoOpciones] = useState<ItemizadoOpcionApi[]>([]);
+  const [loadingItemizadoOpciones, setLoadingItemizadoOpciones] = useState(false);
   const [holguraMenuVisible, setHolguraMenuVisible] = useState(false);
   const [cieloModularMenuVisible, setCieloModularMenuVisible] = useState(false);
   const [aislacionMenuVisible, setAislacionMenuVisible] = useState(false);
@@ -773,6 +784,12 @@ export default function RegistrosScreen({
     setFecha(formatDate(new Date()));
     setCalendarMonth(new Date());
     setItemizadoBeck("");
+    setItemizadoCodigoBeck("");
+    setItemizadoSelectorVisible(false);
+    setItemizadoSearch("");
+    setItemizadoElementoPenetra("");
+    setItemizadoMaterialidad("");
+    setItemizadoOpciones([]);
     setItemizadoMenuVisible(false);
     setHolguraMenuVisible(false);
     setCieloModularMenuVisible(false);
@@ -820,6 +837,35 @@ export default function RegistrosScreen({
     setItemizadoBeck(itemizado);
     setOtroItemizado(false);
     setItemizadoMenuVisible(false);
+  };
+
+  const loadItemizadoOpciones = async () => {
+    try {
+      setLoadingItemizadoOpciones(true);
+      const opciones = await getItemizadoOpciones({
+        search: itemizadoSearch,
+        elementoPenetra: itemizadoElementoPenetra,
+        materialidad: itemizadoMaterialidad,
+        limit: 80,
+      });
+      setItemizadoOpciones(opciones);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron cargar los itemizados.");
+    } finally {
+      setLoadingItemizadoOpciones(false);
+    }
+  };
+
+  const openItemizadoSelector = () => {
+    setItemizadoSelectorVisible(true);
+    void loadItemizadoOpciones();
+  };
+
+  const selectItemizadoOpcion = (opcion: ItemizadoOpcionApi) => {
+    setItemizadoBeck(opcion.elemento_pasante || "");
+    setItemizadoCodigoBeck(opcion.codigo_beck || "");
+    setItemizadoSelectorVisible(false);
+    setError("");
   };
 
   const toggleOtroItemizado = () => {
@@ -935,6 +981,7 @@ export default function RegistrosScreen({
     setFecha(String(registro.fecha || "").slice(0, 10));
     setCalendarMonth(new Date(registro.fecha || new Date()));
     setItemizadoBeck(registro.itemizado_beck || registro.descripcion_material || "");
+    setItemizadoCodigoBeck(registro.codigo_beck || "");
     setOtroItemizado(false);
     setRecinto(registro.recinto || "");
     setModulo(registro.modulo || "");
@@ -1199,6 +1246,10 @@ export default function RegistrosScreen({
           : campoConfiguradoVisible("itemizadoBeck")
             ? itemizadoBeck
             : "No aplica",
+        codigoBeck:
+          isJuntaLineal || !campoConfiguradoVisible("codigoBeck")
+            ? undefined
+            : itemizadoCodigoBeck,
         itemizadoBeck:
           isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
             ? undefined
@@ -1571,6 +1622,121 @@ export default function RegistrosScreen({
     router.replace("/mis-obras");
   };
 
+  const renderItemizadoSelectorModal = () => (
+    <Modal
+      visible={itemizadoSelectorVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setItemizadoSelectorVisible(false)}
+    >
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={() => setItemizadoSelectorVisible(false)}
+      >
+        <Pressable style={styles.itemizadoModal}>
+          <View style={styles.modalHeaderRow}>
+            <View style={styles.recordInfo}>
+              <Text style={styles.modalTitle}>Seleccionar Itemizado BECK</Text>
+              <Text style={styles.modalSubtitle}>
+                Solo se muestran opciones visibles del catálogo.
+              </Text>
+            </View>
+            <Button mode="text" compact onPress={() => setItemizadoSelectorVisible(false)}>
+              Cerrar
+            </Button>
+          </View>
+
+          <TextInput
+            label="Buscar por itemizado, código o tipo"
+            value={itemizadoSearch}
+            onChangeText={setItemizadoSearch}
+            mode="outlined"
+            style={styles.input}
+            left={<TextInput.Icon icon="magnify" />}
+          />
+          <TextInput
+            label="Elemento atravesado"
+            value={itemizadoElementoPenetra}
+            onChangeText={setItemizadoElementoPenetra}
+            mode="outlined"
+            style={styles.input}
+          />
+          <TextInput
+            label="Materialidad"
+            value={itemizadoMaterialidad}
+            onChangeText={setItemizadoMaterialidad}
+            mode="outlined"
+            style={styles.input}
+          />
+
+          <View style={styles.actionRow}>
+            <Button
+              mode="contained"
+              onPress={() => void loadItemizadoOpciones()}
+              loading={loadingItemizadoOpciones}
+              disabled={loadingItemizadoOpciones}
+              style={styles.inlineButton}
+            >
+              Buscar
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                setItemizadoSearch("");
+                setItemizadoElementoPenetra("");
+                setItemizadoMaterialidad("");
+                setItemizadoOpciones([]);
+              }}
+              style={styles.inlineButton}
+            >
+              Limpiar
+            </Button>
+          </View>
+
+          <ScrollView
+            style={styles.itemizadoResults}
+            keyboardShouldPersistTaps="handled"
+          >
+            {loadingItemizadoOpciones ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color="#f97316" />
+                <Text style={styles.emptyText}>Cargando itemizados...</Text>
+              </View>
+            ) : null}
+
+            {!loadingItemizadoOpciones && !itemizadoOpciones.length ? (
+              <Text style={styles.emptyText}>
+                Busca por elemento atravesado, materialidad o texto para ver opciones.
+              </Text>
+            ) : null}
+
+            {itemizadoOpciones.map((opcion) => (
+              <Pressable
+                key={opcion.id}
+                style={styles.itemizadoOption}
+                onPress={() => selectItemizadoOpcion(opcion)}
+              >
+                <Text style={styles.recordTitle}>
+                  {opcion.elemento_pasante || "Sin itemizado"}
+                </Text>
+                <Text style={styles.recordMeta}>
+                  Código BECK: {opcion.codigo_beck || "Sin código"}
+                </Text>
+                <Text style={styles.recordMeta}>
+                  Atravesado: {opcion.elemento_penetra || "Sin dato"} ·{" "}
+                  Materialidad: {opcion.materialidad || "Sin dato"}
+                </Text>
+                {opcion.tipo ? (
+                  <Text style={styles.recordMeta}>Tipo: {opcion.tipo}</Text>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
   const renderFotos = (options?: {
     existingFotos?: NonNullable<RegistroHistorialApi["fotos"]>;
     replacementMode?: boolean;
@@ -1858,7 +2024,7 @@ export default function RegistrosScreen({
                     {campoConfiguradoVisible("codigoBeck") ? (
                       <TextInput
                         label="Código BECK"
-                        value={editingRegistro.codigo_beck || ""}
+                        value={itemizadoCodigoBeck}
                         mode="outlined"
                         editable={false}
                         style={styles.input}
@@ -1875,13 +2041,17 @@ export default function RegistrosScreen({
                       />
                     ) : null}
                     {campoConfiguradoVisible("itemizadoBeck") ? (
-                      <TextInput
-                        label="Itemizado BECK"
-                        value={itemizadoBeck}
-                        onChangeText={setItemizadoBeck}
-                        mode="outlined"
-                        style={styles.input}
-                      />
+                      <>
+                        <Text style={styles.fieldLabel}>Itemizado BECK</Text>
+                        <Button
+                          mode="outlined"
+                          onPress={openItemizadoSelector}
+                          style={styles.dropdownButton}
+                          contentStyle={styles.dropdownContent}
+                        >
+                          {itemizadoBeck || "Seleccionar itemizado"}
+                        </Button>
+                      </>
                     ) : null}
                     {campoConfiguradoVisible("numeroSello") ? (
                       <TextInput
@@ -2241,6 +2411,7 @@ export default function RegistrosScreen({
           )}
         </ScrollView>
         </TouchableWithoutFeedback>
+        {renderItemizadoSelectorModal()}
       </SafeAreaView>
     );
   }
@@ -3211,6 +3382,42 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 14,
+  },
+  itemizadoModal: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    maxHeight: "88%",
+    padding: 14,
+  },
+  modalHeaderRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  modalSubtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  itemizadoResults: {
+    marginTop: 8,
+    maxHeight: 360,
+  },
+  itemizadoOption: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 12,
   },
   confirmModal: {
     backgroundColor: "#ffffff",

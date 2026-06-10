@@ -6,6 +6,7 @@ export type CreateRegistroPayload = {
   obraId: string;
   fecha: string;
   descripcionMaterial: string;
+  codigoBeck?: string;
   itemizadoBeck?: string;
   recinto?: string;
   moduloEdificio?: string;
