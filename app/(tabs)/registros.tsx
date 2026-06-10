@@ -66,6 +66,44 @@ type FotoLocal = {
   type: string;
 };
 
+const MAX_REGISTRO_FOTOS = 10;
+const FALLBACK_IMAGE_TYPE = "image/jpeg";
+const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+};
+
+function getImageExtension(value?: string | null) {
+  const match = value?.match(/\.([a-zA-Z0-9]+)(?:\?|#|$)/);
+  return match?.[1]?.toLowerCase();
+}
+
+function normalizeFotoAsset(
+  asset: ImagePicker.ImagePickerAsset,
+  index: number,
+  prefix: string,
+): FotoLocal {
+  const type =
+    asset.mimeType && asset.mimeType.startsWith("image/")
+      ? asset.mimeType
+      : FALLBACK_IMAGE_TYPE;
+  const extension =
+    getImageExtension(asset.fileName) ||
+    IMAGE_EXTENSION_BY_MIME[type] ||
+    getImageExtension(asset.uri) ||
+    "jpg";
+
+  return {
+    uri: asset.uri,
+    name: asset.fileName || `${prefix}-${Date.now()}-${index}.${extension}`,
+    type,
+  };
+}
+
 const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   CampoConfiguracionRegistro,
   boolean
@@ -102,8 +140,8 @@ const ITEMIZADO_BECK_OPTIONS = [
   "Tubería metálica SIN Aislación",
   "Tubería metálica CON Aislación",
   "Tubería NO metálica",
-  "Ducto de clima Cicular SIN Aislación",
-  "Ducto de clima Cicular CON Aislación",
+  "Ducto de clima Circular SIN Aislación",
+  "Ducto de clima Circular CON Aislación",
   "Ducto de clima Rectangular SIN Aislación",
   "Ducto de clima Rectangular CON Aislación",
   "Bandeja eléctrica o escalerilla",
@@ -204,6 +242,37 @@ function preferirCopiasCorreccion(registros: RegistroHistorialApi[]) {
     (registro) =>
       !(registro.estado === "rechazado" && originalesConCopia.has(registro.id)),
   );
+}
+
+function getRegistroFotos(registro?: RegistroHistorialApi | null) {
+  if (!registro) return [];
+
+  const relationFotos = registro.fotos || [];
+  const originFotos = registro.registro_origen?.fotos || [];
+  const fallbackUrls = [
+    ...(Array.isArray(registro.fotos_urls) ? registro.fotos_urls : []),
+    registro.foto_url,
+    ...(Array.isArray(registro.registro_origen?.fotos_urls)
+      ? registro.registro_origen.fotos_urls
+      : []),
+    registro.registro_origen?.foto_url,
+  ].filter((url): url is string => Boolean(url));
+
+  const seen = new Set<string>();
+
+  return [
+    ...relationFotos,
+    ...originFotos,
+    ...fallbackUrls.map((url, index) => ({
+      id: `${registro.id}-fallback-${index}`,
+      url,
+      created_at: registro.created_at,
+    })),
+  ].filter((foto) => {
+    if (!foto.url || seen.has(foto.url)) return false;
+    seen.add(foto.url);
+    return true;
+  });
 }
 
 function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
@@ -765,6 +834,23 @@ export default function RegistrosScreen({
     });
   };
 
+  const addFotos = (nuevasFotos: FotoLocal[]) => {
+    const disponibles = MAX_REGISTRO_FOTOS - fotos.length;
+
+    if (disponibles <= 0) {
+      setError(`Puedes subir hasta ${MAX_REGISTRO_FOTOS} fotografias por registro.`);
+      return;
+    }
+
+    const fotosPermitidas = nuevasFotos.slice(0, disponibles);
+    setFotos((prev) => [...prev, ...fotosPermitidas]);
+    setError(
+      fotosPermitidas.length < nuevasFotos.length
+        ? `Se agregaron ${fotosPermitidas.length} fotografias. Puedes subir hasta ${MAX_REGISTRO_FOTOS} por registro.`
+        : "",
+    );
+  };
+
   const pickFromLibrary = async () => {
     try {
       const permission =
@@ -778,21 +864,17 @@ export default function RegistrosScreen({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
+        selectionLimit: Math.max(1, MAX_REGISTRO_FOTOS - fotos.length),
         quality: 0.8,
       });
 
       if (result.canceled) return;
 
-      const nuevasFotos: FotoLocal[] = result.assets.map((asset, index) => ({
-        uri: asset.uri,
-        name:
-          asset.fileName ||
-          `foto-${Date.now()}-${index}.${asset.mimeType?.split("/")[1] || "jpg"}`,
-        type: asset.mimeType || "image/jpeg",
-      }));
+      const nuevasFotos = result.assets.map((asset, index) =>
+        normalizeFotoAsset(asset, index, "foto"),
+      );
 
-      setFotos((prev) => [...prev, ...nuevasFotos]);
-      setError("");
+      addFotos(nuevasFotos);
     } catch (err) {
       console.log("PICK IMAGE ERROR =>", err);
       setError("No se pudo seleccionar la imagen.");
@@ -818,16 +900,9 @@ export default function RegistrosScreen({
 
       const asset = result.assets[0];
 
-      const nuevaFoto: FotoLocal = {
-        uri: asset.uri,
-        name:
-          asset.fileName ||
-          `camara-${Date.now()}.${asset.mimeType?.split("/")[1] || "jpg"}`,
-        type: asset.mimeType || "image/jpeg",
-      };
+      const nuevaFoto = normalizeFotoAsset(asset, 0, "camara");
 
-      setFotos((prev) => [...prev, nuevaFoto]);
-      setError("");
+      addFotos([nuevaFoto]);
     } catch (err) {
       console.log("TAKE PHOTO ERROR =>", err);
       setError("No se pudo tomar la foto.");
@@ -1065,11 +1140,17 @@ export default function RegistrosScreen({
           : undefined,
       });
 
-      await uploadRegistroFotos(registro.id, fotos);
+      if (fotos.length) {
+        await uploadRegistroFotos(registro.id, fotos);
+      }
 
       const registros = await getMisRegistros(true, { scope: "registro" });
       setTecnicoRegistros(registros);
-      showSuccessMessage("Registro y fotos enviados correctamente.");
+      showSuccessMessage(
+        fotos.length
+          ? "Registro y fotos enviados correctamente."
+          : "Registro enviado correctamente.",
+      );
       await clearSelectedObra();
       setObra(null);
       resetForm();
@@ -1255,7 +1336,7 @@ export default function RegistrosScreen({
       setTecnicoRegistros(registros);
       setEditingRegistro(null);
       resetForm();
-      showSuccessMessage("Registro corregido y enviado al jefe de obra.");
+      showSuccessMessage("Registro corregido y enviado al Supervisor.");
     } catch (err: any) {
       setError(err?.message || "No se pudo reenviar el registro.");
     } finally {
@@ -1272,9 +1353,9 @@ export default function RegistrosScreen({
       await enviarRegistroATecnico(registro.id);
       const registros = await getMisRegistros(true);
       setJefeRegistros(registros);
-      showSuccessMessage("Registro enviado al técnico para corrección.");
+      showSuccessMessage("Registro enviado al Operario para corrección.");
     } catch (err: any) {
-      setError(err?.message || "No se pudo enviar al técnico.");
+      setError(err?.message || "No se pudo enviar al Operario.");
     } finally {
       setSaving(false);
     }
@@ -1484,7 +1565,7 @@ export default function RegistrosScreen({
   };
 
   const renderFotos = (options?: {
-    existingFotos?: RegistroHistorialApi["fotos"];
+    existingFotos?: NonNullable<RegistroHistorialApi["fotos"]>;
     replacementMode?: boolean;
   }) => {
     if (!campoConfiguradoVisible("foto")) return null;
@@ -1556,9 +1637,9 @@ export default function RegistrosScreen({
       >
         {isJefeObraObrasList ? (
           <View style={styles.fixedHeader}>
-            <BrandHeader subtitle="Registros · Jefe de obra" />
+            <BrandHeader subtitle="Registros · Supervisor" />
             <Text variant="titleLarge" style={styles.title}>
-              Registros de técnicos
+              Registro de Operarios
             </Text>
             <Text style={styles.subtitle}>
               Busca una obra activa o pausada para revisar registros pendientes,
@@ -1580,7 +1661,7 @@ export default function RegistrosScreen({
           <View style={styles.fixedHeader}>
             <View style={styles.fixedTopRow}>
               <View style={styles.fixedBrand}>
-                <BrandHeader subtitle="Registros · Jefe de obra" />
+                <BrandHeader subtitle="Registros · Supervisor" />
               </View>
               <Button
                 mode="text"
@@ -1595,7 +1676,7 @@ export default function RegistrosScreen({
               </Button>
             </View>
             <Text variant="titleLarge" style={styles.title}>
-              Registros de técnicos
+              Registro de Operarios
             </Text>
             <Text style={styles.subtitle}>
               Busca una obra activa o pausada para revisar registros pendientes,
@@ -1609,7 +1690,7 @@ export default function RegistrosScreen({
             </Text>
 
             <TextInput
-              label="Buscar por técnico, piso o eje"
+              label="Buscar por Operario, piso o eje"
               value={jefeRegistroSearch}
               onChangeText={setJefeRegistroSearch}
               mode="outlined"
@@ -1692,9 +1773,9 @@ export default function RegistrosScreen({
         >
           {!isJefeObraObrasList && !isJefeObraRegistrosList ? (
             <>
-              <BrandHeader subtitle="Registros · Jefe de obra" />
+              <BrandHeader subtitle="Registros · Supervisor" />
               <Text variant="titleLarge" style={styles.title}>
-                Registros de técnicos
+                Registro de Operarios
               </Text>
               <Text style={styles.subtitle}>
                 Busca una obra activa o pausada para revisar registros pendientes,
@@ -1729,7 +1810,7 @@ export default function RegistrosScreen({
                   <View>
                     <Text style={styles.formTitle}>Editar registro</Text>
                     <Text style={styles.emptyText}>
-                      Técnico: {editingRegistro.usuarios?.nombre || "Sin técnico"}
+                      Operario: {editingRegistro.usuarios?.nombre || "Sin Operario"}
                     </Text>
                   </View>
                   <Button mode="text" onPress={() => setEditingRegistro(null)}>
@@ -1922,7 +2003,7 @@ export default function RegistrosScreen({
                 ) : null}
 
                 {renderFotos({
-                  existingFotos: editingRegistro.fotos,
+                  existingFotos: getRegistroFotos(editingRegistro),
                   replacementMode: true,
                 })}
 
@@ -1964,7 +2045,7 @@ export default function RegistrosScreen({
                   </View>
 
                   <TextInput
-                    label="Buscar por técnico, piso o eje"
+                    label="Buscar por Operario, piso o eje"
                     value={jefeRegistroSearch}
                     onChangeText={setJefeRegistroSearch}
                     mode="outlined"
@@ -2051,7 +2132,7 @@ export default function RegistrosScreen({
                             Piso {registro.piso} · Eje {registro.eje_alfabetico}-{registro.eje_numerico}
                           </Text>
                           <Text style={styles.recordMeta}>
-                            Técnico: {registro.usuarios?.nombre || registro.nombre_sellador}
+                            Operario: {registro.usuarios?.nombre || registro.nombre_sellador}
                           </Text>
                         </View>
                         <Text
@@ -2085,7 +2166,7 @@ export default function RegistrosScreen({
                             disabled={saving}
                             style={styles.inlineButton}
                           >
-                            Enviar a técnico
+                            Enviar a Operario
                           </Button>
                         ) : null}
                       </View>
@@ -2335,7 +2416,7 @@ export default function RegistrosScreen({
                 <View>
                   <Text style={styles.formTitle}>Corregir registro rechazado</Text>
                   <Text style={styles.emptyText}>
-                    Al reenviarlo quedará pendiente para jefe de obra.
+                    Al reenviarlo quedará pendiente para Supervisor.
                   </Text>
                 </View>
                 <Button mode="text" onPress={() => setEditingRegistro(null)}>
@@ -2462,7 +2543,7 @@ export default function RegistrosScreen({
                 contentStyle={styles.buttonContent}
                 labelStyle={styles.buttonLabel}
               >
-                {saving ? "Reenviando..." : "Reenviar al jefe de obra"}
+                {saving ? "Reenviando..." : "Reenviar al Supervisor"}
               </Button>
             </Card.Content>
           </Card>

@@ -30,7 +30,7 @@ function getRoleLabel(role?: string) {
     case "terreno":
       return "Terreno";
     case "jefeobra":
-      return "Jefe de obra";
+      return "Supervisor";
     case "ingenieria":
       return "Ingenieria";
     case "visualizador":
@@ -403,8 +403,8 @@ export default function PerfilScreen() {
           </Text>
           <Text style={styles.subtitle}>
             {user?.rol === "jefeobra"
-              ? "Sesion activa del jefe de obra."
-              : "Sesion activa del tecnico."}
+              ? "Sesion activa del Supervisor."
+              : "Sesion activa del Operario."}
           </Text>
         </View>
       ) : null}
@@ -420,7 +420,7 @@ export default function PerfilScreen() {
             <Text variant="titleLarge" style={styles.title}>
               Perfil
             </Text>
-            <Text style={styles.subtitle}>Sesion activa del tecnico.</Text>
+            <Text style={styles.subtitle}>Sesion activa del Operario.</Text>
           </>
         ) : null}
 
