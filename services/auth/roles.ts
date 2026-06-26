@@ -1,6 +1,6 @@
 import type { Href } from "expo-router";
 
-export const LIMITED_MODULE_ROLES = new Set(["terreno", "jefeobra"]);
+export const LIMITED_MODULE_ROLES = new Set(["terreno", "jefeobra", "cliente"]);
 
 export function canViewAllModules(rol?: string | null) {
   return Boolean(rol && !LIMITED_MODULE_ROLES.has(rol));

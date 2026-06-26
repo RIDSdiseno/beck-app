@@ -37,6 +37,8 @@ function getRoleLabel(role?: string) {
       return "Visualizador";
     case "vendedor":
       return "Vendedor";
+    case "cliente":
+      return "Cliente";
     default:
       return "Usuario";
   }

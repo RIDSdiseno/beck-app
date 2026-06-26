@@ -1,13 +1,23 @@
 import {
+  ClienteDashboardData,
+  ClienteObraResumen,
+  ClienteRegistroValidado,
+  getClienteDashboard,
+  getClienteObras,
+  getClienteRegistrosObra,
+} from "@/services/api/clienteApi";
+import {
   getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   RefreshControl,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -43,6 +53,36 @@ function getRegistroKind(registro: RegistroHistorialApi) {
     : "Sello";
 }
 
+function getClienteRegistroKind(registro: ClienteRegistroValidado) {
+  return registro.tipoRegistro === "junta_lineal_espuma"
+    ? "Junta Lineal"
+    : "Sello";
+}
+
+function formatNullable(value?: string | number | null) {
+  if (value === null || value === undefined || value === "") return "-";
+  return String(value);
+}
+
+function getClienteFotos(registro: ClienteRegistroValidado) {
+  const seen = new Set<string>();
+  return [
+    ...(registro.fotos || []),
+    ...(registro.fotos_registro || []),
+    ...(registro.fotosUrls || []).map((url, index) => ({
+      id: `${registro.id}-url-${index}`,
+      url,
+    })),
+    ...(registro.fotoUrl
+      ? [{ id: `${registro.id}-foto-url`, url: registro.fotoUrl }]
+      : []),
+  ].filter((foto) => {
+    if (!foto.url || seen.has(foto.url)) return false;
+    seen.add(foto.url);
+    return true;
+  });
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -54,21 +94,64 @@ export default function DashboardScreen() {
     "sello_cortafuego" | "junta_lineal_espuma"
   >("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [clienteDashboard, setClienteDashboard] =
+    useState<ClienteDashboardData | null>(null);
+  const [clienteObras, setClienteObras] = useState<ClienteObraResumen[]>([]);
+  const [clienteObraSeleccionada, setClienteObraSeleccionada] =
+    useState<ClienteObraResumen | null>(null);
+  const [clienteRegistros, setClienteRegistros] = useState<ClienteRegistroValidado[]>([]);
+  const [clienteRegistroSeleccionado, setClienteRegistroSeleccionado] =
+    useState<ClienteRegistroValidado | null>(null);
+  const [loadingClienteRegistros, setLoadingClienteRegistros] = useState(false);
 
   const loadDashboard = useCallback(async (forceRefresh = false) => {
     try {
       setError("");
-      const [session, data] = await Promise.all([
-        getSession(),
-        getMisRegistros(forceRefresh),
-      ]);
+      const session = await getSession();
       setUserName(session.user?.nombre || "Usuario Beck");
       setUserRole(session.user?.rol || "");
+
+      if (session.user?.rol === "cliente") {
+        const [dashboard, obras] = await Promise.all([
+          getClienteDashboard(forceRefresh),
+          getClienteObras(forceRefresh),
+        ]);
+        setClienteDashboard(dashboard);
+        setClienteObras(obras);
+        setRegistros([]);
+        setClienteRegistroSeleccionado(null);
+        return;
+      }
+
+      const data = await getMisRegistros(forceRefresh);
       setRegistros(data);
+      setClienteDashboard(null);
+      setClienteObras([]);
+      setClienteObraSeleccionada(null);
+      setClienteRegistros([]);
+      setClienteRegistroSeleccionado(null);
     } catch (err: any) {
       setError(err?.message || "No se pudo cargar el inicio");
     }
   }, []);
+
+  const abrirClienteObra = useCallback(
+    async (obra: ClienteObraResumen, forceRefresh = false) => {
+      try {
+        setError("");
+        setClienteObraSeleccionada(obra);
+        setClienteRegistroSeleccionado(null);
+        setLoadingClienteRegistros(true);
+        const data = await getClienteRegistrosObra(obra.id, forceRefresh);
+        setClienteRegistros(data);
+      } catch (err: any) {
+        setError(err?.message || "No se pudieron cargar los registros de la obra");
+      } finally {
+        setLoadingClienteRegistros(false);
+      }
+    },
+    [],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -166,7 +249,10 @@ export default function DashboardScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadDashboard(true);
-    setRefreshing(false);
+    if (userRole === "cliente" && clienteObraSeleccionada) {
+      await abrirClienteObra(clienteObraSeleccionada, true);
+    }
+      setRefreshing(false);
   };
 
   if (loading) {
@@ -175,6 +261,352 @@ export default function DashboardScreen() {
         <ActivityIndicator size="large" color="#f97316" />
         <Text style={styles.helper}>Cargando inicio...</Text>
       </View>
+    );
+  }
+
+  if (userRole === "cliente") {
+    const dashboard = clienteDashboard;
+    const ultimos = dashboard?.ultimosRegistrosValidados ?? [];
+    const fotosCount = (registro: ClienteRegistroValidado) =>
+      getClienteFotos(registro).length;
+    const detalleFotos = clienteRegistroSeleccionado
+      ? getClienteFotos(clienteRegistroSeleccionado)
+      : [];
+    const detalleCampos = clienteRegistroSeleccionado
+      ? [
+          ["Tipo de registro", getClienteRegistroKind(clienteRegistroSeleccionado)],
+          ["Estado", clienteRegistroSeleccionado.estado || "Validado"],
+          ["Fecha", formatDate(clienteRegistroSeleccionado.fecha)],
+          ["Día semana", clienteRegistroSeleccionado.diaSemana],
+          ["Código BECK", clienteRegistroSeleccionado.codigoBeck],
+          ["Itemizado BECK", clienteRegistroSeleccionado.itemizadoBeck],
+          ["Itemizado Mandante", clienteRegistroSeleccionado.itemizadoMandante],
+          ["Material", clienteRegistroSeleccionado.material],
+          ["Piso", clienteRegistroSeleccionado.piso],
+          ["Módulo", clienteRegistroSeleccionado.modulo],
+          ["Recinto", clienteRegistroSeleccionado.recinto],
+          ["Eje alfabético", clienteRegistroSeleccionado.ejeAlfabetico],
+          ["Eje numérico", clienteRegistroSeleccionado.ejeNumerico],
+          ["N° del sello", clienteRegistroSeleccionado.numeroSello],
+          ["Cantidad sellos", clienteRegistroSeleccionado.cantidadSellos],
+          ["Metros lineales", clienteRegistroSeleccionado.metrosLineales],
+          ["Holgura", clienteRegistroSeleccionado.holgura],
+          ["Factor por holguras", clienteRegistroSeleccionado.factorPorHolguras],
+          ["Accesibilidad", clienteRegistroSeleccionado.accesibilidad],
+          [
+            "Cantidad sellos con factores",
+            clienteRegistroSeleccionado.cantidadSellosConFactores,
+          ],
+          ["Aislación", clienteRegistroSeleccionado.aislacion],
+          [
+            "Cantidad sellos aislación",
+            clienteRegistroSeleccionado.cantidadSellosAislacion,
+          ],
+          ["Reparación tabique", clienteRegistroSeleccionado.reparacionTabique],
+          ["Cantidad final", clienteRegistroSeleccionado.cantidadFinal],
+          ["Folio", clienteRegistroSeleccionado.folio],
+          ["Sellador", clienteRegistroSeleccionado.sellador],
+          ["Observaciones", clienteRegistroSeleccionado.observaciones],
+        ]
+      : [];
+
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <View style={styles.fixedHeader}>
+          <BrandHeader subtitle="Registros de mi empresa · BECK" />
+
+          <Text variant="titleLarge" style={styles.title}>
+            Hola, {userName.split(" ")[0] || "Cliente"}
+          </Text>
+          <Text style={styles.subtitle}>
+            Consulta tus obras asignadas y los registros validados por ingeniería.
+          </Text>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {error ? (
+            <Card style={styles.errorCard}>
+              <Card.Content>
+                <Text style={styles.errorText}>{error}</Text>
+                <Button
+                  mode="contained"
+                  onPress={() => loadDashboard(true)}
+                  style={styles.button}
+                >
+                  Reintentar
+                </Button>
+              </Card.Content>
+            </Card>
+          ) : null}
+
+          <View style={styles.kpiGrid}>
+            <Card style={styles.kpiCard}>
+              <Card.Content>
+                <MaterialCommunityIcons
+                  name="office-building-outline"
+                  size={24}
+                  color="#f97316"
+                />
+                <Text style={styles.kpiValue}>{dashboard?.totalObras ?? 0}</Text>
+                <Text style={styles.kpiLabel}>Obras asignadas</Text>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.kpiCard}>
+              <Card.Content>
+                <MaterialCommunityIcons
+                  name="check-decagram-outline"
+                  size={24}
+                  color="#16a34a"
+                />
+                <Text style={styles.kpiValue}>{dashboard?.totalRegistros ?? 0}</Text>
+                <Text style={styles.kpiLabel}>Registros validados</Text>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.kpiCard}>
+              <Card.Content>
+                <MaterialCommunityIcons
+                  name="calendar-check-outline"
+                  size={24}
+                  color="#3b82f6"
+                />
+                <Text style={styles.kpiValue}>{dashboard?.registrosEsteMes ?? 0}</Text>
+                <Text style={styles.kpiLabel}>Este mes</Text>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.kpiCard}>
+              <Card.Content>
+                <MaterialCommunityIcons
+                  name="calculator-variant-outline"
+                  size={24}
+                  color="#ea580c"
+                />
+                <Text style={styles.kpiValue}>
+                  {Math.round(dashboard?.cantidadFinalTotal ?? 0)}
+                </Text>
+                <Text style={styles.kpiLabel}>Cantidad final</Text>
+              </Card.Content>
+            </Card>
+          </View>
+
+          {clienteObraSeleccionada ? (
+            <Card style={styles.card}>
+              <Card.Content>
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderInfo}>
+                    <Text style={styles.cardTitle}>
+                      {clienteObraSeleccionada.nombre}
+                    </Text>
+                    <Text style={styles.helperText}>
+                      Código: {clienteObraSeleccionada.codigo || "Sin código"}
+                    </Text>
+                  </View>
+                  <Button
+                    mode="text"
+                    onPress={() => {
+                      setClienteObraSeleccionada(null);
+                      setClienteRegistros([]);
+                      setClienteRegistroSeleccionado(null);
+                    }}
+                  >
+                    Volver
+                  </Button>
+                </View>
+
+                {clienteRegistroSeleccionado ? (
+                  <Card style={styles.detailCard}>
+                    <Card.Content>
+                      <View style={styles.cardHeader}>
+                        <View style={styles.cardHeaderInfo}>
+                          <Text style={styles.cardTitle}>Detalle del registro</Text>
+                          <Text style={styles.helperText}>
+                            {formatDate(clienteRegistroSeleccionado.fecha)} ·{" "}
+                            {getClienteRegistroKind(clienteRegistroSeleccionado)}
+                          </Text>
+                        </View>
+                        <Button
+                          mode="text"
+                          compact
+                          onPress={() => setClienteRegistroSeleccionado(null)}
+                        >
+                          Cerrar
+                        </Button>
+                      </View>
+
+                      <View style={styles.detailGrid}>
+                        {detalleCampos.map(([label, value]) => (
+                          <View key={String(label)} style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>{label}</Text>
+                            <Text style={styles.detailValue}>
+                              {formatNullable(value as string | number | null)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      <Text style={[styles.cardTitle, styles.photoTitle]}>
+                        Fotografías
+                      </Text>
+                      {detalleFotos.length ? (
+                        <View style={styles.photoGrid}>
+                          {detalleFotos.map((foto, index) => (
+                            <View key={foto.id || foto.url} style={styles.photoBox}>
+                              <Image
+                                source={{ uri: foto.url }}
+                                style={styles.photo}
+                                contentFit="cover"
+                                transition={150}
+                              />
+                              <Text style={styles.photoLabel}>Foto {index + 1}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={styles.helperText}>
+                          Este registro validado no tiene fotografías asociadas.
+                        </Text>
+                      )}
+                    </Card.Content>
+                  </Card>
+                ) : null}
+
+                {loadingClienteRegistros ? (
+                  <View style={styles.inlineLoader}>
+                    <ActivityIndicator color="#f97316" />
+                    <Text style={styles.helperText}>Cargando registros...</Text>
+                  </View>
+                ) : clienteRegistros.length ? (
+                  clienteRegistros.map((registro) => (
+                    <Pressable
+                      key={registro.id}
+                      style={[
+                        styles.recentRow,
+                        clienteRegistroSeleccionado?.id === registro.id &&
+                          styles.selectedRegistroRow,
+                      ]}
+                      onPress={() => setClienteRegistroSeleccionado(registro)}
+                    >
+                      <View style={styles.recentIcon}>
+                        <MaterialCommunityIcons
+                          name={
+                            registro.tipoRegistro === "junta_lineal_espuma"
+                              ? "ruler"
+                              : "shield-check-outline"
+                          }
+                          size={20}
+                          color="#f97316"
+                        />
+                      </View>
+                      <View style={styles.recentInfo}>
+                        <Text style={styles.recentTitle}>
+                          {formatDate(registro.fecha)} · Piso {registro.piso || "-"}
+                        </Text>
+                        <Text style={styles.helperText}>
+                          {registro.modulo || "Sin módulo"} ·{" "}
+                          {registro.recinto || "Sin recinto"} · N° sello{" "}
+                          {registro.numeroSello || "-"}
+                        </Text>
+                        <Text style={styles.helperText}>
+                          Cantidad final: {registro.cantidadFinal ?? "-"} · Fotos:{" "}
+                          {fotosCount(registro)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.helperText}>
+                    Esta obra aún no tiene registros validados.
+                  </Text>
+                )}
+              </Card.Content>
+            </Card>
+          ) : null}
+
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text style={styles.cardTitle}>Obras</Text>
+              {clienteObras.length ? (
+                clienteObras.map((obra) => (
+                  <Pressable
+                    key={obra.id}
+                    style={styles.recentRow}
+                    onPress={() => abrirClienteObra(obra)}
+                  >
+                    <View style={styles.recentIcon}>
+                      <MaterialCommunityIcons
+                        name="office-building-marker-outline"
+                        size={20}
+                        color="#f97316"
+                      />
+                    </View>
+                    <View style={styles.recentInfo}>
+                      <Text style={styles.recentTitle}>{obra.nombre}</Text>
+                      <Text style={styles.helperText}>
+                        {obra.codigo || "Sin código"} ·{" "}
+                        {obra.totalRegistros} registros validados
+                      </Text>
+                    </View>
+                    <Chip compact style={styles.lightChip}>
+                      {obra.estado || "Sin estado"}
+                    </Chip>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={styles.helperText}>
+                  Aún no tienes obras asignadas para visualizar.
+                </Text>
+              )}
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text style={styles.cardTitle}>Últimos registros validados</Text>
+              {ultimos.length ? (
+                ultimos.map((registro) => (
+                  <View key={registro.id} style={styles.recentRow}>
+                    <View style={styles.recentIcon}>
+                      <MaterialCommunityIcons
+                        name={
+                          registro.tipoRegistro === "junta_lineal_espuma"
+                            ? "ruler"
+                            : "shield-check-outline"
+                        }
+                        size={20}
+                        color="#f97316"
+                      />
+                    </View>
+                    <View style={styles.recentInfo}>
+                      <Text style={styles.recentTitle}>
+                        {registro.obraNombre || "Sin obra"}
+                      </Text>
+                      <Text style={styles.helperText}>
+                        {formatDate(registro.fecha)} ·{" "}
+                        {registro.modulo || "Sin módulo"} · Cantidad final:{" "}
+                        {registro.cantidadFinal ?? "-"}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.helperText}>
+                  Los registros validados aparecerán aquí cuando estén disponibles.
+                </Text>
+              )}
+            </Card.Content>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -612,6 +1044,9 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: "space-between",
   },
+  cardHeaderInfo: {
+    flex: 1,
+  },
   cardTitle: {
     color: "#0f172a",
     fontSize: 16,
@@ -634,6 +1069,69 @@ const styles = StyleSheet.create({
   chipText: {
     color: "#ffffff",
     fontWeight: "700",
+  },
+  lightChip: {
+    backgroundColor: "#e2e8f0",
+  },
+  detailCard: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  detailGrid: {
+    borderTopColor: "#fed7aa",
+    borderTopWidth: 1,
+    marginTop: 12,
+  },
+  detailRow: {
+    borderBottomColor: "#fed7aa",
+    borderBottomWidth: 1,
+    gap: 4,
+    paddingVertical: 10,
+  },
+  detailLabel: {
+    color: "#9a3412",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  detailValue: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  selectedRegistroRow: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+  },
+  photoTitle: {
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  photoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  photoBox: {
+    width: "48%",
+  },
+  photo: {
+    aspectRatio: 1.2,
+    backgroundColor: "#e2e8f0",
+    borderRadius: 12,
+    width: "100%",
+  },
+  photoLabel: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 4,
   },
   progressTrack: {
     backgroundColor: "#e2e8f0",
@@ -689,6 +1187,11 @@ const styles = StyleSheet.create({
   helper: {
     color: "#475569",
     marginTop: 12,
+  },
+  inlineLoader: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 18,
   },
   errorText: {
     color: "#dc2626",

@@ -69,6 +69,17 @@ export default function TabLayout() {
     userRole === "terreno" || userRole === "jefeobra" ? ["historial"] : [],
   );
   const jefeObraHiddenTabs = new Set(["mis-obras"]);
+  const clienteHiddenTabs = new Set([
+    "registros",
+    "cotizaciones",
+    "reportes",
+    "historial",
+  ]);
+  const ingenieriaHiddenTabs = new Set(
+    userRole === "ingenieria" || userRole === "administrador"
+      ? []
+      : ["ingenieria"],
+  );
 
   if (!canViewAllModules(userRole) && restrictedTabs.has(currentTab)) {
     return <Redirect href="/(tabs)" />;
@@ -79,6 +90,14 @@ export default function TabLayout() {
   }
 
   if (userRole === "jefeobra" && jefeObraHiddenTabs.has(currentTab)) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  if (userRole === "cliente" && clienteHiddenTabs.has(currentTab)) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  if (ingenieriaHiddenTabs.has(currentTab)) {
     return <Redirect href="/(tabs)" />;
   }
 
@@ -111,7 +130,10 @@ export default function TabLayout() {
                 name="mis-obras"
                 options={{
                   title: "Obras",
-                  href: userRole === "jefeobra" ? null : undefined,
+                  href:
+                    userRole === "jefeobra"
+                      ? null
+                      : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="office-building"
@@ -125,9 +147,27 @@ export default function TabLayout() {
                 name="registros"
                 options={{
                   title: "Registro",
+                  href: userRole === "cliente" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="clipboard-text-outline"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="ingenieria"
+                options={{
+                  title: "Ingeniería",
+                  href:
+                    userRole === "ingenieria" || userRole === "administrador"
+                      ? undefined
+                      : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="clipboard-check-outline"
                       color={color}
                       size={size}
                     />
@@ -167,7 +207,9 @@ export default function TabLayout() {
                 options={{
                   title: "Historial",
                   href:
-                    userRole === "terreno" || userRole === "jefeobra"
+                    userRole === "terreno" ||
+                    userRole === "jefeobra" ||
+                    userRole === "cliente"
                       ? null
                       : undefined,
                   tabBarIcon: ({ color, size }) => (

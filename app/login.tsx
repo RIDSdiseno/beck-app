@@ -16,7 +16,6 @@ import { router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Image,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -155,12 +154,7 @@ export default function LoginScreen() {
     : insets.bottom + 28;
 
   return (
-    <ImageBackground
-      source={require("../assets/images/login-fire-bg.jpg")}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      <View style={styles.overlay} />
+    <View style={styles.background}>
 
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
         <KeyboardAvoidingView
@@ -198,6 +192,7 @@ export default function LoginScreen() {
                   source={require("../assets/images/logo_beck.png")}
                   style={[
                     styles.logo,
+                    styles.logoOnYellow,
                     isAndroid && styles.androidLogo,
                     isShortAndroid && styles.shortAndroidLogo,
                   ]}
@@ -333,15 +328,14 @@ export default function LoginScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.48)",
+  background: {
+    flex: 1,
+    backgroundColor: "#facc15",
   },
   safeArea: {
     flex: 1,
@@ -377,6 +371,9 @@ const styles = StyleSheet.create({
     height: 250,
     maxWidth: 500,
     width: "100%",
+  },
+  logoOnYellow: {
+    tintColor: "#111827",
   },
   androidLogo: {
     height: 235,
