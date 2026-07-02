@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/services/api/config";
+import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
 
@@ -137,22 +137,6 @@ function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
   });
 }
 
-async function readJsonResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-  const bodyText = await response.text();
-
-  if (!bodyText) return null;
-
-  if (!contentType.includes("application/json")) {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-}
 
 export async function createRegistro(payload: CreateRegistroPayload) {
   const session = await getSession();
@@ -246,7 +230,10 @@ export async function getMisRegistros(
     throw new Error(result?.error || "No se pudieron obtener los registros");
   }
 
-  const data = result.data as RegistroHistorialApi[];
+  const data = ensureArray<RegistroHistorialApi>(
+    result.data,
+    "Respuesta inválida del servidor al obtener los registros.",
+  );
   registrosCache.set(cacheKey, data);
   return data;
 }

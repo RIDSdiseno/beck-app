@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/services/api/config";
+import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 
 export type LoginResponse = {
   token: string;
@@ -9,27 +9,6 @@ export type LoginResponse = {
     rol: string;
   };
 };
-
-async function readApiResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-  const bodyText = await response.text();
-
-  if (!bodyText) return null;
-
-  if (!contentType.includes("application/json")) {
-    throw new Error(
-      response.status === 404
-        ? "El backend no tiene habilitado el login por correo."
-        : "El servidor no respondió correctamente.",
-    );
-  }
-
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-}
 
 export async function loginWithMicrosoftIdToken(
   idToken: string,
@@ -42,7 +21,7 @@ export async function loginWithMicrosoftIdToken(
     body: JSON.stringify({ idToken }),
   });
 
-  const data = await readApiResponse(response);
+  const data = await readJsonResponse(response);
 
   if (!response.ok) {
     throw new Error(data?.error || "No se pudo iniciar sesión con Microsoft");
@@ -63,7 +42,12 @@ export async function loginWithEmailPassword(
     body: JSON.stringify({ email, password }),
   });
 
-  const data = await readApiResponse(response);
+  // 404 aquí significa que el endpoint de login por email no está habilitado.
+  if (response.status === 404) {
+    throw new Error("El backend no tiene habilitado el login por correo.");
+  }
+
+  const data = await readJsonResponse(response);
 
   if (!response.ok) {
     throw new Error(data?.error || "No se pudo iniciar sesión");

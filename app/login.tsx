@@ -83,8 +83,7 @@ export default function LoginScreen() {
       setError("");
       setIsMicrosoftLoading(true);
 
-      const codeVerifier =
-        (request as any)?.codeVerifier || (request as any)?.code_verifier || "";
+      const codeVerifier = request?.codeVerifier ?? "";
 
       if (!codeVerifier) {
         throw new Error("No se pudo obtener el code_verifier.");
@@ -108,7 +107,7 @@ export default function LoginScreen() {
 
       setIsMicrosoftLoading(false);
     } catch (err: any) {
-      console.log("PROMPT MICROSOFT ERROR", err);
+      if (__DEV__) console.warn("PROMPT MICROSOFT ERROR", err);
       setError(err?.message || "No se pudo abrir el login de Microsoft.");
       setIsMicrosoftLoading(false);
     }

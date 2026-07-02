@@ -6,22 +6,12 @@
     "preview": {
       "channel": "production",
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beck-mobile-backend-production.up.railway.app",
-        "EXPO_PUBLIC_AZURE_CLIENT_ID": "REDACTED_CLIENT_ID",
-        "EXPO_PUBLIC_AZURE_TENANT_ID": "REDACTED_TENANT_ID"
-      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "channel": "production",
-      "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beck-mobile-backend-production.up.railway.app",
-        "EXPO_PUBLIC_AZURE_CLIENT_ID": "REDACTED_CLIENT_ID",
-        "EXPO_PUBLIC_AZURE_TENANT_ID": "REDACTED_TENANT_ID"
-      },
       "android": {
         "buildType": "app-bundle"
       }

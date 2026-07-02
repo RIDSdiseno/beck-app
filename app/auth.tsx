@@ -41,7 +41,10 @@ export default function AuthCallbackScreen() {
         setStep("Validando respuesta de Microsoft...");
 
         const code = typeof params.code === "string" ? params.code : "";
-        const authError = typeof params.error === "string" ? params.error : "";
+        const rawAuthError = typeof params.error === "string" ? params.error : "";
+        // Sanitizar el parámetro error del deep-link antes de mostrarlo —
+        // cualquier app instalada puede disparar beckcrmapp://auth con un error arbitrario.
+        const authError = rawAuthError.slice(0, 80).replace(/[^\w\s\-_.]/g, "");
 
         if (authError) {
           throw new Error(`Microsoft devolvió un error: ${authError}`);
@@ -91,7 +94,7 @@ export default function AuthCallbackScreen() {
 
         router.replace(getInitialRouteForRole(data.user.rol));
       } catch (err: any) {
-        console.log("AUTH CALLBACK ERROR", err);
+        if (__DEV__) console.warn("AUTH CALLBACK ERROR", err);
 
         await clearMicrosoftAuthState();
 

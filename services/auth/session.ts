@@ -54,7 +54,8 @@ function decodeBase64Url(value: string) {
 function isJwtExpired(token: string) {
   const [, payload] = token.split(".");
 
-  if (!payload) return false;
+  // Token sin payload decodificable → fail-closed para no dejar pasar sesiones corruptas.
+  if (!payload) return true;
 
   try {
     const decoded = JSON.parse(decodeBase64Url(payload)) as { exp?: number };
@@ -64,14 +65,16 @@ function isJwtExpired(token: string) {
     const expirationMs = decoded.exp * 1000;
     return Date.now() >= expirationMs;
   } catch {
-    return false;
+    return true;
   }
 }
 
 export async function saveSession(token: string, user: SessionUser) {
   await Promise.all([
     SecureStore.setItemAsync(STORAGE_KEYS.token, token),
-    AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user)),
+    // Guardar en SecureStore (cifrado) en lugar de AsyncStorage (texto plano).
+    SecureStore.setItemAsync(STORAGE_KEYS.user, JSON.stringify(user)),
+    AsyncStorage.removeItem(STORAGE_KEYS.user), // limpia entrada legacy si existe
   ]);
 }
 
@@ -80,17 +83,32 @@ export async function getSession(): Promise<{
   user: SessionUser | null;
   isAuthenticated: boolean;
 }> {
-  const [token, userRaw] = await Promise.all([
+  const [token, userRawSecure] = await Promise.all([
     SecureStore.getItemAsync(STORAGE_KEYS.token),
-    AsyncStorage.getItem(STORAGE_KEYS.user),
+    SecureStore.getItemAsync(STORAGE_KEYS.user),
   ]);
 
   let user: SessionUser | null = null;
+
+  // Migración: si el usuario viene de una versión anterior (datos en AsyncStorage),
+  // moverlos a SecureStore de forma transparente en este primer acceso.
+  let userRaw = userRawSecure;
+  if (!userRaw) {
+    const legacy = await AsyncStorage.getItem(STORAGE_KEYS.user);
+    if (legacy && token) {
+      userRaw = legacy;
+      await Promise.all([
+        SecureStore.setItemAsync(STORAGE_KEYS.user, legacy),
+        AsyncStorage.removeItem(STORAGE_KEYS.user),
+      ]);
+    }
+  }
 
   try {
     user = userRaw ? (JSON.parse(userRaw) as SessionUser) : null;
   } catch {
     user = null;
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.user);
   }
 
   if (token && isJwtExpired(token)) {
@@ -113,9 +131,10 @@ export async function getSession(): Promise<{
 export async function clearSession() {
   await Promise.all([
     SecureStore.deleteItemAsync(STORAGE_KEYS.token),
+    SecureStore.deleteItemAsync(STORAGE_KEYS.user),
     clearMicrosoftAuthState(),
     AsyncStorage.multiRemove([
-      STORAGE_KEYS.user,
+      STORAGE_KEYS.user,             // limpia entrada legacy en AsyncStorage
       STORAGE_KEYS.obraSeleccionada,
     ]),
   ]);

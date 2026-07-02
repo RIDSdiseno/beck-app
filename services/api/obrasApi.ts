@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/services/api/config";
+import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
 
@@ -97,22 +97,6 @@ export function isObraDisponible(estado?: string | null) {
   return estado === "activa" || estado === "pausada";
 }
 
-async function readJsonResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-  const bodyText = await response.text();
-
-  if (!bodyText) return null;
-
-  if (!contentType.includes("application/json")) {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-}
 
 export function clearMisObrasCache() {
   obrasCache.clear();
@@ -130,7 +114,7 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
     throw new Error("No hay sesión activa");
   }
 
-  const cacheKey = session.user?.id || session.token;
+  const cacheKey = session.user?.id ?? "anonymous";
   const cached = obrasCache.get(cacheKey);
 
   if (cached && !forceRefresh) {
@@ -151,9 +135,10 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
     throw new Error(result?.error || "No se pudieron obtener las obras");
   }
 
-  const data = (result.data as ObraApi[]).filter((obra) =>
-    isObraDisponible(obra.estado),
-  );
+  const data = ensureArray<ObraApi>(
+    result.data,
+    "Respuesta inválida del servidor al obtener las obras.",
+  ).filter((obra) => isObraDisponible(obra.estado));
   obrasCache.set(cacheKey, data);
   return data;
 }
@@ -194,7 +179,10 @@ export async function getConfiguracionRegistro(
     );
   }
 
-  const data = (result.data as ConfiguracionCampoRegistroApi[])
+  const data = ensureArray<ConfiguracionCampoRegistroApi>(
+    result.data,
+    "Respuesta inválida del servidor al obtener la configuración del registro.",
+  )
     .map((campo) => ({
       ...campo,
       campo: normalizeCampoConfiguracion(campo.campo) || campo.campo,

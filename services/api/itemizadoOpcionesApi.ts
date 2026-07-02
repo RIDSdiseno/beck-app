@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/services/api/config";
+import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
 
@@ -18,23 +18,6 @@ export type GetItemizadoOpcionesParams = {
   limit?: number;
 };
 
-async function readJsonResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-  const bodyText = await response.text();
-
-  if (!bodyText) return null;
-
-  if (!contentType.includes("application/json")) {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    throw new Error("El servidor no respondió correctamente.");
-  }
-}
-
 export async function getItemizadoOpciones(
   params?: GetItemizadoOpcionesParams,
 ): Promise<ItemizadoOpcionApi[]> {
@@ -52,7 +35,7 @@ export async function getItemizadoOpciones(
   if (params?.materialidad?.trim()) {
     query.set("materialidad", params.materialidad.trim());
   }
-  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
 
   const queryString = query.toString();
   const response = await authenticatedFetch(
@@ -72,5 +55,8 @@ export async function getItemizadoOpciones(
     throw new Error(result?.error || "No se pudieron obtener los itemizados");
   }
 
-  return result.data as ItemizadoOpcionApi[];
+  return ensureArray<ItemizadoOpcionApi>(
+    result.data,
+    "Respuesta inválida del servidor al obtener los itemizados.",
+  );
 }

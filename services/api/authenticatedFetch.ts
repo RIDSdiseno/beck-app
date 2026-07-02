@@ -10,6 +10,13 @@ export async function closeExpiredSession() {
   isClosingExpiredSession = true;
 
   try {
+    const { clearMisObrasCache } =
+      require("@/services/api/obrasApi") as typeof import("@/services/api/obrasApi");
+    const { clearMisRegistrosCache } =
+      require("@/services/api/registrosApi") as typeof import("@/services/api/registrosApi");
+
+    clearMisObrasCache();
+    clearMisRegistrosCache();
     await clearSession();
     router.replace("/login");
   } finally {
@@ -27,6 +34,9 @@ export async function authenticatedFetch(
 
   if (response.status === 401) {
     await closeExpiredSession();
+    throw new Error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+  } else if (response.status === 403) {
+    console.warn("PERMISO DENEGADO (403) =>", input);
   }
 
   return response;
