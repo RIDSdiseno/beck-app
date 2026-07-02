@@ -19,7 +19,7 @@ export default function AppEntryScreen() {
             : "/login",
         );
       } catch (error) {
-        console.log("APP ENTRY ERROR", error);
+        if (__DEV__) console.warn("APP ENTRY ERROR", error);
         setRedirectTo("/login");
       } finally {
         setLoading(false);

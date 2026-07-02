@@ -9,8 +9,6 @@ import {
   Provider as PaperProvider,
   Text,
 } from "react-native-paper";
-import { HistorialProvider } from "../../context/HistorialContext";
-import { RegistrosProvider } from "../../context/RegistrosContext";
 import { canViewAllModules } from "../../services/auth/roles";
 import { getSession } from "../../services/auth/session";
 
@@ -84,9 +82,7 @@ export default function TabLayout() {
 
   return (
     <PaperProvider theme={theme}>
-      <HistorialProvider>
-        <RegistrosProvider>
-          <View style={styles.container}>
+      <View style={styles.container}>
             <StatusBar style="dark" backgroundColor="#f5f7fb" />
             <Tabs
               screenOptions={{
@@ -193,9 +189,7 @@ export default function TabLayout() {
                 }}
               />
             </Tabs>
-          </View>
-        </RegistrosProvider>
-      </HistorialProvider>
+      </View>
     </PaperProvider>
   );
 }

@@ -124,8 +124,9 @@ export default function MisObrasScreen() {
 
       setSelectedObra(obra);
       setShowRegistro(true);
-    } catch (err) {
-      console.log("SELECT OBRA ERROR", err);
+    } catch (err: any) {
+      if (__DEV__) console.warn("SELECT OBRA ERROR", err);
+      setError(err?.message || "No se pudo seleccionar la obra. Intenta nuevamente.");
     } finally {
       setSelectingId(null);
     }

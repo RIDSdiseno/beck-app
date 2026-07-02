@@ -2,6 +2,12 @@ import {
   getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
+import {
+  estadoColor,
+  formatShortDate as formatDate,
+  getEstadoLabel,
+} from "@/utils/registroEstado";
+import { STORAGE_KEYS } from "@/services/auth/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
@@ -18,45 +24,8 @@ import {
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 
-const HIDDEN_VALIDATED_REGISTROS_KEY = "beck_historial_registros_ocultos";
-
-const estadoColor = {
-  pendiente: "#f59e0b",
-  en_revision: "#3b82f6",
-  validado: "#16a34a",
-  rechazado: "#dc2626",
-} as const;
-
-function getEstadoLabel(estado: RegistroHistorialApi["estado"]) {
-  switch (estado) {
-    case "pendiente":
-      return "Pendiente";
-    case "en_revision":
-      return "En revisión";
-    case "validado":
-      return "Validado";
-    case "rechazado":
-      return "Rechazado";
-    default:
-      return "Pendiente";
-  }
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sin fecha";
-
-  return date.toLocaleDateString("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 async function getHiddenValidatedIds() {
-  const raw = await AsyncStorage.getItem(HIDDEN_VALIDATED_REGISTROS_KEY);
+  const raw = await AsyncStorage.getItem(STORAGE_KEYS.hiddenValidatedRegistros);
 
   if (!raw) return new Set<string>();
 
@@ -69,7 +38,7 @@ async function getHiddenValidatedIds() {
 
 async function saveHiddenValidatedIds(ids: Set<string>) {
   await AsyncStorage.setItem(
-    HIDDEN_VALIDATED_REGISTROS_KEY,
+    STORAGE_KEYS.hiddenValidatedRegistros,
     JSON.stringify(Array.from(ids)),
   );
 }

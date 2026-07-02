@@ -5,6 +5,13 @@ import {
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
 import { clearSession, getSession } from "@/services/auth/session";
+import {
+  estadoColor,
+  formatDateTime,
+  formatShortDate as formatDate,
+  getEstadoLabel,
+  shouldShowRejectionContext,
+} from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -51,67 +58,6 @@ function getInitials(name?: string) {
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "B";
 }
 
-const estadoColor = {
-  pendiente: "#f59e0b",
-  en_revision: "#3b82f6",
-  validado: "#16a34a",
-  rechazado: "#dc2626",
-} as const;
-
-function getEstadoLabel(estado: RegistroHistorialApi["estado"]) {
-  switch (estado) {
-    case "pendiente":
-      return "Pendiente";
-    case "en_revision":
-      return "En revisión";
-    case "validado":
-      return "Validado";
-    case "rechazado":
-      return "Rechazado";
-    default:
-      return "Pendiente";
-  }
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sin fecha";
-
-  return date.toLocaleDateString("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleString("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function isCorreccionEditable(registro: RegistroHistorialApi) {
-  return (
-    registro.estado === "pendiente" &&
-    Boolean(registro.es_correccion) &&
-    Boolean(registro.devuelto_a_tecnico || registro.registro_origen_id)
-  );
-}
-
-function shouldShowRejectionContext(registro: RegistroHistorialApi) {
-  return registro.estado === "rechazado" || isCorreccionEditable(registro);
-}
 
 function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
   if (!shouldShowRejectionContext(registro)) return null;

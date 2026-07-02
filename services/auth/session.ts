@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   obraSeleccionada: "beck_obra_seleccionada",
   codeVerifier: "beck_code_verifier",
   redirectUri: "beck_redirect_uri",
+  hiddenValidatedRegistros: "beck_historial_registros_ocultos",
 } as const;
 
 export type SessionUser = {
@@ -60,7 +61,7 @@ function isJwtExpired(token: string) {
   try {
     const decoded = JSON.parse(decodeBase64Url(payload)) as { exp?: number };
 
-    if (!decoded.exp) return false;
+    if (decoded.exp === undefined || decoded.exp === null) return false;
 
     const expirationMs = decoded.exp * 1000;
     return Date.now() >= expirationMs;
@@ -134,8 +135,9 @@ export async function clearSession() {
     SecureStore.deleteItemAsync(STORAGE_KEYS.user),
     clearMicrosoftAuthState(),
     AsyncStorage.multiRemove([
-      STORAGE_KEYS.user,             // limpia entrada legacy en AsyncStorage
+      STORAGE_KEYS.user,
       STORAGE_KEYS.obraSeleccionada,
+      STORAGE_KEYS.hiddenValidatedRegistros,
     ]),
   ]);
 }

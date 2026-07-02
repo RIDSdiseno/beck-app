@@ -23,6 +23,10 @@ import {
   getSelectedObra,
   getSession,
 } from "@/services/auth/session";
+import {
+  isCorreccionEditable,
+  shouldShowRejectionContext,
+} from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -220,17 +224,6 @@ function getRegistroEstadoLabel(estado: RegistroHistorialApi["estado"]) {
   return estado.replace("_", " ");
 }
 
-function isCorreccionEditable(registro: RegistroHistorialApi) {
-  return (
-    registro.estado === "pendiente" &&
-    Boolean(registro.es_correccion) &&
-    Boolean(registro.devuelto_a_tecnico || registro.registro_origen_id)
-  );
-}
-
-function shouldShowRejectionContext(registro: RegistroHistorialApi) {
-  return registro.estado === "rechazado" || isCorreccionEditable(registro);
-}
 
 function preferirCopiasCorreccion(registros: RegistroHistorialApi[]) {
   const originalesConCopia = new Set(
@@ -768,7 +761,7 @@ export default function RegistrosScreen({
         }
 
         } catch (err: any) {
-          console.log("LOAD REGISTROS ERROR =>", err);
+          if (__DEV__) console.warn("LOAD REGISTROS ERROR =>", err);
           setError(err?.message || "No se pudieron obtener los registros");
         } finally {
           setLoadingJefeRegistros(false);
@@ -921,7 +914,7 @@ export default function RegistrosScreen({
 
       addFotos(nuevasFotos);
     } catch (err) {
-      console.log("PICK IMAGE ERROR =>", err);
+      if (__DEV__) console.warn("PICK IMAGE ERROR =>", err);
       setError("No se pudo seleccionar la imagen.");
     }
   };
@@ -949,7 +942,7 @@ export default function RegistrosScreen({
 
       addFotos([nuevaFoto]);
     } catch (err) {
-      console.log("TAKE PHOTO ERROR =>", err);
+      if (__DEV__) console.warn("TAKE PHOTO ERROR =>", err);
       setError("No se pudo tomar la foto.");
     }
   };
@@ -1199,12 +1192,12 @@ export default function RegistrosScreen({
       resetForm();
       router.replace("/registros");
     } catch (err: any) {
-      console.log("CREATE/UPLOAD REGISTRO ERROR =>", err);
+      if (__DEV__) console.warn("CREATE/UPLOAD REGISTRO ERROR =>", err);
       if (registroCreadoId) {
         try {
           await deleteRegistroPendiente(registroCreadoId);
         } catch (deleteError) {
-          console.log("ROLLBACK REGISTRO ERROR =>", deleteError);
+          if (__DEV__) console.warn("ROLLBACK REGISTRO ERROR =>", deleteError);
         }
       }
       setError(
@@ -1271,11 +1264,9 @@ export default function RegistrosScreen({
             ? undefined
             : factorValue(holgura),
         accesibilidad:
-          isJuntaLineal
+          isJuntaLineal || !campoConfiguradoVisible("cieloModular")
             ? 1
-            : campoConfiguradoVisible("cieloModular")
-              ? factorValue(accesibilidad)
-              : undefined,
+            : factorValue(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
@@ -1330,6 +1321,12 @@ export default function RegistrosScreen({
       setSaving(true);
       setError("");
       setSuccess("");
+
+      if (fotos.length) {
+        await uploadRegistroFotos(editingRegistro.id, fotos, {
+          replaceExisting: true,
+        });
+      }
 
       await reenviarRegistroComoTecnico(editingRegistro.id, {
         obraId: obra.id,
