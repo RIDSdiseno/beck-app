@@ -255,22 +255,15 @@ export async function uploadRegistroFotos(
     throw new Error("No hay sesión activa");
   }
 
-  const uploadedFotos = [];
-
-  for (const [index, foto] of fotos.entries()) {
-    const replaceExisting = Boolean(options?.replaceExisting && index === 0);
-    const result = await uploadRegistroFotosRequest(
-      session.token,
-      registroId,
-      [foto],
-      replaceExisting,
-    );
-
-    uploadedFotos.push(...result);
-  }
+  const result = await uploadRegistroFotosRequest(
+    session.token,
+    registroId,
+    fotos,
+    Boolean(options?.replaceExisting),
+  );
 
   clearMisRegistrosCache();
-  return uploadedFotos;
+  return result;
 }
 
 async function uploadRegistroFotosRequest(
