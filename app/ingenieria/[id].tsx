@@ -170,7 +170,8 @@ export default function IngenieriaDetalleScreen() {
           folio: data.folio || "",
           observaciones: data.observaciones || "",
         });
-        if (data.seleccionado_para_inspeccion) {
+        if (data.seleccionado_para_inspeccion &&
+            (data.estado === "validado" || data.estado === "en_revision")) {
           loadControl();
         }
       } catch (err: any) {
@@ -448,65 +449,67 @@ export default function IngenieriaDetalleScreen() {
           </>
         ) : null}
 
-        <SectionTitle title="INSPECCIÓN" />
-        <View style={styles.inspeccionRow}>
-          <View>
-            <Text style={styles.infoLabel}>Seleccionado para inspección</Text>
-            <Text style={[styles.infoValue, { color: registro.seleccionado_para_inspeccion ? "#7c3aed" : "#64748b" }]}>
-              {registro.seleccionado_para_inspeccion ? "Sí" : "No"}
-            </Text>
-          </View>
-          <Button
-            mode="outlined"
-            compact
-            onPress={handleToggleInspeccion}
-            loading={saving}
-            style={styles.inspeccionToggleBtn}
-            labelStyle={{ fontSize: 12 }}
-          >
-            {registro.seleccionado_para_inspeccion ? "Quitar inspección" : "Marcar inspección"}
-          </Button>
-        </View>
-
-        {registro.seleccionado_para_inspeccion ? (
-          <View style={styles.controlRow}>
-            {controlLoading ? (
-              <ActivityIndicator size="small" color="#7c3aed" />
-            ) : control ? (
-              <View style={styles.controlCard}>
-                <Text style={styles.controlTitle}>Control de inspección registrado</Text>
-                <InfoRow label="Ensayo" value={control.ensayo} />
-                <InfoRow label="Fecha" value={control.fecha?.slice(0, 10)} />
-                <InfoRow label="Conformidad" value={control.conformidad === "conforme" ? "Conforme" : control.conformidad === "no_conforme" ? "No conforme" : "Sin definir"} />
-                {control.observacion ? <InfoRow label="Observación" value={control.observacion} /> : null}
-                <Text style={styles.paramsTitle}>
-                  {control.controles_inspeccion_parametros?.length ?? 0} parámetros evaluados
+        {(registro.estado === "validado" || registro.estado === "en_revision") ? (
+          <>
+            <SectionTitle title="INSPECCIÓN" />
+            <View style={styles.inspeccionRow}>
+              <View>
+                <Text style={styles.infoLabel}>Seleccionado para inspección</Text>
+                <Text style={[styles.infoValue, { color: registro.seleccionado_para_inspeccion ? "#7c3aed" : "#64748b" }]}>
+                  {registro.seleccionado_para_inspeccion ? "Sí" : "No"}
                 </Text>
               </View>
-            ) : (
               <Button
-                mode="contained"
-                onPress={() => {
-                  setShowControlForm(true);
-                }}
-                style={styles.controlBtn}
-                icon="clipboard-check-outline"
-                labelStyle={{ fontSize: 13 }}
+                mode="outlined"
+                compact
+                onPress={handleToggleInspeccion}
+                loading={saving}
+                style={styles.inspeccionToggleBtn}
+                labelStyle={{ fontSize: 12 }}
               >
-                Crear control de inspección
+                {registro.seleccionado_para_inspeccion ? "Quitar inspección" : "Marcar inspección"}
               </Button>
-            )}
-            <Button
-              mode="text"
-              compact
-              onPress={loadControl}
-              style={{ marginTop: 6 }}
-              labelStyle={{ fontSize: 12 }}
-              disabled={controlLoading}
-            >
-              {control ? "Recargar control" : "Verificar si existe un control"}
-            </Button>
-          </View>
+            </View>
+
+            {registro.seleccionado_para_inspeccion ? (
+              <View style={styles.controlRow}>
+                {controlLoading ? (
+                  <ActivityIndicator size="small" color="#7c3aed" />
+                ) : control ? (
+                  <View style={styles.controlCard}>
+                    <Text style={styles.controlTitle}>Control de inspección registrado</Text>
+                    <InfoRow label="Ensayo" value={control.ensayo} />
+                    <InfoRow label="Fecha" value={control.fecha?.slice(0, 10)} />
+                    <InfoRow label="Conformidad" value={control.conformidad === "conforme" ? "Conforme" : control.conformidad === "no_conforme" ? "No conforme" : "Sin definir"} />
+                    {control.observacion ? <InfoRow label="Observación" value={control.observacion} /> : null}
+                    <Text style={styles.paramsTitle}>
+                      {control.controles_inspeccion_parametros?.length ?? 0} parámetros evaluados
+                    </Text>
+                  </View>
+                ) : (
+                  <Button
+                    mode="contained"
+                    onPress={() => setShowControlForm(true)}
+                    style={styles.controlBtn}
+                    icon="clipboard-check-outline"
+                    labelStyle={{ fontSize: 13 }}
+                  >
+                    Crear control de inspección
+                  </Button>
+                )}
+                <Button
+                  mode="text"
+                  compact
+                  onPress={loadControl}
+                  style={{ marginTop: 6 }}
+                  labelStyle={{ fontSize: 12 }}
+                  disabled={controlLoading}
+                >
+                  {control ? "Recargar control" : "Verificar si existe un control"}
+                </Button>
+              </View>
+            ) : null}
+          </>
         ) : null}
 
         <View style={{ height: 120 }} />
