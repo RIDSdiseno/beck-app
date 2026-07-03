@@ -58,8 +58,6 @@ export type RegistroCliente = {
   fotos: FotoCliente[];
   validadoCliente: boolean;
   validadoClienteAt: string | null;
-  firmaClienteUrl: string | null;
-  pdfFirmadoUrl: string | null;
   obraNombre: string | null;
   obraCodigo: string | null;
   obraId: string;

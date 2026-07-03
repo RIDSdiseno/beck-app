@@ -382,13 +382,6 @@ export default function ClienteRegistroScreen() {
             </View>
           ) : null}
 
-          {/* PDF firmado disponible */}
-          {registro.validadoCliente && registro.pdfFirmadoUrl ? (
-            <View style={styles.pdfBox}>
-              <MaterialCommunityIcons name="file-pdf-box" size={22} color="#16a34a" />
-              <Text style={styles.pdfText}>PDF firmado generado y disponible.</Text>
-            </View>
-          ) : null}
 
         </ScrollView>
 
@@ -534,18 +527,6 @@ const styles = StyleSheet.create({
   warningContent: { flex: 1 },
   warningTitle:   { color: "#92400e", fontWeight: "800", fontSize: 13, marginBottom: 4 },
   warningText:    { color: "#78350f", fontSize: 12, lineHeight: 18 },
-  pdfBox: {
-    alignItems: "center",
-    backgroundColor: "#f0fdf4",
-    borderColor: "#86efac",
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-    padding: 14,
-  },
-  pdfText:        { color: "#166534", flex: 1, fontWeight: "700" },
   bottomBar: {
     backgroundColor: "#f5f7fb",
     borderTopColor: "#e2e8f0",
