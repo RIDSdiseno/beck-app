@@ -75,8 +75,8 @@ export default function ClienteObraScreen() {
         </Text>
         <Text style={styles.subtitle}>
           {registros.length === 0
-            ? "Todos los registros de esta obra ya fueron validados."
-            : `${registros.length} ${registros.length === 1 ? "registro requiere" : "registros requieren"} tu validación.`}
+            ? "Esta obra no tiene registros validados por ingeniería disponibles para tu firma."
+            : `${registros.length} ${registros.length === 1 ? "registro validado por ingeniería requiere" : "registros validados por ingeniería requieren"} tu firma.`}
         </Text>
       </View>
 
@@ -93,9 +93,11 @@ export default function ClienteObraScreen() {
 
         {registros.length === 0 && !error ? (
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="check-all" size={52} color="#86efac" />
-            <Text style={styles.emptyTitle}>Todo al día</Text>
-            <Text style={styles.emptyText}>No hay registros pendientes de validación en esta obra.</Text>
+            <MaterialCommunityIcons name="clipboard-off-outline" size={52} color="#cbd5e1" />
+            <Text style={styles.emptyTitle}>Sin registros disponibles</Text>
+            <Text style={styles.emptyText}>
+              Ingeniería aún no ha validado registros en esta obra o todos ya fueron firmados por ti.
+            </Text>
           </View>
         ) : null}
 
