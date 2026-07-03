@@ -16,7 +16,6 @@ import { router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Image,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -154,13 +153,7 @@ export default function LoginScreen() {
     : insets.bottom + 28;
 
   return (
-    <ImageBackground
-      source={require("../assets/images/login-fire-bg.jpg")}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      <View style={styles.overlay} />
-
+    <View style={styles.background}>
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
@@ -194,7 +187,7 @@ export default function LoginScreen() {
                 ]}
               >
                 <Image
-                  source={require("../assets/images/logo_beck.png")}
+                  source={require("../assets/images/beck-splash-logo.png")}
                   style={[
                     styles.logo,
                     isAndroid && styles.androidLogo,
@@ -332,15 +325,14 @@ export default function LoginScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.48)",
+  background: {
+    flex: 1,
+    backgroundColor: "#FDC10B",
   },
   safeArea: {
     flex: 1,
@@ -386,10 +378,9 @@ const styles = StyleSheet.create({
     maxWidth: 410,
   },
   card: {
-    backgroundColor: "rgba(255, 255, 255, 0.93)",
+    backgroundColor: "#ffffff",
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
+    borderWidth: 0,
     paddingVertical: 6,
   },
   androidCard: {
@@ -401,7 +392,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.2,
-    color: "#f97316",
+    color: "#1a1a1a",
     marginBottom: 8,
   },
   title: {
