@@ -12,9 +12,12 @@ import {
   updateRegistroIngenieria,
   validarRegistroIngenieria,
 } from "@/services/api/ingenieriaApi";
+import { uploadRegistroFotos } from "@/services/api/registrosApi";
 import { estadoColor, getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -35,6 +38,23 @@ import {
   TextInput,
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+type FotoLocal = { uri: string; name: string; type: string };
+
+async function normalizeFoto(asset: ImagePicker.ImagePickerAsset, index: number): Promise<FotoLocal> {
+  const maxDim = Math.max(asset.width || 0, asset.height || 0);
+  const resizeAction = maxDim > 1600
+    ? (asset.width && asset.width >= (asset.height || 0)
+      ? { resize: { width: 1600 } }
+      : { resize: { height: 1600 } })
+    : null;
+  const processed = await ImageManipulator.manipulateAsync(
+    asset.uri,
+    resizeAction ? [resizeAction] : [],
+    { compress: 0.65, format: ImageManipulator.SaveFormat.JPEG },
+  );
+  return { uri: processed.uri, name: `ingenieria-${Date.now()}-${index}.jpg`, type: "image/jpeg" };
+}
 
 const PARAMETROS_FIJOS = [
   "Continuidad del sello cortafuego en toda la longitud de la junta",
@@ -93,6 +113,7 @@ export default function IngenieriaDetalleScreen() {
   const [showEdit, setShowEdit] = useState(false);
   const [showRechazo, setShowRechazo] = useState(false);
   const [showControlForm, setShowControlForm] = useState(false);
+  const [fotosNuevas, setFotosNuevas] = useState<FotoLocal[]>([]);
   const [control, setControl] = useState<ControlInspeccion | null>(null);
   const [controlLoading, setControlLoading] = useState(false);
 
@@ -222,6 +243,37 @@ export default function IngenieriaDetalleScreen() {
     }
   };
 
+  const handlePickFotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Debes otorgar acceso a la galería.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      quality: 1,
+      selectionLimit: 10,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const normalized = await Promise.all(result.assets.map((a, i) => normalizeFoto(a, i)));
+      setFotosNuevas(normalized);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Debes otorgar acceso a la cámara.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (!result.canceled && result.assets.length > 0) {
+      const normalized = await normalizeFoto(result.assets[0], 0);
+      setFotosNuevas((prev) => [...prev, normalized]);
+    }
+  };
+
   const handleGuardarEdicion = async () => {
     if (!id) return;
     try {
@@ -243,6 +295,12 @@ export default function IngenieriaDetalleScreen() {
         observaciones: editFields.observaciones || undefined,
       });
       setRegistro(updated);
+      if (fotosNuevas.length > 0) {
+        await uploadRegistroFotos(id, fotosNuevas, { replaceExisting: true });
+        const refreshed = await getIngenieriaRegistroById(id);
+        setRegistro(refreshed);
+        setFotosNuevas([]);
+      }
       setShowEdit(false);
       Alert.alert("Guardado", "Los cambios fueron guardados correctamente.");
     } catch (err: any) {
@@ -529,7 +587,7 @@ export default function IngenieriaDetalleScreen() {
         <View style={styles.editModal}>
           <View style={[styles.editHeader, { paddingTop: insets.top + 14 }]}>
             <Text style={styles.editTitle}>Editar campos</Text>
-            <TouchableOpacity onPress={() => setShowEdit(false)}>
+            <TouchableOpacity onPress={() => { setShowEdit(false); setFotosNuevas([]); }}>
               <MaterialCommunityIcons name="close" size={24} color="#0f172a" />
             </TouchableOpacity>
           </View>
@@ -571,6 +629,62 @@ export default function IngenieriaDetalleScreen() {
                 }
               />
             ))}
+            <Text style={styles.paramsTitle}>Fotografías</Text>
+            {(registro.fotos?.length ?? 0) > 0 ? (
+              <>
+                <Text style={styles.fotosHint}>
+                  Fotos actuales ({registro.fotos!.length})
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
+                  {registro.fotos!.map((f) => (
+                    <Image key={f.id} source={{ uri: f.url }} style={styles.fotoThumb} />
+                  ))}
+                </ScrollView>
+              </>
+            ) : null}
+            {fotosNuevas.length > 0 ? (
+              <>
+                <Text style={styles.fotosHintNew}>
+                  {fotosNuevas.length} foto(s) nueva(s) — reemplazarán las actuales al guardar
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
+                  {fotosNuevas.map((f, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => setFotosNuevas((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      <View style={styles.fotoThumbWrap}>
+                        <Image source={{ uri: f.uri }} style={styles.fotoThumb} />
+                        <View style={styles.fotoRemoveBadge}>
+                          <MaterialCommunityIcons name="close" size={12} color="#ffffff" />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : null}
+            <View style={styles.fotoBtnsRow}>
+              <Button
+                mode="outlined"
+                onPress={handlePickFotos}
+                icon="image-multiple-outline"
+                style={styles.fotoBtnHalf}
+                labelStyle={{ fontSize: 12 }}
+              >
+                Galería
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={handleTakePhoto}
+                icon="camera-outline"
+                style={styles.fotoBtnHalf}
+                labelStyle={{ fontSize: 12 }}
+              >
+                Cámara
+              </Button>
+            </View>
+
             <Button
               mode="contained"
               onPress={handleGuardarEdicion}
@@ -751,6 +865,13 @@ const styles = StyleSheet.create({
   editScroll: { padding: 16, gap: 8 },
   editInput: { marginBottom: 4 },
   editSaveBtn: { marginTop: 12, borderRadius: 14, backgroundColor: "#3b82f6" },
+  fotosHint: { color: "#64748b", fontSize: 12, marginBottom: 8 },
+  fotosHintNew: { color: "#0ea5e9", fontSize: 12, marginBottom: 8, fontWeight: "600" },
+  fotoThumb: { width: 80, height: 80, borderRadius: 8, marginRight: 8 },
+  fotoThumbWrap: { position: "relative", marginRight: 8 },
+  fotoRemoveBadge: { position: "absolute", top: 2, right: 10, backgroundColor: "#dc2626", borderRadius: 8, width: 16, height: 16, alignItems: "center", justifyContent: "center" },
+  fotoBtnsRow: { flexDirection: "row", gap: 8, marginTop: 8, marginBottom: 4 },
+  fotoBtnHalf: { flex: 1, borderRadius: 10 },
   conformidadRow: { flexDirection: "row", gap: 10, marginBottom: 8 },
   conformidadBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: "#e2e8f0", alignItems: "center" },
   conformidadBtnActive: { backgroundColor: "#16a34a", borderColor: "#16a34a" },
