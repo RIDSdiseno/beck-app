@@ -4,7 +4,7 @@ import {
 } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
+import { Redirect, router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   RefreshControl,
@@ -176,6 +176,10 @@ export default function DashboardScreen() {
         <Text style={styles.helper}>Cargando inicio...</Text>
       </View>
     );
+  }
+
+  if (userRole === "ingenieria") {
+    return <Redirect href="/(tabs)/ingenieria" />;
   }
 
   if (userRole === "jefeobra") {

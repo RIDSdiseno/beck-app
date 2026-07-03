@@ -107,7 +107,7 @@ export default function TabLayout() {
                 name="mis-obras"
                 options={{
                   title: "Obras",
-                  href: userRole === "jefeobra" ? null : undefined,
+                  href: userRole === "jefeobra" || userRole === "ingenieria" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="office-building"
@@ -118,9 +118,24 @@ export default function TabLayout() {
                 }}
               />
               <Tabs.Screen
+                name="ingenieria"
+                options={{
+                  title: "Revisión",
+                  href: userRole === "ingenieria" ? undefined : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="clipboard-check-outline"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
                 name="registros"
                 options={{
                   title: "Registro",
+                  href: userRole === "ingenieria" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="clipboard-text-outline"
@@ -163,7 +178,7 @@ export default function TabLayout() {
                 options={{
                   title: "Historial",
                   href:
-                    userRole === "terreno" || userRole === "jefeobra"
+                    userRole === "terreno" || userRole === "jefeobra" || userRole === "ingenieria"
                       ? null
                       : undefined,
                   tabBarIcon: ({ color, size }) => (
