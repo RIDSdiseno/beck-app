@@ -61,7 +61,7 @@ function isJwtExpired(token: string) {
   try {
     const decoded = JSON.parse(decodeBase64Url(payload)) as { exp?: number };
 
-    if (decoded.exp === undefined || decoded.exp === null) return false;
+    if (!decoded.exp) return true;
 
     const expirationMs = decoded.exp * 1000;
     return Date.now() >= expirationMs;
