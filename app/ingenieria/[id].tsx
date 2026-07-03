@@ -15,7 +15,7 @@ import {
 import { estadoColor, getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -25,14 +25,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput as RNTextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import {
   ActivityIndicator,
   Button,
-  Divider,
   Text,
   TextInput,
 } from "react-native-paper";
@@ -94,7 +92,6 @@ export default function IngenieriaDetalleScreen() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showRechazo, setShowRechazo] = useState(false);
-  const [showInspeccion, setShowInspeccion] = useState(false);
   const [showControlForm, setShowControlForm] = useState(false);
   const [control, setControl] = useState<ControlInspeccion | null>(null);
   const [controlLoading, setControlLoading] = useState(false);
@@ -152,6 +149,9 @@ export default function IngenieriaDetalleScreen() {
           folio: data.folio || "",
           observaciones: data.observaciones || "",
         });
+        if (data.seleccionado_para_inspeccion) {
+          loadControl();
+        }
       } catch (err: any) {
         setError(err?.message || "No se pudo cargar el registro");
       } finally {
@@ -438,17 +438,16 @@ export default function IngenieriaDetalleScreen() {
                 Crear control de inspección
               </Button>
             )}
-            {!controlLoading && !control ? null : (
-              <Button
-                mode="text"
-                compact
-                onPress={loadControl}
-                style={{ marginTop: 6 }}
-                labelStyle={{ fontSize: 12 }}
-              >
-                {control ? "Recargar control" : "Verificar si existe un control"}
-              </Button>
-            )}
+            <Button
+              mode="text"
+              compact
+              onPress={loadControl}
+              style={{ marginTop: 6 }}
+              labelStyle={{ fontSize: 12 }}
+              disabled={controlLoading}
+            >
+              {control ? "Recargar control" : "Verificar si existe un control"}
+            </Button>
           </View>
         ) : null}
 
@@ -490,7 +489,7 @@ export default function IngenieriaDetalleScreen() {
 
       <Modal visible={showRechazo} animationType="slide" transparent>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 16, 36) }]}>
             <Text style={styles.modalTitle}>Motivo del rechazo</Text>
             <Text style={styles.modalSubtitle}>
               Describe por qué se rechaza este registro. El técnico recibirá esta información para corregirlo.
@@ -527,14 +526,17 @@ export default function IngenieriaDetalleScreen() {
       </Modal>
 
       <Modal visible={showEdit} animationType="slide">
-        <SafeAreaView style={styles.editModal}>
-          <View style={styles.editHeader}>
+        <View style={styles.editModal}>
+          <View style={[styles.editHeader, { paddingTop: insets.top + 14 }]}>
             <Text style={styles.editTitle}>Editar campos</Text>
             <TouchableOpacity onPress={() => setShowEdit(false)}>
               <MaterialCommunityIcons name="close" size={24} color="#0f172a" />
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.editScroll} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={[styles.editScroll, { paddingBottom: insets.bottom + 24 }]}
+            keyboardShouldPersistTaps="handled"
+          >
             {(
               [
                 ["codigoBeck", "Código BECK"],
@@ -578,18 +580,21 @@ export default function IngenieriaDetalleScreen() {
               Guardar cambios
             </Button>
           </ScrollView>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       <Modal visible={showControlForm} animationType="slide">
-        <SafeAreaView style={styles.editModal}>
-          <View style={styles.editHeader}>
+        <View style={styles.editModal}>
+          <View style={[styles.editHeader, { paddingTop: insets.top + 14 }]}>
             <Text style={styles.editTitle}>Control de inspección</Text>
             <TouchableOpacity onPress={() => setShowControlForm(false)}>
               <MaterialCommunityIcons name="close" size={24} color="#0f172a" />
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.editScroll} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={[styles.editScroll, { paddingBottom: insets.bottom + 24 }]}
+            keyboardShouldPersistTaps="handled"
+          >
             <TextInput
               label="Fecha (YYYY-MM-DD)"
               value={inspeccionFields.fecha}
@@ -676,7 +681,7 @@ export default function IngenieriaDetalleScreen() {
               Guardar control
             </Button>
           </ScrollView>
-        </SafeAreaView>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -741,7 +746,7 @@ const styles = StyleSheet.create({
   modalBtnCancel: { flex: 1, borderRadius: 12 },
   modalBtnConfirm: { flex: 1, borderRadius: 12 },
   editModal: { flex: 1, backgroundColor: "#f5f7fb" },
-  editHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
+  editHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingBottom: 14, backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
   editTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
   editScroll: { padding: 16, gap: 8 },
   editInput: { marginBottom: 4 },
