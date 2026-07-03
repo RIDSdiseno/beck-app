@@ -1,6 +1,8 @@
 import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 export type EstadoRegistroIngenieria =
   | "pendiente"
@@ -327,4 +329,31 @@ export async function createControlInspeccion(
     throw new Error(result?.error || "No se pudo crear el control de inspección");
   }
   return result.data as ControlInspeccion;
+}
+
+export async function descargarRegistroPdf(registroId: string, codigoBeck?: string | null): Promise<void> {
+  const token = await getToken();
+  const fileName = `${codigoBeck ?? `registro-${registroId.slice(0, 6)}`}.pdf`;
+  const fileUri  = `${FileSystem.cacheDirectory}${fileName}`;
+
+  const result = await FileSystem.downloadAsync(
+    `${API_BASE_URL}/api/ingenieria/registros/${registroId}/pdf`,
+    fileUri,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+
+  if (result.status !== 200) {
+    throw new Error("No se pudo descargar el PDF del registro");
+  }
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (!canShare) {
+    throw new Error("La función de compartir no está disponible en este dispositivo");
+  }
+
+  await Sharing.shareAsync(result.uri, {
+    mimeType: "application/pdf",
+    dialogTitle: `Registro ${fileName}`,
+    UTI: "com.adobe.pdf",
+  });
 }

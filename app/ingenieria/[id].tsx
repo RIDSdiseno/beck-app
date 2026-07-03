@@ -2,6 +2,7 @@ import {
   Conformidad,
   ControlInspeccion,
   createControlInspeccion,
+  descargarRegistroPdf,
   getControlInspeccion,
   getIngenieriaRegistroById,
   marcarInspeccion,
@@ -114,6 +115,7 @@ export default function IngenieriaDetalleScreen() {
   const [showRechazo, setShowRechazo] = useState(false);
   const [showControlForm, setShowControlForm] = useState(false);
   const [fotosNuevas, setFotosNuevas] = useState<FotoLocal[]>([]);
+  const [downloading, setDownloading] = useState(false);
   const [control, setControl] = useState<ControlInspeccion | null>(null);
   const [controlLoading, setControlLoading] = useState(false);
 
@@ -311,6 +313,18 @@ export default function IngenieriaDetalleScreen() {
     }
   };
 
+  const handleDescargarPdf = async () => {
+    if (!registro || !id) return;
+    try {
+      setDownloading(true);
+      await descargarRegistroPdf(id, registro.codigo_beck);
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "No se pudo descargar el PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleToggleInspeccion = async () => {
     if (!registro || !id) return;
     try {
@@ -447,6 +461,21 @@ export default function IngenieriaDetalleScreen() {
               ))}
             </ScrollView>
           </>
+        ) : null}
+
+        {registro.estado === "validado" ? (
+          <View style={styles.pdfRow}>
+            <Button
+              mode="contained"
+              onPress={handleDescargarPdf}
+              loading={downloading}
+              icon="file-pdf-box"
+              style={styles.pdfBtn}
+              labelStyle={{ fontSize: 13 }}
+            >
+              Descargar PDF
+            </Button>
+          </View>
         ) : null}
 
         {(registro.estado === "validado" || registro.estado === "en_revision") ? (
@@ -868,6 +897,8 @@ const styles = StyleSheet.create({
   editScroll: { padding: 16, gap: 8 },
   editInput: { marginBottom: 4 },
   editSaveBtn: { marginTop: 12, borderRadius: 14, backgroundColor: "#3b82f6" },
+  pdfRow: { marginTop: 16, marginBottom: 4 },
+  pdfBtn: { borderRadius: 12, backgroundColor: "#dc2626" },
   fotosHint: { color: "#64748b", fontSize: 12, marginBottom: 8 },
   fotosHintNew: { color: "#0ea5e9", fontSize: 12, marginBottom: 8, fontWeight: "600" },
   fotoThumb: { width: 80, height: 80, borderRadius: 8, marginRight: 8 },
