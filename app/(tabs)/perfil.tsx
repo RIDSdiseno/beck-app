@@ -4,6 +4,7 @@ import {
   getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
+import { getClienteHistorial, RegistroCliente } from "@/services/api/clienteApi";
 import { clearSession, getSession } from "@/services/auth/session";
 import {
   estadoColor,
@@ -32,21 +33,22 @@ type ProfileUser = {
 
 function getRoleLabel(role?: string) {
   switch (role) {
-    case "administrador":
-      return "Administrador";
-    case "terreno":
-      return "Terreno";
-    case "jefeobra":
-      return "Supervisor";
-    case "ingenieria":
-      return "Ingenieria";
-    case "visualizador":
-      return "Visualizador";
-    case "vendedor":
-      return "Vendedor";
-    default:
-      return "Usuario";
+    case "administrador": return "Administrador";
+    case "terreno":       return "Terreno";
+    case "jefeobra":      return "Supervisor";
+    case "ingenieria":    return "Ingeniería";
+    case "cliente":       return "Cliente";
+    case "visualizador":  return "Visualizador";
+    case "vendedor":      return "Vendedor";
+    default:              return "Usuario";
   }
+}
+
+function formatDateShort(value?: string | null) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function getInitials(name?: string) {
@@ -137,6 +139,7 @@ export default function PerfilScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [historialCliente, setHistorialCliente] = useState<RegistroCliente[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [refreshingHistory, setRefreshingHistory] = useState(false);
 
@@ -151,6 +154,13 @@ export default function PerfilScreen() {
           ? data.filter((registro) => registro.estado !== "pendiente")
           : data,
       );
+    }
+
+    if (session.user?.rol === "cliente") {
+      try {
+        const historial = await getClienteHistorial();
+        setHistorialCliente(historial);
+      } catch { /* silenciar */ }
     }
   }, []);
 
@@ -176,7 +186,10 @@ export default function PerfilScreen() {
       setShowHistory(true);
       return;
     }
-
+    if (user?.rol === "cliente") {
+      setShowHistory(true);
+      return;
+    }
     router.push("/historial");
   };
 
@@ -186,11 +199,86 @@ export default function PerfilScreen() {
     setRefreshingHistory(false);
   };
   const isFixedProfileHeader =
-    user?.rol === "terreno" || user?.rol === "jefeobra";
+    user?.rol === "terreno" || user?.rol === "jefeobra" || user?.rol === "cliente";
+
+  // ── Historial cliente ─────────────────────────────────────────────────────────
+  if (showHistory && user?.rol === "cliente") {
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <View style={styles.fixedHeader}>
+          <View style={styles.fixedTopRow}>
+            <View style={styles.fixedBrand}><BrandHeader subtitle="Registros validados · BECK" /></View>
+            <Button mode="text" onPress={() => setShowHistory(false)}>Volver</Button>
+          </View>
+          <Text variant="titleLarge" style={styles.title}>Mis validaciones</Text>
+          <Text style={styles.subtitle}>
+            {historialCliente.length > 0
+              ? `${historialCliente.length} ${historialCliente.length === 1 ? "registro validado" : "registros validados"} con tu firma.`
+              : "Aún no has validado ningún registro."}
+          </Text>
+        </View>
+        <ScrollView
+          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
+          refreshControl={
+            <RefreshControl refreshing={refreshingHistory} onRefresh={async () => { setRefreshingHistory(true); await loadProfile(true); setRefreshingHistory(false); }} />
+          }
+        >
+          {historialCliente.length > 0 ? (
+            historialCliente.map((item) => {
+              const isJunta = item.tipoRegistro === "junta_lineal_espuma";
+              return (
+                <Card key={item.id} style={styles.historyFullCard}>
+                  <Card.Content>
+                    <View style={styles.historyCardHeader}>
+                      <View style={styles.historyTitleGroup}>
+                        <Text style={styles.historyItemTitle}>{item.obraNombre || "Obra sin nombre"}</Text>
+                        <Text style={styles.historyItemMeta}>
+                          {item.obraCodigo || "Sin código"} · {formatDateShort(item.fecha)}
+                        </Text>
+                      </View>
+                      <Chip
+                        compact
+                        style={[styles.historyChip, { backgroundColor: "#2563eb" }]}
+                        textStyle={styles.historyChipText}
+                      >
+                        Firmado
+                      </Chip>
+                    </View>
+                    <Text style={styles.historyItemDetail}>
+                      {item.descripcionMaterial || (isJunta ? "Junta Lineal Espuma" : "Sello Cortafuego")}
+                    </Text>
+                    <View style={styles.historyDetailGrid}>
+                      <Text style={styles.historyDetailItem}>Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
+                      <Text style={styles.historyDetailItem}>Módulo: {item.modulo}</Text>
+                      <Text style={styles.historyDetailItem}>Piso: {item.piso}</Text>
+                      <Text style={styles.historyDetailItem}>Código: {item.codigoBeck || "-"}</Text>
+                      {item.validadoClienteAt ? (
+                        <Text style={styles.historyDetailItem}>Firmado el: {formatDateShort(item.validadoClienteAt)}</Text>
+                      ) : null}
+                    </View>
+                  </Card.Content>
+                </Card>
+              );
+            })
+          ) : (
+            <View style={styles.historyEmptyState}>
+              <Text style={styles.historyEmptyTitle}>Sin validaciones</Text>
+              <Text style={styles.historyItemMeta}>
+                Los registros que valides con tu firma aparecerán aquí.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   if (showHistory && (user?.rol === "jefeobra" || user?.rol === "terreno")) {
     const isFixedHistoryHeader =
-      user?.rol === "terreno" || user?.rol === "jefeobra";
+      user?.rol === "terreno" || user?.rol === "jefeobra" || user?.rol === "cliente";
     const historyTitle =
       user?.rol === "jefeobra"
         ? "Historial de registros actualizados"
@@ -344,13 +432,13 @@ export default function PerfilScreen() {
       {isFixedProfileHeader ? (
         <View style={styles.fixedHeader}>
           <BrandHeader subtitle="Perfil · BECK" />
-          <Text variant="titleLarge" style={styles.title}>
-            Perfil
-          </Text>
+          <Text variant="titleLarge" style={styles.title}>Perfil</Text>
           <Text style={styles.subtitle}>
             {user?.rol === "jefeobra"
-              ? "Sesion activa del Supervisor."
-              : "Sesion activa del Operario."}
+              ? "Sesión activa del Supervisor."
+              : user?.rol === "cliente"
+              ? "Sesión activa del Cliente."
+              : "Sesión activa del Operario."}
           </Text>
         </View>
       ) : null}

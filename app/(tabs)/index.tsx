@@ -182,6 +182,10 @@ export default function DashboardScreen() {
     return <Redirect href="/(tabs)/ingenieria" />;
   }
 
+  if (userRole === "cliente") {
+    return <Redirect href="/(tabs)/cliente" />;
+  }
+
   if (userRole === "jefeobra") {
     const isJunta = activeTipo === "junta_lineal_espuma";
 

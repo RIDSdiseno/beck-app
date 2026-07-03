@@ -104,10 +104,24 @@ export default function TabLayout() {
                 }}
               />
               <Tabs.Screen
+                name="cliente"
+                options={{
+                  title: "Mis Obras",
+                  href: userRole === "cliente" || userRole === "administrador" ? undefined : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="domain"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
                 name="mis-obras"
                 options={{
                   title: "Obras",
-                  href: userRole === "jefeobra" || userRole === "ingenieria" ? null : undefined,
+                  href: userRole === "jefeobra" || userRole === "ingenieria" || userRole === "cliente" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="office-building"
@@ -135,7 +149,7 @@ export default function TabLayout() {
                 name="registros"
                 options={{
                   title: "Registro",
-                  href: userRole === "ingenieria" ? null : undefined,
+                  href: userRole === "ingenieria" || userRole === "cliente" ? null : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="clipboard-text-outline"
@@ -178,7 +192,7 @@ export default function TabLayout() {
                 options={{
                   title: "Historial",
                   href:
-                    userRole === "terreno" || userRole === "jefeobra" || userRole === "ingenieria"
+                    userRole === "terreno" || userRole === "jefeobra" || userRole === "ingenieria" || userRole === "cliente"
                       ? null
                       : undefined,
                   tabBarIcon: ({ color, size }) => (
