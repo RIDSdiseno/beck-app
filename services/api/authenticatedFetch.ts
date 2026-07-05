@@ -30,7 +30,16 @@ export async function authenticatedFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ) {
-  const response = await fetch(input, init);
+  let response: Response;
+
+  try {
+    response = await fetch(input, init);
+  } catch (error) {
+    if (error instanceof TypeError && error.message.toLowerCase().includes("network request failed")) {
+      throw new Error("Sin conexión. Verifica tu red e intenta nuevamente.");
+    }
+    throw error;
+  }
 
   if (response.status === 401) {
     await closeExpiredSession();
