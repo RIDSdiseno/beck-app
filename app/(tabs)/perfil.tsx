@@ -14,10 +14,12 @@ import {
   shouldShowRejectionContext,
 } from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import { router, useFocusEffect } from "expo-router";
+import * as Sharing from "expo-sharing";
 import React, { useCallback, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Avatar, Button, Card, Chip, Text } from "react-native-paper";
+import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Avatar, Button, Card, Chip, Text } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -142,6 +144,8 @@ export default function PerfilScreen() {
   const [historialCliente, setHistorialCliente] = useState<RegistroCliente[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [refreshingHistory, setRefreshingHistory] = useState(false);
+  const [selectedRegistro, setSelectedRegistro] = useState<RegistroCliente | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const loadProfile = useCallback(async (forceRefresh = false) => {
     const session = await getSession();
@@ -181,6 +185,29 @@ export default function PerfilScreen() {
     }
   };
 
+  const handleSharePdf = async (pdfUrl: string, codigoBeck: string | null) => {
+    try {
+      setSharing(true);
+      const safeName = (codigoBeck || "registro").replace(/[^a-zA-Z0-9-_]/g, "_");
+      const localUri = `${FileSystem.cacheDirectory}beck-${safeName}.pdf`;
+      await FileSystem.downloadAsync(pdfUrl, localUri);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("No disponible", "Compartir archivos no está disponible en este dispositivo.");
+        return;
+      }
+      await Sharing.shareAsync(localUri, {
+        mimeType: "application/pdf",
+        dialogTitle: "Compartir PDF firmado",
+        UTI: "com.adobe.pdf",
+      });
+    } catch {
+      Alert.alert("Error", "No se pudo descargar el PDF. Verifica tu conexión e intenta nuevamente.");
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const handleHistoryPress = () => {
     if (user?.rol === "terreno" || user?.rol === "jefeobra") {
       setShowHistory(true);
@@ -204,75 +231,163 @@ export default function PerfilScreen() {
   // ── Historial cliente ─────────────────────────────────────────────────────────
   if (showHistory && user?.rol === "cliente") {
     return (
-      <SafeAreaView
-        style={[styles.container, { paddingTop: insets.top + 2 }]}
-        edges={["top", "left", "right"]}
-      >
-        <View style={styles.fixedHeader}>
-          <View style={styles.fixedTopRow}>
-            <View style={styles.fixedBrand}><BrandHeader subtitle="Registros validados · BECK" /></View>
-            <Button mode="text" onPress={() => setShowHistory(false)}>Volver</Button>
-          </View>
-          <Text variant="titleLarge" style={styles.title}>Mis validaciones</Text>
-          <Text style={styles.subtitle}>
-            {historialCliente.length > 0
-              ? `${historialCliente.length} ${historialCliente.length === 1 ? "registro validado" : "registros validados"} con tu firma.`
-              : "Aún no has validado ningún registro."}
-          </Text>
-        </View>
-        <ScrollView
-          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
-          refreshControl={
-            <RefreshControl refreshing={refreshingHistory} onRefresh={async () => { setRefreshingHistory(true); await loadProfile(true); setRefreshingHistory(false); }} />
-          }
+      <>
+        <SafeAreaView
+          style={[styles.container, { paddingTop: insets.top + 2 }]}
+          edges={["top", "left", "right"]}
         >
-          {historialCliente.length > 0 ? (
-            historialCliente.map((item) => {
-              const isJunta = item.tipoRegistro === "junta_lineal_espuma";
-              return (
-                <Card key={item.id} style={styles.historyFullCard}>
-                  <Card.Content>
-                    <View style={styles.historyCardHeader}>
-                      <View style={styles.historyTitleGroup}>
-                        <Text style={styles.historyItemTitle}>{item.obraNombre || "Obra sin nombre"}</Text>
-                        <Text style={styles.historyItemMeta}>
-                          {item.obraCodigo || "Sin código"} · {formatDateShort(item.fecha)}
+          <View style={styles.fixedHeader}>
+            <View style={styles.fixedTopRow}>
+              <View style={styles.fixedBrand}><BrandHeader subtitle="Registros validados · BECK" /></View>
+              <Button mode="text" onPress={() => setShowHistory(false)}>Volver</Button>
+            </View>
+            <Text variant="titleLarge" style={styles.title}>Mis validaciones</Text>
+            <Text style={styles.subtitle}>
+              {historialCliente.length > 0
+                ? `${historialCliente.length} ${historialCliente.length === 1 ? "registro validado" : "registros validados"} con tu firma.`
+                : "Aún no has validado ningún registro."}
+            </Text>
+          </View>
+          <ScrollView
+            contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
+            refreshControl={
+              <RefreshControl refreshing={refreshingHistory} onRefresh={async () => { setRefreshingHistory(true); await loadProfile(true); setRefreshingHistory(false); }} />
+            }
+          >
+            {historialCliente.length > 0 ? (
+              historialCliente.map((item) => {
+                const isJunta = item.tipoRegistro === "junta_lineal_espuma";
+                const hasPdf = Boolean(item.pdfFirmadoUrl);
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => setSelectedRegistro(item)}
+                    style={({ pressed }) => pressed ? { opacity: 0.82 } : undefined}
+                  >
+                    <Card style={styles.historyFullCard}>
+                      <Card.Content>
+                        <View style={styles.historyCardHeader}>
+                          <View style={styles.historyTitleGroup}>
+                            <Text style={styles.historyItemTitle}>{item.obraNombre || "Obra sin nombre"}</Text>
+                            <Text style={styles.historyItemMeta}>
+                              {item.obraCodigo || "Sin código"} · {formatDateShort(item.fecha)}
+                            </Text>
+                          </View>
+                          <View style={styles.historyChipGroup}>
+                            <Chip
+                              compact
+                              style={[styles.historyChip, { backgroundColor: "#2563eb" }]}
+                              textStyle={styles.historyChipText}
+                            >
+                              Firmado
+                            </Chip>
+                            {hasPdf ? (
+                              <MaterialCommunityIcons name="file-pdf-box" size={22} color="#16a34a" />
+                            ) : null}
+                          </View>
+                        </View>
+                        <Text style={styles.historyItemDetail}>
+                          {item.descripcionMaterial || (isJunta ? "Junta Lineal Espuma" : "Sello Cortafuego")}
                         </Text>
-                      </View>
-                      <Chip
-                        compact
-                        style={[styles.historyChip, { backgroundColor: "#2563eb" }]}
-                        textStyle={styles.historyChipText}
-                      >
-                        Firmado
-                      </Chip>
-                    </View>
-                    <Text style={styles.historyItemDetail}>
-                      {item.descripcionMaterial || (isJunta ? "Junta Lineal Espuma" : "Sello Cortafuego")}
-                    </Text>
-                    <View style={styles.historyDetailGrid}>
-                      <Text style={styles.historyDetailItem}>Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
-                      <Text style={styles.historyDetailItem}>Módulo: {item.modulo}</Text>
-                      <Text style={styles.historyDetailItem}>Piso: {item.piso}</Text>
-                      <Text style={styles.historyDetailItem}>Código: {item.codigoBeck || "-"}</Text>
-                      {item.validadoClienteAt ? (
-                        <Text style={styles.historyDetailItem}>Firmado el: {formatDateShort(item.validadoClienteAt)}</Text>
+                        <View style={styles.historyDetailGrid}>
+                          <Text style={styles.historyDetailItem}>Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
+                          <Text style={styles.historyDetailItem}>Módulo: {item.modulo}</Text>
+                          <Text style={styles.historyDetailItem}>Piso: {item.piso}</Text>
+                          <Text style={styles.historyDetailItem}>Código: {item.codigoBeck || "-"}</Text>
+                          {item.validadoClienteAt ? (
+                            <Text style={styles.historyDetailItem}>Firmado el: {formatDateShort(item.validadoClienteAt)}</Text>
+                          ) : null}
+                        </View>
+                        {hasPdf ? (
+                          <View style={styles.historyPdfHint}>
+                            <MaterialCommunityIcons name="share-variant" size={13} color="#16a34a" />
+                            <Text style={styles.historyPdfHintText}>Toca para ver y compartir el PDF</Text>
+                          </View>
+                        ) : null}
+                      </Card.Content>
+                    </Card>
+                  </Pressable>
+                );
+              })
+            ) : (
+              <View style={styles.historyEmptyState}>
+                <Text style={styles.historyEmptyTitle}>Sin validaciones</Text>
+                <Text style={styles.historyItemMeta}>
+                  Los registros que valides con tu firma aparecerán aquí.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+
+        {/* Modal PDF */}
+        <Modal
+          visible={selectedRegistro !== null}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setSelectedRegistro(null)}
+        >
+          <SafeAreaView style={styles.pdfModalContainer} edges={["top", "bottom"]}>
+            <View style={styles.pdfModalHeader}>
+              <Text style={styles.pdfModalTitle}>PDF Firmado</Text>
+              <TouchableOpacity onPress={() => setSelectedRegistro(null)} style={styles.pdfModalClose}>
+                <MaterialCommunityIcons name="close" size={24} color="#0f172a" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedRegistro ? (
+              <ScrollView contentContainerStyle={styles.pdfModalContent}>
+                <Text style={styles.pdfModalItemTitle}>
+                  {selectedRegistro.obraNombre || "Obra sin nombre"}
+                </Text>
+                <Text style={styles.pdfModalItemMeta}>
+                  {selectedRegistro.obraCodigo || "Sin código"} · {formatDateShort(selectedRegistro.fecha)}
+                </Text>
+                <Text style={styles.pdfModalItemMeta}>
+                  Código BECK: {selectedRegistro.codigoBeck || "-"}
+                </Text>
+
+                {selectedRegistro.pdfFirmadoUrl ? (
+                  <>
+                    <View style={styles.pdfPreviewBox}>
+                      <MaterialCommunityIcons name="file-pdf-box" size={64} color="#16a34a" />
+                      <Text style={styles.pdfPreviewTitle}>PDF firmado disponible</Text>
+                      {selectedRegistro.validadoClienteAt ? (
+                        <Text style={styles.pdfPreviewMeta}>
+                          Firmado el {formatDateShort(selectedRegistro.validadoClienteAt)}
+                        </Text>
                       ) : null}
                     </View>
-                  </Card.Content>
-                </Card>
-              );
-            })
-          ) : (
-            <View style={styles.historyEmptyState}>
-              <Text style={styles.historyEmptyTitle}>Sin validaciones</Text>
-              <Text style={styles.historyItemMeta}>
-                Los registros que valides con tu firma aparecerán aquí.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+
+                    <Button
+                      mode="contained"
+                      icon={sharing ? undefined : "share-variant"}
+                      onPress={() => handleSharePdf(selectedRegistro.pdfFirmadoUrl!, selectedRegistro.codigoBeck)}
+                      loading={sharing}
+                      disabled={sharing}
+                      style={styles.pdfShareBtn}
+                      contentStyle={styles.pdfShareBtnContent}
+                      labelStyle={styles.pdfShareBtnLabel}
+                    >
+                      {sharing ? "Descargando PDF..." : "Compartir PDF"}
+                    </Button>
+
+                    <Text style={styles.pdfShareHint}>
+                      Puedes enviarlo por WhatsApp, correo, iMessage u otras aplicaciones.
+                    </Text>
+                  </>
+                ) : (
+                  <View style={styles.pdfNoUrl}>
+                    <MaterialCommunityIcons name="file-pdf-box" size={48} color="#94a3b8" />
+                    <Text style={styles.pdfNoUrlText}>PDF no disponible para este registro.</Text>
+                    <Text style={styles.pdfNoUrlMeta}>Es posible que el PDF aún no se haya generado.</Text>
+                  </View>
+                )}
+              </ScrollView>
+            ) : null}
+          </SafeAreaView>
+        </Modal>
+      </>
     );
   }
 
@@ -808,5 +923,123 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontWeight: "800",
     marginBottom: 4,
+  },
+
+  // Chips agrupados en historial cliente
+  historyChipGroup: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  historyPdfHint: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 10,
+  },
+  historyPdfHintText: {
+    color: "#16a34a",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  // Modal PDF
+  pdfModalContainer: {
+    backgroundColor: "#f5f7fb",
+    flex: 1,
+  },
+  pdfModalHeader: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderBottomColor: "#e2e8f0",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  pdfModalTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  pdfModalClose: {
+    padding: 4,
+  },
+  pdfModalContent: {
+    padding: 20,
+    paddingBottom: 48,
+  },
+  pdfModalItemTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  pdfModalItemMeta: {
+    color: "#64748b",
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 2,
+  },
+  pdfPreviewBox: {
+    alignItems: "center",
+    backgroundColor: "#f0fdf4",
+    borderColor: "#86efac",
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 24,
+    marginBottom: 20,
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+  },
+  pdfPreviewTitle: {
+    color: "#166534",
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  pdfPreviewMeta: {
+    color: "#4ade80",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  pdfShareBtn: {
+    backgroundColor: "#0f172a",
+    borderRadius: 14,
+  },
+  pdfShareBtnContent: {
+    minHeight: 52,
+  },
+  pdfShareBtnLabel: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  pdfShareHint: {
+    color: "#64748b",
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  pdfNoUrl: {
+    alignItems: "center",
+    gap: 8,
+    marginTop: 40,
+    paddingVertical: 20,
+  },
+  pdfNoUrlText: {
+    color: "#475569",
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  pdfNoUrlMeta: {
+    color: "#94a3b8",
+    fontSize: 13,
+    textAlign: "center",
   },
 });

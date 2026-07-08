@@ -1,6 +1,8 @@
 import { getClienteRegistrosObra, RegistroCliente, validarRegistroCliente } from "@/services/api/clienteApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -44,13 +46,16 @@ function FieldRow({ label, value }: { label: string; value?: string | number | n
 
 type SignatureCanvasProps = {
   onPathChange: (pathData: string, w: number, h: number) => void;
+  onScrollLock?: (locked: boolean) => void;
 };
 
-function SignatureCanvas({ onPathChange }: SignatureCanvasProps) {
+function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
   const [completedPaths, setCompletedPaths] = useState<string[]>([]);
   const [currentPath, setCurrentPath] = useState<string>("");
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const currentPathRef = useRef<string>("");
+  const completedPathsRef = useRef<string[]>([]);
+  const dimensionsRef = useRef({ width: 0, height: 0 });
   const isDrawing = useRef(false);
 
   const notifyChange = useCallback((paths: string[], w: number, h: number) => {
@@ -64,6 +69,7 @@ function SignatureCanvas({ onPathChange }: SignatureCanvasProps) {
     onStartShouldSetPanResponderCapture: () => true,
     onMoveShouldSetPanResponderCapture:  () => true,
     onPanResponderGrant: (evt) => {
+      onScrollLock?.(true);
       const { locationX, locationY } = evt.nativeEvent;
       currentPathRef.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
       setCurrentPath(currentPathRef.current);
@@ -76,24 +82,24 @@ function SignatureCanvas({ onPathChange }: SignatureCanvasProps) {
       setCurrentPath(currentPathRef.current);
     },
     onPanResponderRelease: () => {
+      onScrollLock?.(false);
       if (currentPathRef.current) {
-        setCompletedPaths((prev) => {
-          const newPaths = [...prev, currentPathRef.current];
-          notifyChange(newPaths, dimensions.width, dimensions.height);
-          return newPaths;
-        });
+        const newPaths = [...completedPathsRef.current, currentPathRef.current];
+        completedPathsRef.current = newPaths;
+        setCompletedPaths(newPaths);
+        notifyChange(newPaths, dimensionsRef.current.width, dimensionsRef.current.height);
       }
       currentPathRef.current = "";
       setCurrentPath("");
       isDrawing.current = false;
     },
     onPanResponderTerminate: () => {
+      onScrollLock?.(false);
       if (currentPathRef.current) {
-        setCompletedPaths((prev) => {
-          const newPaths = [...prev, currentPathRef.current];
-          notifyChange(newPaths, dimensions.width, dimensions.height);
-          return newPaths;
-        });
+        const newPaths = [...completedPathsRef.current, currentPathRef.current];
+        completedPathsRef.current = newPaths;
+        setCompletedPaths(newPaths);
+        notifyChange(newPaths, dimensionsRef.current.width, dimensionsRef.current.height);
       }
       currentPathRef.current = "";
       setCurrentPath("");
@@ -102,10 +108,11 @@ function SignatureCanvas({ onPathChange }: SignatureCanvasProps) {
   });
 
   const handleClear = () => {
+    completedPathsRef.current = [];
     setCompletedPaths([]);
     setCurrentPath("");
     currentPathRef.current = "";
-    notifyChange([], dimensions.width, dimensions.height);
+    notifyChange([], dimensionsRef.current.width, dimensionsRef.current.height);
   };
 
   const isEmpty = completedPaths.length === 0 && currentPath === "";
@@ -116,6 +123,7 @@ function SignatureCanvas({ onPathChange }: SignatureCanvasProps) {
         style={styles.signatureBox}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
+          dimensionsRef.current = { width, height };
           setDimensions({ width, height });
         }}
         {...panResponder.panHandlers}
@@ -176,10 +184,13 @@ export default function ClienteRegistroScreen() {
   const [pathData, setPathData] = useState("");
   const [canvasWidth, setCanvasWidth] = useState(0);
   const [canvasHeight, setCanvasHeight] = useState(0);
+  const [scrollLocked, setScrollLocked] = useState(false);
 
   // Validación
   const [validando, setValidando] = useState(false);
   const [validado, setValidado] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   // Galería de fotos
   const [fotoIdx, setFotoIdx] = useState(0);
@@ -233,16 +244,17 @@ export default function ClienteRegistroScreen() {
             setValidando(true);
             setShowSignModal(false);
             try {
-              await validarRegistroCliente(registro.id, {
+              const updated = await validarRegistroCliente(registro.id, {
                 pathData,
                 canvasWidth,
                 canvasHeight,
               });
               setValidado(true);
+              if (updated.pdfFirmadoUrl) setPdfUrl(updated.pdfFirmadoUrl);
               Alert.alert(
                 "¡Registro validado!",
-                "El registro fue firmado y el PDF final fue generado exitosamente.",
-                [{ text: "Volver a obras", onPress: () => router.back() }],
+                "El registro fue firmado y el PDF final fue generado. Puedes compartirlo desde esta pantalla.",
+                [{ text: "Entendido" }],
               );
             } catch (err: any) {
               Alert.alert("Error", err?.message || "No se pudo validar el registro");
@@ -253,6 +265,31 @@ export default function ClienteRegistroScreen() {
         },
       ],
     );
+  };
+
+  const handleSharePdf = async () => {
+    const url = pdfUrl || registro?.pdfFirmadoUrl;
+    if (!url) return;
+    try {
+      setSharing(true);
+      const safeName = (codigoBeck ?? "registro").replace(/[^a-zA-Z0-9-_]/g, "_");
+      const localUri = `${FileSystem.cacheDirectory}beck-${safeName}.pdf`;
+      await FileSystem.downloadAsync(url, localUri);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("No disponible", "Compartir archivos no está disponible en este dispositivo.");
+        return;
+      }
+      await Sharing.shareAsync(localUri, {
+        mimeType: "application/pdf",
+        dialogTitle: "Compartir PDF firmado",
+        UTI: "com.adobe.pdf",
+      });
+    } catch {
+      Alert.alert("Error", "No se pudo descargar el PDF. Verifica tu conexión e intenta nuevamente.");
+    } finally {
+      setSharing(false);
+    }
   };
 
   if (loading) {
@@ -383,11 +420,22 @@ export default function ClienteRegistroScreen() {
           ) : null}
 
           {/* PDF firmado disponible */}
-          {(registro.validadoCliente || validado) && registro.pdfFirmadoUrl ? (
-            <View style={styles.pdfBox}>
+          {(registro.validadoCliente || validado) && (pdfUrl || registro.pdfFirmadoUrl) ? (
+            <TouchableOpacity
+              style={styles.pdfBox}
+              onPress={handleSharePdf}
+              disabled={sharing}
+              activeOpacity={0.75}
+            >
               <MaterialCommunityIcons name="file-pdf-box" size={22} color="#16a34a" />
-              <Text style={styles.pdfText}>PDF firmado generado y disponible.</Text>
-            </View>
+              <Text style={styles.pdfText}>
+                {sharing ? "Descargando PDF..." : "PDF firmado listo · toca para compartir"}
+              </Text>
+              {sharing
+                ? <ActivityIndicator size="small" color="#16a34a" />
+                : <MaterialCommunityIcons name="share-variant" size={20} color="#16a34a" />
+              }
+            </TouchableOpacity>
           ) : null}
 
         </ScrollView>
@@ -426,7 +474,11 @@ export default function ClienteRegistroScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalContent}>
+          <ScrollView
+            contentContainerStyle={styles.modalContent}
+            scrollEnabled={!scrollLocked}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.modalSubtitle}>
               Dibuja tu firma en el recuadro con el dedo para validar el registro{" "}
               <Text style={{ fontWeight: "900" }}>{codigoBeck}</Text>.
@@ -443,7 +495,10 @@ export default function ClienteRegistroScreen() {
               </View>
             </View>
 
-            <SignatureCanvas onPathChange={handleSignatureChange} />
+            <SignatureCanvas
+              onPathChange={handleSignatureChange}
+              onScrollLock={setScrollLocked}
+            />
 
             <Button
               mode="contained"
