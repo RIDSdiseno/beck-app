@@ -124,6 +124,7 @@ export default function IngenieriaDetalleScreen() {
   const [editFields, setEditFields] = useState({
     codigoBeck: "",
     itemizadoBeck: "",
+    itemizadoMandante: "",
     recinto: "",
     modulo: "",
     piso: "",
@@ -134,6 +135,8 @@ export default function IngenieriaDetalleScreen() {
     nombreSellador: "",
     holgura: "",
     accesibilidad: "",
+    aislacion: "",
+    reparacionTabique: "",
     folio: "",
     observaciones: "",
   });
@@ -159,6 +162,7 @@ export default function IngenieriaDetalleScreen() {
         setEditFields({
           codigoBeck: data.codigo_beck || "",
           itemizadoBeck: data.itemizado_beck || "",
+          itemizadoMandante: data.itemizado_mandante || "",
           recinto: data.recinto || "",
           modulo: data.modulo || "",
           piso: data.piso || "",
@@ -169,6 +173,8 @@ export default function IngenieriaDetalleScreen() {
           nombreSellador: data.nombre_sellador || "",
           holgura: String(data.holgura ?? ""),
           accesibilidad: String(data.accesibilidad ?? ""),
+          aislacion: String(data.aislacion ?? ""),
+          reparacionTabique: String(data.reparacion_tabique ?? ""),
           folio: data.folio || "",
           observaciones: data.observaciones || "",
         });
@@ -284,6 +290,7 @@ export default function IngenieriaDetalleScreen() {
       const updated = await updateRegistroIngenieria(id, {
         codigoBeck: editFields.codigoBeck || undefined,
         itemizadoBeck: editFields.itemizadoBeck || undefined,
+        itemizadoMandante: editFields.itemizadoMandante || undefined,
         recinto: editFields.recinto || undefined,
         modulo: editFields.modulo || undefined,
         piso: editFields.piso || undefined,
@@ -294,6 +301,8 @@ export default function IngenieriaDetalleScreen() {
         nombreSellador: editFields.nombreSellador || undefined,
         holgura: editFields.holgura ? Number(editFields.holgura.replace(",", ".")) : undefined,
         accesibilidad: editFields.accesibilidad ? Number(editFields.accesibilidad) : undefined,
+        aislacion: editFields.aislacion ? Number(editFields.aislacion.replace(",", ".")) : undefined,
+        reparacionTabique: editFields.reparacionTabique ? Number(editFields.reparacionTabique.replace(",", ".")) : undefined,
         folio: editFields.folio || undefined,
         observaciones: editFields.observaciones || undefined,
       });
@@ -403,54 +412,20 @@ export default function IngenieriaDetalleScreen() {
         <InfoRow label="Código" value={registro.obra?.codigo} />
         <InfoRow label="Cliente" value={registro.obra?.cliente} />
 
-        <SectionTitle title="UBICACIÓN" />
-        <InfoRow label="Piso" value={registro.piso} />
-        <InfoRow label="Módulo / Edificio" value={registro.modulo} />
-        <InfoRow label="Recinto" value={registro.recinto} />
-        <InfoRow label="Eje numérico" value={registro.eje_numerico} />
-        <InfoRow label="Eje alfabético" value={registro.eje_alfabetico} />
-
-        <SectionTitle title="TÉCNICO" />
-        <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} />
-        <InfoRow label="Nº Sello" value={registro.numero_sello} />
-        <InfoRow label="Folio" value={registro.folio} />
+        <SectionTitle title="REGISTRO" />
         <InfoRow label="Código BECK" value={registro.codigo_beck} />
         <InfoRow label="Itemizado BECK" value={registro.itemizado_beck} />
-        <InfoRow label="Material" value={registro.descripcion_material} />
+        {registro.itemizado_mandante ? (
+          <InfoRow label="Itemizado Mandante" value={registro.itemizado_mandante} />
+        ) : null}
         <InfoRow label="Fecha ejecución" value={formatShortDate(registro.fecha)} />
+        {registro.dia_semana ? (
+          <InfoRow label="Día" value={registro.dia_semana} />
+        ) : null}
+        <InfoRow label="Piso" value={registro.piso} />
+        <InfoRow label="Eje alfabético" value={registro.eje_alfabetico} />
+        <InfoRow label="Eje numérico" value={registro.eje_numerico} />
         <InfoRow label="Sellador" value={registro.nombre_sellador} />
-        <InfoRow label="Técnico creador" value={registro.usuario?.nombre} />
-
-        <SectionTitle title="CANTIDADES" />
-        <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} />
-        <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} />
-        <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} />
-        <InfoRow label="Sellos con factor" value={formatDecimal(registro.cantidad_sellos_con_factores)} />
-        <InfoRow label="Accesibilidad" value={registro.accesibilidad} />
-        <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} />
-        <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} />
-        <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} />
-        <InfoRow label="Cantidad final" value={formatDecimal(registro.cantidad_final)} />
-        {registro.metros_lineales ? (
-          <InfoRow label="Metros lineales" value={`${registro.metros_lineales} m`} />
-        ) : null}
-
-        {registro.observaciones ? (
-          <>
-            <SectionTitle title="OBSERVACIONES" />
-            <Text style={styles.observacionesText}>{registro.observaciones}</Text>
-          </>
-        ) : null}
-
-        {registro.motivo_rechazo ? (
-          <>
-            <SectionTitle title="MOTIVO DE RECHAZO" />
-            <View style={styles.rechazoBadge}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#dc2626" />
-              <Text style={styles.rechazoText}>{registro.motivo_rechazo}</Text>
-            </View>
-          </>
-        ) : null}
 
         {(registro.fotos?.length ?? 0) > 0 ? (
           <>
@@ -460,6 +435,35 @@ export default function IngenieriaDetalleScreen() {
                 <Image key={foto.id} source={{ uri: foto.url }} style={styles.foto} />
               ))}
             </ScrollView>
+          </>
+        ) : null}
+
+        <InfoRow label="Recinto" value={registro.recinto} />
+        <InfoRow label="Módulo / Edificio" value={registro.modulo} />
+        <InfoRow label="Nº Sello" value={registro.numero_sello} />
+        <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} />
+        <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} />
+        <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} />
+        <InfoRow label="Accesibilidad" value={registro.accesibilidad} />
+        <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} />
+        <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} />
+        <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} />
+        {registro.observaciones ? (
+          <InfoRow label="Observaciones" value={registro.observaciones} />
+        ) : null}
+        <InfoRow label="Folio" value={registro.folio} />
+        <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} />
+        {registro.metros_lineales ? (
+          <InfoRow label="Longitud (m)" value={`${registro.metros_lineales} m`} />
+        ) : null}
+
+        {registro.motivo_rechazo ? (
+          <>
+            <SectionTitle title="MOTIVO DE RECHAZO" />
+            <View style={styles.rechazoBadge}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#dc2626" />
+              <Text style={styles.rechazoText}>{registro.motivo_rechazo}</Text>
+            </View>
           </>
         ) : null}
 
@@ -627,40 +631,17 @@ export default function IngenieriaDetalleScreen() {
             contentContainerStyle={[styles.editScroll, { paddingBottom: insets.bottom + 24 }]}
             keyboardShouldPersistTaps="handled"
           >
-            {(
-              [
-                ["codigoBeck", "Código BECK"],
-                ["itemizadoBeck", "Itemizado BECK"],
-                ["recinto", "Recinto"],
-                ["modulo", "Módulo / Edificio"],
-                ["piso", "Piso"],
-                ["ejeNumerico", "Eje numérico"],
-                ["ejeAlfabetico", "Eje alfabético"],
-                ["numeroSello", "Nº Sello"],
-                ["cantidadSellos", "Cantidad de sellos"],
-                ["nombreSellador", "Nombre sellador"],
-                ["holgura", "Holgura (cm)"],
-                ["accesibilidad", "Accesibilidad"],
-                ["folio", "Folio"],
-                ["observaciones", "Observaciones"],
-              ] as [keyof typeof editFields, string][]
-            ).map(([key, label]) => (
-              <TextInput
-                key={key}
-                label={label}
-                value={editFields[key]}
-                onChangeText={(v) => setEditFields((prev) => ({ ...prev, [key]: v }))}
-                mode="outlined"
-                style={styles.editInput}
-                multiline={key === "observaciones"}
-                numberOfLines={key === "observaciones" ? 3 : 1}
-                keyboardType={
-                  ["cantidadSellos", "holgura", "accesibilidad"].includes(key)
-                    ? "decimal-pad"
-                    : "default"
-                }
-              />
-            ))}
+            <TextInput label="Código BECK" value={editFields.codigoBeck} onChangeText={(v) => setEditFields((p) => ({ ...p, codigoBeck: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Itemizado BECK" value={editFields.itemizadoBeck} onChangeText={(v) => setEditFields((p) => ({ ...p, itemizadoBeck: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Itemizado Mandante" value={editFields.itemizadoMandante} onChangeText={(v) => setEditFields((p) => ({ ...p, itemizadoMandante: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Fecha ejecución" value={formatShortDate(registro.fecha)} mode="outlined" style={styles.editInput} editable={false} />
+            {registro.dia_semana ? (
+              <TextInput label="Día" value={registro.dia_semana} mode="outlined" style={styles.editInput} editable={false} />
+            ) : null}
+            <TextInput label="Piso" value={editFields.piso} onChangeText={(v) => setEditFields((p) => ({ ...p, piso: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Eje alfabético" value={editFields.ejeAlfabetico} onChangeText={(v) => setEditFields((p) => ({ ...p, ejeAlfabetico: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Eje numérico" value={editFields.ejeNumerico} onChangeText={(v) => setEditFields((p) => ({ ...p, ejeNumerico: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Nombre sellador" value={editFields.nombreSellador} onChangeText={(v) => setEditFields((p) => ({ ...p, nombreSellador: v }))} mode="outlined" style={styles.editInput} />
             <Text style={styles.paramsTitle}>Fotografías</Text>
             {(registro.fotos?.length ?? 0) > 0 ? (
               <>
@@ -716,6 +697,20 @@ export default function IngenieriaDetalleScreen() {
                 Cámara
               </Button>
             </View>
+
+            <TextInput label="Recinto" value={editFields.recinto} onChangeText={(v) => setEditFields((p) => ({ ...p, recinto: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Módulo / Edificio" value={editFields.modulo} onChangeText={(v) => setEditFields((p) => ({ ...p, modulo: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Nº Sello" value={editFields.numeroSello} onChangeText={(v) => setEditFields((p) => ({ ...p, numeroSello: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Cantidad de sellos" value={editFields.cantidadSellos} onChangeText={(v) => setEditFields((p) => ({ ...p, cantidadSellos: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label="Holgura (cm)" value={editFields.holgura} onChangeText={(v) => setEditFields((p) => ({ ...p, holgura: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} mode="outlined" style={styles.editInput} editable={false} />
+            <TextInput label="Accesibilidad" value={editFields.accesibilidad} onChangeText={(v) => setEditFields((p) => ({ ...p, accesibilidad: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label="Aislación" value={editFields.aislacion} onChangeText={(v) => setEditFields((p) => ({ ...p, aislacion: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} mode="outlined" style={styles.editInput} editable={false} />
+            <TextInput label="Reparación de tabique" value={editFields.reparacionTabique} onChangeText={(v) => setEditFields((p) => ({ ...p, reparacionTabique: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label="Observaciones" value={editFields.observaciones} onChangeText={(v) => setEditFields((p) => ({ ...p, observaciones: v }))} mode="outlined" style={styles.editInput} multiline numberOfLines={3} />
+            <TextInput label="Folio" value={editFields.folio} onChangeText={(v) => setEditFields((p) => ({ ...p, folio: v }))} mode="outlined" style={styles.editInput} />
+            <TextInput label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} mode="outlined" style={styles.editInput} editable={false} />
 
             <Button
               mode="contained"

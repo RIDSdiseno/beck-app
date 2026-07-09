@@ -335,15 +335,6 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
-function formatEjeAlfabetico(value: string) {
-  const letras = value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
-  return letras.length > 1 ? `${letras[0]}-${letras[1]}` : letras;
-}
-
-function formatEjeNumerico(value: string) {
-  const numeros = onlyDigits(value).slice(0, 2);
-  return numeros.length > 1 ? `${numeros[0]}-${numeros[1]}` : numeros;
-}
 
 function toApiNumber(value: string) {
   return Number(value.replace(",", "."));
@@ -1010,19 +1001,6 @@ export default function RegistrosScreen({
       (campoConfiguradoVisible("nombreSellador") && !nombreSellador.trim());
 
     if (commonMissing) return "Debes completar todos los campos obligatorios.";
-    if (
-      campoConfiguradoVisible("ejeAlfabetico") &&
-      !/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)
-    ) {
-      return "El Eje Alfabético debe tener el formato F-G.";
-    }
-    if (
-      campoConfiguradoVisible("ejeNumerico") &&
-      !/^\d-\d$/.test(ejeNumerico)
-    ) {
-      return "El Eje Numérico debe tener el formato 8-9.";
-    }
-
     if (isJuntaLineal) {
       if (!metrosLineales.trim()) {
         return "Debes ingresar la longitud en metros.";
@@ -1064,19 +1042,6 @@ export default function RegistrosScreen({
       (campoConfiguradoVisible("nombreSellador") && !nombreSellador.trim());
 
     if (commonMissing) return "Debes completar todos los campos obligatorios.";
-    if (
-      campoConfiguradoVisible("ejeAlfabetico") &&
-      !/^[A-Z]-[A-Z]$/.test(ejeAlfabetico)
-    ) {
-      return "El Eje Alfabético debe tener el formato F-G.";
-    }
-    if (
-      campoConfiguradoVisible("ejeNumerico") &&
-      !/^\d-\d$/.test(ejeNumerico)
-    ) {
-      return "El Eje Numérico debe tener el formato 8-9.";
-    }
-
     if (isJuntaLineal) {
       if (!metrosLineales.trim()) return "Debes ingresar la longitud en metros.";
       if (!Number.isFinite(toApiNumber(metrosLineales)) || toApiNumber(metrosLineales) <= 0) {
@@ -1416,97 +1381,6 @@ export default function RegistrosScreen({
     }
   };
 
-  const renderCommonFields = () => (
-    <>
-      {campoConfiguradoVisible("fechaEjecucionSello") ? (
-        <Pressable onPress={() => setCalendarVisible(true)}>
-          <TextInput
-            label="Fecha ejecución de sello"
-            value={fecha}
-            mode="outlined"
-            editable={false}
-            pointerEvents="none"
-            right={<TextInput.Icon icon="calendar" />}
-            style={styles.input}
-          />
-        </Pressable>
-      ) : null}
-
-      {campoConfiguradoVisible("diaSemana") ? (
-        <TextInput
-          label="Día"
-          value={getDiaSemana(fecha)}
-          mode="outlined"
-          editable={false}
-          style={styles.input}
-        />
-      ) : null}
-
-      {campoConfiguradoVisible("recinto") ? (
-        <TextInput
-          label="Recinto"
-          value={recinto}
-          onChangeText={setRecinto}
-          mode="outlined"
-          style={styles.input}
-        />
-      ) : null}
-
-      {campoConfiguradoVisible("modulo") ? (
-        <TextInput
-          label="Módulo o edificio"
-          value={modulo}
-          onChangeText={setModulo}
-          mode="outlined"
-          style={styles.input}
-        />
-      ) : null}
-
-      {campoConfiguradoVisible("piso") ? (
-        <TextInput
-          label="Piso"
-          value={piso}
-          onChangeText={(value) => setPiso(onlyDigits(value))}
-          mode="outlined"
-          keyboardType="numeric"
-          style={styles.input}
-        />
-      ) : null}
-
-      {campoConfiguradoVisible("nombreSellador") ? (
-        <TextInput
-          label="Nombre sellador"
-          value={nombreSellador}
-          mode="outlined"
-          editable={false}
-          style={styles.input}
-        />
-      ) : null}
-
-      {campoConfiguradoVisible("ejeNumerico") ? (
-        <TextInput
-          label="Eje Numérico"
-          value={ejeNumerico}
-          onChangeText={(value) => setEjeNumerico(formatEjeNumerico(value))}
-          mode="outlined"
-          keyboardType="numeric"
-          style={styles.input}
-        />
-      ) : null}
-
-      {campoConfiguradoVisible("ejeAlfabetico") ? (
-        <TextInput
-          label="Eje Alfabético"
-          value={ejeAlfabetico}
-          onChangeText={(value) => setEjeAlfabetico(formatEjeAlfabetico(value))}
-          mode="outlined"
-          autoCapitalize="characters"
-          style={styles.input}
-        />
-      ) : null}
-    </>
-  );
-
   const getPayloadCommonFields = () => ({
     fecha,
     recinto: campoConfiguradoVisible("recinto") ? recinto : "No aplica",
@@ -1566,7 +1440,7 @@ export default function RegistrosScreen({
 
     return (
       <>
-      <Text style={styles.fieldLabel}>Itemizado BECK</Text>
+      <Text style={styles.fieldLabel}>Itemizado Básico</Text>
       <Menu
         visible={itemizadoMenuVisible}
         onDismiss={() => setItemizadoMenuVisible(false)}
@@ -1599,7 +1473,7 @@ export default function RegistrosScreen({
 
       {otroItemizado ? (
         <TextInput
-          label="Ingresar Itemizado BECK"
+          label="Ingresar Itemizado Básico"
           value={itemizadoBeck}
           onChangeText={setItemizadoBeck}
           mode="outlined"
@@ -1633,7 +1507,7 @@ export default function RegistrosScreen({
         <Pressable style={styles.itemizadoModal}>
           <View style={styles.modalHeaderRow}>
             <View style={styles.recordInfo}>
-              <Text style={styles.modalTitle}>Seleccionar Itemizado BECK</Text>
+              <Text style={styles.modalTitle}>Seleccionar Itemizado Básico</Text>
               <Text style={styles.modalSubtitle}>
                 Solo se muestran opciones visibles del catálogo.
               </Text>
@@ -2003,27 +1877,149 @@ export default function RegistrosScreen({
                   </>
                 ) : null}
 
-                {renderCommonFields()}
-
-                {isJuntaLineal ? (
-                  campoConfiguradoVisible("metrosLineales") ? (
-                    <TextInput
-                      label="Longitud (m)"
-                      value={metrosLineales}
-                      onChangeText={setMetrosLineales}
+                {!isJuntaLineal && campoConfiguradoVisible("itemizadoBeck") ? (
+                  <>
+                    <Text style={styles.fieldLabel}>Itemizado Beck</Text>
+                    <Button
                       mode="outlined"
-                      keyboardType="decimal-pad"
+                      onPress={openItemizadoSelector}
+                      style={styles.dropdownButton}
+                      contentStyle={styles.dropdownContent}
+                    >
+                      {itemizadoBeck || "Seleccionar itemizado"}
+                    </Button>
+                  </>
+                ) : null}
+
+                {!isJuntaLineal && campoConfiguradoVisible("codigoBeck") ? (
+                  <TextInput
+                    label="Código BECK"
+                    value={itemizadoCodigoBeck}
+                    mode="outlined"
+                    editable={false}
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {!isJuntaLineal && campoConfiguradoVisible("itemizadoMandante") ? (
+                  <TextInput
+                    label="Itemizado Mandante"
+                    value={itemizadoSacyr}
+                    onChangeText={setItemizadoSacyr}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("fechaEjecucionSello") ? (
+                  <Pressable onPress={() => setCalendarVisible(true)}>
+                    <TextInput
+                      label="Fecha ejecución de sello"
+                      value={fecha}
+                      mode="outlined"
+                      editable={false}
+                      pointerEvents="none"
+                      right={<TextInput.Icon icon="calendar" />}
                       style={styles.input}
                     />
-                  ) : null
-                ) : (
+                  </Pressable>
+                ) : null}
+
+                {campoConfiguradoVisible("diaSemana") ? (
+                  <TextInput
+                    label="Día"
+                    value={getDiaSemana(fecha)}
+                    mode="outlined"
+                    editable={false}
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("piso") ? (
+                  <TextInput
+                    label="Piso"
+                    value={piso}
+                    onChangeText={(value) => setPiso(onlyDigits(value))}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("ejeAlfabetico") ? (
+                  <TextInput
+                    label="Eje Alfabético"
+                    value={ejeAlfabetico}
+                    onChangeText={setEjeAlfabetico}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("ejeNumerico") ? (
+                  <TextInput
+                    label="Eje Numérico"
+                    value={ejeNumerico}
+                    onChangeText={setEjeNumerico}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("nombreSellador") ? (
+                  <TextInput
+                    label="Nombre sellador"
+                    value={nombreSellador}
+                    mode="outlined"
+                    editable={false}
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {isJuntaLineal && campoConfiguradoVisible("metrosLineales") ? (
+                  <TextInput
+                    label="Longitud (m)"
+                    value={metrosLineales}
+                    onChangeText={setMetrosLineales}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {renderFotos({
+                  existingFotos: getRegistroFotos(editingRegistro),
+                  replacementMode: true,
+                })}
+
+                {campoConfiguradoVisible("recinto") ? (
+                  <TextInput
+                    label="Recinto"
+                    value={recinto}
+                    onChangeText={setRecinto}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("modulo") ? (
+                  <TextInput
+                    label="Módulo o edificio"
+                    value={modulo}
+                    onChangeText={setModulo}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {!isJuntaLineal ? (
                   <>
-                    {campoConfiguradoVisible("codigoBeck") ? (
+                    {campoConfiguradoVisible("numeroSello") ? (
                       <TextInput
-                        label="Código BECK"
-                        value={itemizadoCodigoBeck}
+                        label="N° del sello"
+                        value={numeroSello}
+                        onChangeText={setNumeroSello}
                         mode="outlined"
-                        editable={false}
                         style={styles.input}
                       />
                     ) : null}
@@ -2037,36 +2033,14 @@ export default function RegistrosScreen({
                         style={styles.input}
                       />
                     ) : null}
-                    {campoConfiguradoVisible("itemizadoBeck") ? (
-                      <>
-                        <Text style={styles.fieldLabel}>Itemizado BECK</Text>
-                        <Button
-                          mode="outlined"
-                          onPress={openItemizadoSelector}
-                          style={styles.dropdownButton}
-                          contentStyle={styles.dropdownContent}
-                        >
-                          {itemizadoBeck || "Seleccionar itemizado"}
-                        </Button>
-                      </>
-                    ) : null}
-                    {campoConfiguradoVisible("numeroSello") ? (
-                      <TextInput
-                        label="N° del sello"
-                        value={numeroSello}
-                        onChangeText={setNumeroSello}
-                        mode="outlined"
-                        style={styles.input}
-                      />
-                    ) : null}
                     {campoConfiguradoVisible("holgura")
                       ? renderMenuField(
-                      "Holgura (cm)",
-                      holgura,
-                      holguraMenuVisible,
-                      setHolguraMenuVisible,
-                      setHolgura,
-                      HOLGURA_OPTIONS,
+                          "Holgura (cm)",
+                          holgura,
+                          holguraMenuVisible,
+                          setHolguraMenuVisible,
+                          setHolgura,
+                          HOLGURA_OPTIONS,
                         )
                       : null}
                     {campoConfiguradoVisible("factorPorHolguras") ? (
@@ -2143,15 +2117,6 @@ export default function RegistrosScreen({
                         style={styles.input}
                       />
                     ) : null}
-                    {campoConfiguradoVisible("itemizadoMandante") ? (
-                      <TextInput
-                        label="Itemizado Mandante"
-                        value={itemizadoSacyr}
-                        onChangeText={setItemizadoSacyr}
-                        mode="outlined"
-                        style={styles.input}
-                      />
-                    ) : null}
                     {campoConfiguradoVisible("folio") ? (
                       <TextInput
                         label="Folio"
@@ -2162,7 +2127,7 @@ export default function RegistrosScreen({
                       />
                     ) : null}
                   </>
-                )}
+                ) : null}
 
                 {campoConfiguradoVisible("observaciones") ? (
                   <TextInput
@@ -2175,11 +2140,6 @@ export default function RegistrosScreen({
                     style={[styles.input, styles.observacionesInput]}
                   />
                 ) : null}
-
-                {renderFotos({
-                  existingFotos: getRegistroFotos(editingRegistro),
-                  replacementMode: true,
-                })}
 
                 <Button
                   mode="contained"
@@ -2614,21 +2574,128 @@ export default function RegistrosScreen({
                 </>
               ) : null}
 
-              {renderCommonFields()}
+              {!isJuntaLineal ? renderItemizadoTerreno() : null}
 
-              {isJuntaLineal ? (
-                campoConfiguradoVisible("metrosLineales") ? (
+              {campoConfiguradoVisible("fechaEjecucionSello") ? (
+                <Pressable onPress={() => setCalendarVisible(true)}>
                   <TextInput
-                    label="Longitud (m)"
-                    value={metrosLineales}
-                    onChangeText={setMetrosLineales}
+                    label="Fecha ejecución de sello"
+                    value={fecha}
                     mode="outlined"
-                    keyboardType="decimal-pad"
+                    editable={false}
+                    pointerEvents="none"
+                    right={<TextInput.Icon icon="calendar" />}
                     style={styles.input}
                   />
-                ) : null
+                </Pressable>
+              ) : null}
+
+              {campoConfiguradoVisible("diaSemana") ? (
+                <TextInput
+                  label="Día"
+                  value={getDiaSemana(fecha)}
+                  mode="outlined"
+                  editable={false}
+                  style={styles.input}
+                />
+              ) : null}
+
+              {campoConfiguradoVisible("piso") ? (
+                <TextInput
+                  label="Piso"
+                  value={piso}
+                  onChangeText={(value) => setPiso(onlyDigits(value))}
+                  mode="outlined"
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+              ) : null}
+
+              {campoConfiguradoVisible("ejeAlfabetico") ? (
+                <TextInput
+                  label="Eje Alfabético"
+                  value={ejeAlfabetico}
+                  onChangeText={setEjeAlfabetico}
+                  mode="outlined"
+                  style={styles.input}
+                />
+              ) : null}
+
+              {campoConfiguradoVisible("ejeNumerico") ? (
+                <TextInput
+                  label="Eje Numérico"
+                  value={ejeNumerico}
+                  onChangeText={setEjeNumerico}
+                  mode="outlined"
+                  style={styles.input}
+                />
+              ) : null}
+
+              {campoConfiguradoVisible("nombreSellador") ? (
+                <TextInput
+                  label="Nombre sellador"
+                  value={nombreSellador}
+                  mode="outlined"
+                  editable={false}
+                  style={styles.input}
+                />
+              ) : null}
+
+              {isJuntaLineal ? (
+                <>
+                  {campoConfiguradoVisible("metrosLineales") ? (
+                    <TextInput
+                      label="Longitud (m)"
+                      value={metrosLineales}
+                      onChangeText={setMetrosLineales}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                    />
+                  ) : null}
+                  {campoConfiguradoVisible("observaciones") ? (
+                    <TextInput
+                      label="Observaciones"
+                      value={observaciones}
+                      onChangeText={setObservaciones}
+                      mode="outlined"
+                      multiline
+                      numberOfLines={6}
+                      style={[styles.input, styles.observacionesInput]}
+                    />
+                  ) : null}
+                  {renderFotos()}
+                </>
               ) : (
                 <>
+                  {renderFotos()}
+                  {campoConfiguradoVisible("recinto") ? (
+                    <TextInput
+                      label="Recinto"
+                      value={recinto}
+                      onChangeText={setRecinto}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                  ) : null}
+                  {campoConfiguradoVisible("modulo") ? (
+                    <TextInput
+                      label="Módulo o edificio"
+                      value={modulo}
+                      onChangeText={setModulo}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                  ) : null}
+                  {campoConfiguradoVisible("numeroSello") ? (
+                    <TextInput
+                      label="N° del sello"
+                      value={numeroSello}
+                      onChangeText={setNumeroSello}
+                      mode="outlined"
+                      style={styles.input}
+                    />
+                  ) : null}
                   {campoConfiguradoVisible("cantidadSellos") ? (
                     <TextInput
                       label="Cantidad de Sellos"
@@ -2636,16 +2703,6 @@ export default function RegistrosScreen({
                       onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
                       mode="outlined"
                       keyboardType="numeric"
-                      style={styles.input}
-                    />
-                  ) : null}
-                  {renderItemizadoTerreno()}
-                  {campoConfiguradoVisible("numeroSello") ? (
-                    <TextInput
-                      label="N° del sello"
-                      value={numeroSello}
-                      onChangeText={setNumeroSello}
-                      mode="outlined"
                       style={styles.input}
                     />
                   ) : null}
@@ -2689,22 +2746,19 @@ export default function RegistrosScreen({
                       APLICA_OPTIONS,
                     )
                   ) : null}
+                  {campoConfiguradoVisible("observaciones") ? (
+                    <TextInput
+                      label="Observaciones"
+                      value={observaciones}
+                      onChangeText={setObservaciones}
+                      mode="outlined"
+                      multiline
+                      numberOfLines={6}
+                      style={[styles.input, styles.observacionesInput]}
+                    />
+                  ) : null}
                 </>
               )}
-
-              {campoConfiguradoVisible("observaciones") ? (
-                <TextInput
-                  label="Observaciones"
-                  value={observaciones}
-                  onChangeText={setObservaciones}
-                  mode="outlined"
-                  multiline
-                  numberOfLines={6}
-                  style={[styles.input, styles.observacionesInput]}
-                />
-              ) : null}
-
-              {renderFotos()}
 
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               {success ? <Text style={styles.successText}>{success}</Text> : null}
@@ -2810,7 +2864,72 @@ export default function RegistrosScreen({
                   </>
                 ) : null}
 
-                {renderCommonFields()}
+                {!isJuntaLineal ? renderItemizadoTerreno() : null}
+
+                {campoConfiguradoVisible("fechaEjecucionSello") ? (
+                  <Pressable onPress={() => setCalendarVisible(true)}>
+                    <TextInput
+                      label="Fecha ejecución de sello"
+                      value={fecha}
+                      mode="outlined"
+                      editable={false}
+                      pointerEvents="none"
+                      right={<TextInput.Icon icon="calendar" />}
+                      style={styles.input}
+                    />
+                  </Pressable>
+                ) : null}
+
+                {campoConfiguradoVisible("diaSemana") ? (
+                  <TextInput
+                    label="Día"
+                    value={getDiaSemana(fecha)}
+                    mode="outlined"
+                    editable={false}
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("piso") ? (
+                  <TextInput
+                    label="Piso"
+                    value={piso}
+                    onChangeText={(value) => setPiso(onlyDigits(value))}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("ejeAlfabetico") ? (
+                  <TextInput
+                    label="Eje Alfabético"
+                    value={ejeAlfabetico}
+                    onChangeText={setEjeAlfabetico}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("ejeNumerico") ? (
+                  <TextInput
+                    label="Eje Numérico"
+                    value={ejeNumerico}
+                    onChangeText={setEjeNumerico}
+                    mode="outlined"
+                    style={styles.input}
+                  />
+                ) : null}
+
+                {campoConfiguradoVisible("nombreSellador") ? (
+                  <TextInput
+                    label="Nombre sellador"
+                    value={nombreSellador}
+                    mode="outlined"
+                    editable={false}
+                    style={styles.input}
+                  />
+                ) : null}
 
                 {isJuntaLineal ? (
                   campoConfiguradoVisible("metrosLineales") ? (
@@ -2823,24 +2942,54 @@ export default function RegistrosScreen({
                         keyboardType="decimal-pad"
                         style={styles.input}
                       />
-
                       {campoConfiguradoVisible("observaciones") ? (
                         <TextInput
                           label="Observaciones"
                           value={observaciones}
                           onChangeText={setObservaciones}
                           mode="outlined"
-                        multiline
-                        numberOfLines={6}
-                        style={[styles.input, styles.observacionesInput]}
-                      />
-                    ) : null}
-
-                    {renderFotos()}
+                          multiline
+                          numberOfLines={6}
+                          style={[styles.input, styles.observacionesInput]}
+                        />
+                      ) : null}
+                      {renderFotos()}
                     </>
                   ) : null
                 ) : (
                   <>
+                    {renderFotos()}
+
+                    {campoConfiguradoVisible("recinto") ? (
+                      <TextInput
+                        label="Recinto"
+                        value={recinto}
+                        onChangeText={setRecinto}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
+
+                    {campoConfiguradoVisible("modulo") ? (
+                      <TextInput
+                        label="Módulo o edificio"
+                        value={modulo}
+                        onChangeText={setModulo}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
+
+                    {campoConfiguradoVisible("numeroSello") ? (
+                      <TextInput
+                        label="N° del sello"
+                        value={numeroSello}
+                        onChangeText={setNumeroSello}
+                        mode="outlined"
+                        style={styles.input}
+                      />
+                    ) : null}
+
                     {campoConfiguradoVisible("cantidadSellos") ? (
                       <TextInput
                         label="Cantidad de Sellos"
@@ -2850,18 +2999,6 @@ export default function RegistrosScreen({
                         }
                         mode="outlined"
                         keyboardType="numeric"
-                        style={styles.input}
-                      />
-                    ) : null}
-
-                    {renderItemizadoTerreno()}
-
-                    {campoConfiguradoVisible("numeroSello") ? (
-                      <TextInput
-                        label="N° del sello"
-                        value={numeroSello}
-                        onChangeText={setNumeroSello}
-                        mode="outlined"
                         style={styles.input}
                       />
                     ) : null}
@@ -2921,8 +3058,6 @@ export default function RegistrosScreen({
                         style={[styles.input, styles.observacionesInput]}
                       />
                     ) : null}
-
-                    {renderFotos()}
                   </>
                 )}
 
