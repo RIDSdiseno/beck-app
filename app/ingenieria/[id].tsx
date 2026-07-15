@@ -11,6 +11,7 @@ import {
   RegistroIngenieriaApi,
   ResultadoParametro,
   updateRegistroIngenieria,
+  uploadControlInspeccionFotos,
   validarRegistroIngenieria,
 } from "@/services/api/ingenieriaApi";
 import { uploadRegistroFotos } from "@/services/api/registrosApi";
@@ -41,6 +42,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 type FotoLocal = { uri: string; name: string; type: string };
+
+const MIN_FOTOS_CONTROL = 1;
+const MAX_FOTOS_CONTROL = 5;
 
 async function normalizeFoto(asset: ImagePicker.ImagePickerAsset, index: number): Promise<FotoLocal> {
   const maxDim = Math.max(asset.width || 0, asset.height || 0);
@@ -118,6 +122,7 @@ export default function IngenieriaDetalleScreen() {
   const [downloading, setDownloading] = useState(false);
   const [control, setControl] = useState<ControlInspeccion | null>(null);
   const [controlLoading, setControlLoading] = useState(false);
+  const [fotosControl, setFotosControl] = useState<FotoLocal[]>([]);
 
   const [motivoRechazo, setMotivoRechazo] = useState("");
 
@@ -283,6 +288,47 @@ export default function IngenieriaDetalleScreen() {
     }
   };
 
+  const handlePickFotosControl = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Debes otorgar acceso a la galería.");
+      return;
+    }
+    const disponibles = MAX_FOTOS_CONTROL - fotosControl.length;
+    if (disponibles <= 0) {
+      Alert.alert("Límite alcanzado", `Puedes agregar hasta ${MAX_FOTOS_CONTROL} fotografías.`);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      quality: 1,
+      selectionLimit: disponibles,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const seleccionadas = result.assets.slice(0, disponibles);
+      const normalized = await Promise.all(seleccionadas.map((a, i) => normalizeFoto(a, i)));
+      setFotosControl((prev) => [...prev, ...normalized]);
+    }
+  };
+
+  const handleTakePhotoControl = async () => {
+    if (fotosControl.length >= MAX_FOTOS_CONTROL) {
+      Alert.alert("Límite alcanzado", `Puedes agregar hasta ${MAX_FOTOS_CONTROL} fotografías.`);
+      return;
+    }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Debes otorgar acceso a la cámara.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (!result.canceled && result.assets.length > 0) {
+      const normalized = await normalizeFoto(result.assets[0], 0);
+      setFotosControl((prev) => [...prev, normalized]);
+    }
+  };
+
   const handleGuardarEdicion = async () => {
     if (!id) return;
     try {
@@ -353,6 +399,10 @@ export default function IngenieriaDetalleScreen() {
       Alert.alert("Requerido", "El campo ensayo es obligatorio");
       return;
     }
+    if (fotosControl.length < MIN_FOTOS_CONTROL) {
+      Alert.alert("Requerido", "Debes agregar al menos 1 fotografía");
+      return;
+    }
     try {
       setSaving(true);
       const created = await createControlInspeccion(id, {
@@ -362,7 +412,9 @@ export default function IngenieriaDetalleScreen() {
         conformidad: inspeccionFields.conformidad || undefined,
         parametros,
       });
-      setControl(created);
+      const fotos = await uploadControlInspeccionFotos(id, created.id, fotosControl);
+      setControl({ ...created, fotos_control_inspeccion: fotos });
+      setFotosControl([]);
       setShowControlForm(false);
       Alert.alert("Control creado", "El control de inspección fue registrado.");
     } catch (err: any) {
@@ -518,6 +570,18 @@ export default function IngenieriaDetalleScreen() {
                     <Text style={styles.paramsTitle}>
                       {control.controles_inspeccion_parametros?.length ?? 0} parámetros evaluados
                     </Text>
+                    {(control.fotos_control_inspeccion?.length ?? 0) > 0 ? (
+                      <>
+                        <Text style={styles.fotosHint}>
+                          {control.fotos_control_inspeccion!.length} foto(s)
+                        </Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
+                          {control.fotos_control_inspeccion!.map((f) => (
+                            <Image key={f.id} source={{ uri: f.url }} style={styles.fotoThumb} />
+                          ))}
+                        </ScrollView>
+                      </>
+                    ) : null}
                   </View>
                 ) : (
                   <Button
@@ -811,6 +875,48 @@ export default function IngenieriaDetalleScreen() {
                 </View>
               </View>
             ))}
+
+            <Text style={styles.paramsTitle}>Fotografías del control *</Text>
+            <Text style={styles.fotosHint}>
+              Mínimo {MIN_FOTOS_CONTROL}, máximo {MAX_FOTOS_CONTROL} fotografías
+            </Text>
+            {fotosControl.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
+                {fotosControl.map((f, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => setFotosControl((prev) => prev.filter((_, idx) => idx !== i))}
+                  >
+                    <View style={styles.fotoThumbWrap}>
+                      <Image source={{ uri: f.uri }} style={styles.fotoThumb} />
+                      <View style={styles.fotoRemoveBadge}>
+                        <MaterialCommunityIcons name="close" size={12} color="#ffffff" />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : null}
+            <View style={styles.fotoBtnsRow}>
+              <Button
+                mode="outlined"
+                onPress={handlePickFotosControl}
+                icon="image-multiple-outline"
+                style={styles.fotoBtnHalf}
+                labelStyle={{ fontSize: 12 }}
+              >
+                Galería
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={handleTakePhotoControl}
+                icon="camera-outline"
+                style={styles.fotoBtnHalf}
+                labelStyle={{ fontSize: 12 }}
+              >
+                Cámara
+              </Button>
+            </View>
 
             <Button
               mode="contained"

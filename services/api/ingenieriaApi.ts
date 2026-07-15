@@ -128,6 +128,7 @@ export type ControlInspeccion = {
     nombre: string;
     email: string;
   } | null;
+  fotos_control_inspeccion?: FotoRegistro[];
 };
 
 export type UpdateRegistroIngenieriaPayload = {
@@ -329,6 +330,37 @@ export async function createControlInspeccion(
     throw new Error(result?.error || "No se pudo crear el control de inspección");
   }
   return result.data as ControlInspeccion;
+}
+
+export async function uploadControlInspeccionFotos(
+  registroId: string,
+  controlId: string,
+  fotos: { uri: string; name: string; type: string }[],
+): Promise<FotoRegistro[]> {
+  const token = await getToken();
+  const formData = new FormData();
+
+  fotos.forEach((foto) => {
+    formData.append("fotos", {
+      uri: foto.uri,
+      name: foto.name,
+      type: foto.type,
+    } as any);
+  });
+
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/ingenieria/registros/${registroId}/control-inspeccion/${controlId}/fotos`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudieron subir las fotografías");
+  }
+  return result.data as FotoRegistro[];
 }
 
 export async function descargarRegistroPdf(registroId: string, codigoBeck?: string | null): Promise<void> {
