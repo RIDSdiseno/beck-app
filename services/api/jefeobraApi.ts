@@ -40,6 +40,8 @@ export type ControlCorreccion = {
     fecha: string;
     piso?: string | null;
     numero_sello?: string | null;
+    inspeccion_revision_estado?: "pendiente" | "validado" | "rechazado" | null;
+    motivo_rechazo_inspeccion?: string | null;
     obras?: { id: string; nombre: string; codigo: string } | null;
   };
 };

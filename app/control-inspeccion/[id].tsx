@@ -204,6 +204,14 @@ export default function ControlInspeccionDetalleScreen() {
               <Text style={styles.enviadaText}>Corrección ya enviada a Ingeniería</Text>
             </View>
           ) : null}
+          {registro?.inspeccion_revision_estado === "rechazado" && registro?.motivo_rechazo_inspeccion ? (
+            <View style={styles.rechazoBox}>
+              <MaterialCommunityIcons name="alert-outline" size={16} color="#b91c1c" />
+              <Text style={styles.rechazoText}>
+                Ingeniería rechazó la corrección anterior: {registro.motivo_rechazo_inspeccion}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <Text style={styles.sectionTitle}>Parámetros ({parametros.length})</Text>
@@ -320,6 +328,8 @@ const styles = StyleSheet.create({
   ensayo: { marginTop: 8, fontSize: 14, color: "#334155", fontWeight: "600" },
   enviadaBadge: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   enviadaText: { color: "#16a34a", fontSize: 12, fontWeight: "600" },
+  rechazoBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 10, backgroundColor: "#fef2f2", borderRadius: 8, padding: 8 },
+  rechazoText: { flex: 1, color: "#b91c1c", fontSize: 12 },
   sectionTitle: { marginTop: 18, marginBottom: 6, fontSize: 14, fontWeight: "700", color: "#0f172a" },
   paramCard: { backgroundColor: "#ffffff", borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0", padding: 12, marginBottom: 10 },
   paramHeaderRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
