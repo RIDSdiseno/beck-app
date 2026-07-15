@@ -146,6 +146,20 @@ export default function TabLayout() {
                 }}
               />
               <Tabs.Screen
+                name="control-inspeccion"
+                options={{
+                  title: "Correcciones",
+                  href: userRole === "jefeobra" || userRole === "administrador" ? undefined : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="clipboard-alert-outline"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
                 name="registros"
                 options={{
                   title: "Registro",

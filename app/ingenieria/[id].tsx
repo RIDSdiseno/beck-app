@@ -873,6 +873,21 @@ export default function IngenieriaDetalleScreen() {
                     </Pressable>
                   ))}
                 </View>
+                {p.resultado === "no_cumple" && (
+                  <TextInput
+                    label="Observación (por qué no cumple)"
+                    value={p.observacion ?? ""}
+                    onChangeText={(v) =>
+                      setParametros((prev) =>
+                        prev.map((item, idx) => idx === i ? { ...item, observacion: v } : item),
+                      )
+                    }
+                    mode="outlined"
+                    multiline
+                    numberOfLines={2}
+                    style={styles.editInput}
+                  />
+                )}
               </View>
             ))}
 
