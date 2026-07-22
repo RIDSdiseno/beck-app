@@ -139,6 +139,7 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   cantidadFinal: false,
   observaciones: true,
   folio: false,
+  eje: true,
 };
 
 const ITEMIZADO_BECK_OPTIONS = [
@@ -823,7 +824,16 @@ export default function RegistrosScreen({
     setItemizadoMenuVisible(false);
   };
 
+  const itemizadoObraId =
+    userRole === "jefeobra" ? editingRegistro?.obras?.id : obra?.id;
+
   const loadItemizadoOpciones = async () => {
+    if (!itemizadoObraId) {
+      setItemizadoOpciones([]);
+      setError("No se pudo determinar la obra para filtrar los itemizados.");
+      return;
+    }
+
     try {
       setLoadingItemizadoOpciones(true);
       const opciones = await getItemizadoOpciones({
@@ -831,6 +841,8 @@ export default function RegistrosScreen({
         elementoPenetra: itemizadoElementoPenetra,
         materialidad: itemizadoMaterialidad,
         limit: 80,
+        obraId: itemizadoObraId,
+        visible: true,
       });
       setItemizadoOpciones(opciones);
     } catch (err: any) {
@@ -848,6 +860,7 @@ export default function RegistrosScreen({
   const selectItemizadoOpcion = (opcion: ItemizadoOpcionApi) => {
     setItemizadoBeck(opcion.elemento_pasante || "");
     setItemizadoCodigoBeck(opcion.codigo_beck || "");
+    setItemizadoSacyr(opcion.nombre_personalizado || opcion.elemento_pasante || "");
     setItemizadoSelectorVisible(false);
     setError("");
   };
@@ -1509,7 +1522,7 @@ export default function RegistrosScreen({
             <View style={styles.recordInfo}>
               <Text style={styles.modalTitle}>Seleccionar Itemizado Básico</Text>
               <Text style={styles.modalSubtitle}>
-                Solo se muestran opciones visibles del catálogo.
+                Solo se muestran los itemizados habilitados para esta obra.
               </Text>
             </View>
             <Button mode="text" compact onPress={() => setItemizadoSelectorVisible(false)}>

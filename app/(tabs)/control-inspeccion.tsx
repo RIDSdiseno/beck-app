@@ -62,7 +62,7 @@ export default function ControlInspeccionScreen() {
         Correcciones pendientes
       </Text>
       <Text style={styles.subtitle}>
-        Controles de inspección marcados "No conforme" por Ingeniería que necesitan corrección.
+        Controles de inspección marcados &quot;No conforme&quot; por Ingeniería que necesitan corrección.
       </Text>
 
       {error ? (

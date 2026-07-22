@@ -36,7 +36,8 @@ export type CampoConfiguracionRegistro =
   | "reparacionTabique"
   | "cantidadFinal"
   | "observaciones"
-  | "folio";
+  | "folio"
+  | "eje";
 
 export type ConfiguracionCampoRegistroApi = {
   campo: CampoConfiguracionRegistro;
@@ -87,6 +88,7 @@ const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
   cantidadFinal: "cantidadFinal",
   observaciones: "observaciones",
   folio: "folio",
+  eje: "eje",
 };
 
 function normalizeCampoConfiguracion(campo: unknown) {
@@ -145,7 +147,7 @@ export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
 
 export async function getConfiguracionRegistro(
   obraId: string,
-  rol: "trabajador" | "jefeobra",
+  rol: "trabajador" | "jefeobra" | "cliente",
   forceRefresh = false,
 ): Promise<ConfiguracionCampoRegistroApi[]> {
   const cacheKey = `${rol}:${obraId}`;

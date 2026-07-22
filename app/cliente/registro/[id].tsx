@@ -1,4 +1,8 @@
 import { getClienteRegistrosObra, RegistroCliente, validarRegistroCliente } from "@/services/api/clienteApi";
+import {
+  CampoConfiguracionRegistro,
+  getConfiguracionRegistro,
+} from "@/services/api/obrasApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import { router, useLocalSearchParams } from "expo-router";
@@ -171,6 +175,25 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
 
 // ── Pantalla principal ────────────────────────────────────────────────────────────
 
+const DEFAULT_CAMPOS_CLIENTE: Partial<Record<CampoConfiguracionRegistro, boolean>> = {
+  codigoBeck: true,
+  itemizadoBeck: true,
+  itemizadoMandante: true,
+  diaSemana: true,
+  folio: true,
+  recinto: true,
+  modulo: true,
+  piso: true,
+  eje: true,
+  numeroSello: true,
+  cantidadSellos: true,
+  cantidadFinal: true,
+  nombreSellador: true,
+  holgura: true,
+  factorPorHolguras: true,
+  cieloModular: true,
+};
+
 export default function ClienteRegistroScreen() {
   const insets = useSafeAreaInsets();
   const { id, obraId } = useLocalSearchParams<{ id: string; obraId: string }>();
@@ -178,6 +201,7 @@ export default function ClienteRegistroScreen() {
   const [registro, setRegistro] = useState<RegistroCliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [camposConfigurables, setCamposConfigurables] = useState(DEFAULT_CAMPOS_CLIENTE);
 
   // Firma
   const [showSignModal, setShowSignModal] = useState(false);
@@ -219,6 +243,32 @@ export default function ClienteRegistroScreen() {
     };
     load();
   }, [id, obraId]);
+
+  useEffect(() => {
+    if (!obraId) return;
+    let active = true;
+
+    const loadConfiguracion = async () => {
+      try {
+        const configuracion = await getConfiguracionRegistro(obraId, "cliente");
+        if (!active) return;
+        setCamposConfigurables({
+          ...DEFAULT_CAMPOS_CLIENTE,
+          ...Object.fromEntries(configuracion.map((campo) => [campo.campo, campo.visible])),
+        });
+      } catch {
+        // Si falla, se mantiene la configuracion por defecto (todo visible).
+      }
+    };
+
+    loadConfiguracion();
+    return () => {
+      active = false;
+    };
+  }, [obraId]);
+
+  const campoVisible = (campo: CampoConfiguracionRegistro) =>
+    camposConfigurables[campo] ?? true;
 
   const handleSignatureChange = (path: string, w: number, h: number) => {
     setPathData(path);
@@ -353,10 +403,10 @@ export default function ClienteRegistroScreen() {
           {/* Información general */}
           <SectionTitle title="INFORMACIÓN GENERAL" />
           <View style={styles.section}>
-            <FieldRow label="Código BECK"   value={codigoBeck} />
+            <FieldRow label="Código BECK"   value={campoVisible("codigoBeck") ? codigoBeck : null} />
             <FieldRow label="Fecha"         value={formatDate(registro.fecha)} />
-            <FieldRow label="Día semana"    value={registro.diaSemana} />
-            <FieldRow label="Folio"         value={registro.folio} />
+            <FieldRow label="Día semana"    value={campoVisible("diaSemana") ? registro.diaSemana : null} />
+            <FieldRow label="Folio"         value={campoVisible("folio") ? registro.folio : null} />
             <FieldRow label="Observaciones" value={registro.observaciones} />
           </View>
 
@@ -364,24 +414,28 @@ export default function ClienteRegistroScreen() {
           <SectionTitle title="DATOS TÉCNICOS" />
           <View style={styles.section}>
             <FieldRow label="Material"        value={registro.descripcionMaterial} />
-            <FieldRow label="Recinto"         value={registro.recinto} />
-            <FieldRow label="Módulo"          value={registro.modulo} />
-            <FieldRow label="Piso"            value={registro.piso} />
-            <FieldRow label="Eje"             value={registro.eje} />
-            {!isJunta && <FieldRow label="N° de sello"   value={registro.numeroSello} />}
-            <FieldRow
-              label={isJunta ? "Longitud (m)" : "Cant. sellos"}
-              value={isJunta ? registro.metrosLineales : registro.cantidadSellos}
-            />
-            {registro.cantidadFinal != null && (
+            <FieldRow label="Recinto"         value={campoVisible("recinto") ? registro.recinto : null} />
+            <FieldRow label="Módulo"          value={campoVisible("modulo") ? registro.modulo : null} />
+            <FieldRow label="Piso"            value={campoVisible("piso") ? registro.piso : null} />
+            <FieldRow label="Eje"             value={campoVisible("eje") ? registro.eje : null} />
+            {!isJunta && campoVisible("numeroSello") && (
+              <FieldRow label="N° de sello" value={registro.numeroSello} />
+            )}
+            {campoVisible("cantidadSellos") && (
+              <FieldRow
+                label={isJunta ? "Longitud (m)" : "Cant. sellos"}
+                value={isJunta ? registro.metrosLineales : registro.cantidadSellos}
+              />
+            )}
+            {registro.cantidadFinal != null && campoVisible("cantidadFinal") && (
               <FieldRow label="Cantidad final" value={registro.cantidadFinal} />
             )}
-            <FieldRow label="Sellador"        value={registro.nombreSellador} />
-            <FieldRow label="Holgura (cm)"    value={registro.holgura} />
-            <FieldRow label="Factor holgura"  value={registro.factorPorHolguras} />
-            <FieldRow label="Accesibilidad"   value={registro.accesibilidad} />
-            <FieldRow label="Itemizado BECK"     value={registro.itemizadoBeck} />
-            <FieldRow label="Itemizado mandante" value={registro.itemizadoMandante} />
+            <FieldRow label="Sellador"        value={campoVisible("nombreSellador") ? registro.nombreSellador : null} />
+            <FieldRow label="Holgura (cm)"    value={campoVisible("holgura") ? registro.holgura : null} />
+            <FieldRow label="Factor holgura"  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
+            <FieldRow label="Accesibilidad"   value={campoVisible("cieloModular") ? registro.accesibilidad : null} />
+            <FieldRow label="Itemizado BECK"     value={campoVisible("itemizadoBeck") ? registro.itemizadoBeck : null} />
+            <FieldRow label="Itemizado mandante" value={campoVisible("itemizadoMandante") ? registro.itemizadoMandante : null} />
           </View>
 
           {/* Fotografías */}

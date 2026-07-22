@@ -15,6 +15,10 @@ import {
   validarRegistroIngenieria,
 } from "@/services/api/ingenieriaApi";
 import { uploadRegistroFotos } from "@/services/api/registrosApi";
+import {
+  getItemizadoOpciones,
+  ItemizadoOpcionApi,
+} from "@/services/api/itemizadoOpcionesApi";
 import { estadoColor, getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -125,6 +129,11 @@ export default function IngenieriaDetalleScreen() {
   const [fotosControl, setFotosControl] = useState<FotoLocal[]>([]);
 
   const [motivoRechazo, setMotivoRechazo] = useState("");
+
+  const [itemizadoSelectorVisible, setItemizadoSelectorVisible] = useState(false);
+  const [itemizadoSearch, setItemizadoSearch] = useState("");
+  const [itemizadoOpciones, setItemizadoOpciones] = useState<ItemizadoOpcionApi[]>([]);
+  const [loadingItemizadoOpciones, setLoadingItemizadoOpciones] = useState(false);
 
   const [editFields, setEditFields] = useState({
     codigoBeck: "",
@@ -391,6 +400,44 @@ export default function IngenieriaDetalleScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const loadItemizadoOpciones = async () => {
+    const obraId = registro?.obra?.id;
+    if (!obraId) {
+      setItemizadoOpciones([]);
+      return;
+    }
+
+    try {
+      setLoadingItemizadoOpciones(true);
+      const opciones = await getItemizadoOpciones({
+        search: itemizadoSearch,
+        limit: 80,
+        obraId,
+        visible: true,
+      });
+      setItemizadoOpciones(opciones);
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "No se pudieron cargar los itemizados.");
+    } finally {
+      setLoadingItemizadoOpciones(false);
+    }
+  };
+
+  const openItemizadoSelector = () => {
+    setItemizadoSelectorVisible(true);
+    void loadItemizadoOpciones();
+  };
+
+  const selectItemizadoOpcion = (opcion: ItemizadoOpcionApi) => {
+    setEditFields((p) => ({
+      ...p,
+      itemizadoBeck: opcion.elemento_pasante || "",
+      codigoBeck: opcion.codigo_beck || p.codigoBeck,
+      itemizadoMandante: opcion.nombre_personalizado || opcion.elemento_pasante || "",
+    }));
+    setItemizadoSelectorVisible(false);
   };
 
   const handleCrearControl = async () => {
@@ -683,6 +730,76 @@ export default function IngenieriaDetalleScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <Modal
+        visible={itemizadoSelectorVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setItemizadoSelectorVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setItemizadoSelectorVisible(false)}
+        >
+          <Pressable style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Seleccionar Itemizado Básico</Text>
+            <Text style={styles.modalSubtitle}>
+              Solo se muestran los itemizados habilitados para esta obra.
+            </Text>
+
+            <TextInput
+              label="Buscar por itemizado, código o tipo"
+              value={itemizadoSearch}
+              onChangeText={setItemizadoSearch}
+              mode="outlined"
+              style={styles.modalInput}
+              left={<TextInput.Icon icon="magnify" />}
+            />
+            <Button
+              mode="contained"
+              onPress={() => void loadItemizadoOpciones()}
+              loading={loadingItemizadoOpciones}
+              disabled={loadingItemizadoOpciones}
+              style={styles.modalInput}
+            >
+              Buscar
+            </Button>
+
+            <ScrollView style={styles.itemizadoResults} keyboardShouldPersistTaps="handled">
+              {loadingItemizadoOpciones ? (
+                <ActivityIndicator color="#3b82f6" />
+              ) : null}
+              {!loadingItemizadoOpciones && !itemizadoOpciones.length ? (
+                <Text style={styles.modalSubtitle}>
+                  No hay itemizados visibles para esta obra con ese filtro.
+                </Text>
+              ) : null}
+              {itemizadoOpciones.map((opcion) => (
+                <Pressable
+                  key={opcion.id}
+                  style={styles.itemizadoOption}
+                  onPress={() => selectItemizadoOpcion(opcion)}
+                >
+                  <Text style={styles.itemizadoOptionTitle}>
+                    {opcion.elemento_pasante || "Sin nombre"}
+                  </Text>
+                  <Text style={styles.itemizadoOptionSubtitle}>
+                    {[opcion.codigo_beck, opcion.tipo].filter(Boolean).join(" · ")}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <Button
+              mode="text"
+              onPress={() => setItemizadoSelectorVisible(false)}
+              style={styles.modalInput}
+            >
+              Cerrar
+            </Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <Modal visible={showEdit} animationType="slide">
         <View style={styles.editModal}>
           <View style={[styles.editHeader, { paddingTop: insets.top + 14 }]}>
@@ -696,7 +813,15 @@ export default function IngenieriaDetalleScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <TextInput label="Código BECK" value={editFields.codigoBeck} onChangeText={(v) => setEditFields((p) => ({ ...p, codigoBeck: v }))} mode="outlined" style={styles.editInput} />
-            <TextInput label="Itemizado BECK" value={editFields.itemizadoBeck} onChangeText={(v) => setEditFields((p) => ({ ...p, itemizadoBeck: v }))} mode="outlined" style={styles.editInput} />
+            <Text style={styles.itemizadoLabel}>Itemizado BECK</Text>
+            <Button
+              mode="outlined"
+              onPress={openItemizadoSelector}
+              style={styles.itemizadoSelectBtn}
+              contentStyle={styles.itemizadoSelectBtnContent}
+            >
+              {editFields.itemizadoBeck || "Seleccionar itemizado"}
+            </Button>
             <TextInput label="Itemizado Mandante" value={editFields.itemizadoMandante} onChangeText={(v) => setEditFields((p) => ({ ...p, itemizadoMandante: v }))} mode="outlined" style={styles.editInput} />
             <TextInput label="Fecha ejecución" value={formatShortDate(registro.fecha)} mode="outlined" style={styles.editInput} editable={false} />
             {registro.dia_semana ? (
@@ -1013,6 +1138,13 @@ const styles = StyleSheet.create({
   editScroll: { padding: 16, gap: 8 },
   editInput: { marginBottom: 4 },
   editSaveBtn: { marginTop: 12, borderRadius: 14, backgroundColor: "#3b82f6" },
+  itemizadoLabel: { color: "#475569", fontSize: 12, marginBottom: 4, marginTop: 4 },
+  itemizadoSelectBtn: { marginBottom: 4, borderColor: "#94a3b8", justifyContent: "center" },
+  itemizadoSelectBtnContent: { justifyContent: "flex-start" },
+  itemizadoResults: { maxHeight: 320, marginBottom: 8 },
+  itemizadoOption: { paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
+  itemizadoOptionTitle: { color: "#0f172a", fontWeight: "600", fontSize: 14 },
+  itemizadoOptionSubtitle: { color: "#64748b", fontSize: 12, marginTop: 2 },
   pdfRow: { marginTop: 16, marginBottom: 4 },
   pdfBtn: { borderRadius: 12, backgroundColor: "#dc2626" },
   fotosHint: { color: "#64748b", fontSize: 12, marginBottom: 8 },

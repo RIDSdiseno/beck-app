@@ -9,6 +9,7 @@ export type ItemizadoOpcionApi = {
   elemento_pasante?: string | null;
   elemento_penetra?: string | null;
   materialidad?: string | null;
+  nombre_personalizado?: string | null;
 };
 
 export type GetItemizadoOpcionesParams = {
@@ -16,6 +17,8 @@ export type GetItemizadoOpcionesParams = {
   elementoPenetra?: string;
   materialidad?: string;
   limit?: number;
+  obraId?: string;
+  visible?: boolean;
 };
 
 export async function getItemizadoOpciones(
@@ -36,6 +39,8 @@ export async function getItemizadoOpciones(
     query.set("materialidad", params.materialidad.trim());
   }
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.obraId?.trim()) query.set("obraId", params.obraId.trim());
+  if (params?.visible !== undefined) query.set("visible", String(params.visible));
 
   const queryString = query.toString();
   const response = await authenticatedFetch(
