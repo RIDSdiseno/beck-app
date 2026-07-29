@@ -29,14 +29,18 @@ import {
   Divider,
   HelperText,
   Text,
-  TextInput,
 } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
 
 const BECK_EMAIL_DOMAIN = "@becksoluciones.cl";
+
+// Login con Microsoft deshabilitado temporalmente mientras se prueba la app
+// por ramas de Expo. Cambiar a true para reactivarlo.
+const MICROSOFT_LOGIN_ENABLED = false;
 
 function isBeckEmail(value: string) {
   return value.toLowerCase().trim().endsWith(BECK_EMAIL_DOMAIN);
@@ -303,19 +307,21 @@ export default function LoginScreen() {
                   <Button
                     mode="contained"
                     icon="microsoft-windows"
-                    onPress={onMicrosoftLogin}
+                    onPress={MICROSOFT_LOGIN_ENABLED ? onMicrosoftLogin : undefined}
                     loading={isMicrosoftLoading}
-                    disabled={!request || isLoading}
+                    disabled={!MICROSOFT_LOGIN_ENABLED || !request || isLoading}
                     style={styles.microsoftButton}
                     contentStyle={[
                       styles.buttonContent,
                       isAndroid && styles.androidButtonContent,
                     ]}
-                    labelStyle={styles.buttonLabel}
+                    labelStyle={[styles.buttonLabel, styles.microsoftButtonLabel]}
                   >
-                    {isMicrosoftLoading
-                      ? "Conectando..."
-                      : "Continuar con Microsoft"}
+                    {!MICROSOFT_LOGIN_ENABLED
+                      ? "Microsoft (no disponible)"
+                      : isMicrosoftLoading
+                        ? "Conectando..."
+                        : "Continuar con Microsoft"}
                   </Button>
 
                   {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -446,6 +452,9 @@ const styles = StyleSheet.create({
   buttonLabel: {
     fontSize: 15,
     fontWeight: "700",
+  },
+  microsoftButtonLabel: {
+    color: "#ffffff",
   },
   dividerRow: {
     alignItems: "center",

@@ -18,8 +18,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ActivityIndicator, Button, Text, TextInput } from "react-native-paper";
+import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
 
 const MAX_FOTOS_POR_PARAMETRO = 5;
 

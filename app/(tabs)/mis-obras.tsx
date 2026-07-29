@@ -12,12 +12,12 @@ import {
   Card,
   Chip,
   Text,
-  TextInput,
 } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
 import { BrandHeader } from "../../components/BrandHeader";
 import RegistrosScreen from "./registros";
 

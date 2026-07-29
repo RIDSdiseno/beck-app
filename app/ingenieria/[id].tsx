@@ -41,9 +41,9 @@ import {
   ActivityIndicator,
   Button,
   Text,
-  TextInput,
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
 
 type FotoLocal = { uri: string; name: string; type: string };
 

@@ -49,15 +49,15 @@ import {
   Card,
   Chip,
   Checkbox,
-  Menu,
   SegmentedButtons,
   Text,
-  TextInput,
 } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
+import { SelectSheet } from "@/components/SelectSheet";
 import { BrandHeader } from "../../components/BrandHeader";
 
 type TipoRegistro = "sello_cortafuego" | "junta_lineal_espuma";
@@ -408,18 +408,12 @@ export default function RegistrosScreen({
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [itemizadoBeck, setItemizadoBeck] = useState("");
   const [itemizadoCodigoBeck, setItemizadoCodigoBeck] = useState("");
-  const [itemizadoMenuVisible, setItemizadoMenuVisible] = useState(false);
   const [itemizadoSelectorVisible, setItemizadoSelectorVisible] = useState(false);
   const [itemizadoSearch, setItemizadoSearch] = useState("");
   const [itemizadoElementoPenetra, setItemizadoElementoPenetra] = useState("");
   const [itemizadoMaterialidad, setItemizadoMaterialidad] = useState("");
   const [itemizadoOpciones, setItemizadoOpciones] = useState<ItemizadoOpcionApi[]>([]);
   const [loadingItemizadoOpciones, setLoadingItemizadoOpciones] = useState(false);
-  const [holguraMenuVisible, setHolguraMenuVisible] = useState(false);
-  const [cieloModularMenuVisible, setCieloModularMenuVisible] = useState(false);
-  const [aislacionMenuVisible, setAislacionMenuVisible] = useState(false);
-  const [reparacionTabiqueMenuVisible, setReparacionTabiqueMenuVisible] =
-    useState(false);
   const [otroItemizado, setOtroItemizado] = useState(false);
   const [recinto, setRecinto] = useState("");
   const [modulo, setModulo] = useState("");
@@ -775,11 +769,6 @@ export default function RegistrosScreen({
     setItemizadoElementoPenetra("");
     setItemizadoMaterialidad("");
     setItemizadoOpciones([]);
-    setItemizadoMenuVisible(false);
-    setHolguraMenuVisible(false);
-    setCieloModularMenuVisible(false);
-    setAislacionMenuVisible(false);
-    setReparacionTabiqueMenuVisible(false);
     setOtroItemizado(false);
     setRecinto("");
     setModulo("");
@@ -821,7 +810,6 @@ export default function RegistrosScreen({
   const selectItemizadoBeck = (itemizado: string) => {
     setItemizadoBeck(itemizado);
     setOtroItemizado(false);
-    setItemizadoMenuVisible(false);
   };
 
   const itemizadoObraId =
@@ -869,7 +857,6 @@ export default function RegistrosScreen({
     setOtroItemizado((current) => {
       const next = !current;
       setItemizadoBeck(next ? "" : itemizadoBeck);
-      setItemizadoMenuVisible(false);
       return next;
     });
   };
@@ -1412,40 +1399,16 @@ export default function RegistrosScreen({
   const renderMenuField = (
     label: string,
     value: string,
-    visible: boolean,
-    setVisible: (next: boolean) => void,
     onSelect: (next: string) => void,
     options: { value: string; label: string }[],
   ) => (
-    <>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <Menu
-        visible={visible}
-        onDismiss={() => setVisible(false)}
-        anchor={
-          <Button
-            mode="outlined"
-            onPress={() => setVisible(true)}
-            style={styles.dropdownButton}
-            contentStyle={styles.dropdownContent}
-          >
-            {options.find((option) => option.value === value)?.label ||
-              "Seleccionar opción"}
-          </Button>
-        }
-      >
-        {options.map((option) => (
-          <Menu.Item
-            key={option.value}
-            title={option.label}
-            onPress={() => {
-              onSelect(option.value);
-              setVisible(false);
-            }}
-          />
-        ))}
-      </Menu>
-    </>
+    <SelectSheet
+      label={label}
+      value={value || null}
+      placeholder="Seleccionar opción"
+      options={options}
+      onChange={(next) => onSelect(next ?? "")}
+    />
   );
 
   const renderItemizadoTerreno = () => {
@@ -1453,29 +1416,16 @@ export default function RegistrosScreen({
 
     return (
       <>
-      <Text style={styles.fieldLabel}>Itemizado Básico</Text>
-      <Menu
-        visible={itemizadoMenuVisible}
-        onDismiss={() => setItemizadoMenuVisible(false)}
-        anchor={
-          <Button
-            mode="outlined"
-            onPress={() => setItemizadoMenuVisible(true)}
-            style={styles.dropdownButton}
-            contentStyle={styles.dropdownContent}
-          >
-            {itemizadoBeck || "Seleccionar itemizado"}
-          </Button>
-        }
-      >
-        {ITEMIZADO_BECK_OPTIONS.map((itemizado) => (
-          <Menu.Item
-            key={itemizado}
-            title={itemizado}
-            onPress={() => selectItemizadoBeck(itemizado)}
-          />
-        ))}
-      </Menu>
+      <SelectSheet
+        label="Itemizado Básico"
+        value={otroItemizado ? null : itemizadoBeck || null}
+        placeholder="Seleccionar itemizado"
+        options={ITEMIZADO_BECK_OPTIONS.map((itemizado) => ({
+          value: itemizado,
+          label: itemizado,
+        }))}
+        onChange={(next) => selectItemizadoBeck(next ?? "")}
+      />
 
       <Checkbox.Item
         label="Otras: escribir"
@@ -2050,8 +2000,6 @@ export default function RegistrosScreen({
                       ? renderMenuField(
                           "Holgura (cm)",
                           holgura,
-                          holguraMenuVisible,
-                          setHolguraMenuVisible,
                           setHolgura,
                           HOLGURA_OPTIONS,
                         )
@@ -2073,8 +2021,6 @@ export default function RegistrosScreen({
                       renderMenuField(
                         "Accesibilidad",
                         accesibilidad,
-                        cieloModularMenuVisible,
-                        setCieloModularMenuVisible,
                         setAccesibilidad,
                         CIELO_MODULAR_OPTIONS,
                       )
@@ -2096,8 +2042,6 @@ export default function RegistrosScreen({
                       renderMenuField(
                         "Aislación",
                         aislacion,
-                        aislacionMenuVisible,
-                        setAislacionMenuVisible,
                         setAislacion,
                         APLICA_OPTIONS,
                       )
@@ -2115,8 +2059,6 @@ export default function RegistrosScreen({
                       renderMenuField(
                         "Reparación de tabique",
                         reparacionTabique,
-                        reparacionTabiqueMenuVisible,
-                        setReparacionTabiqueMenuVisible,
                         setReparacionTabique,
                         APLICA_OPTIONS,
                       )
@@ -2723,8 +2665,6 @@ export default function RegistrosScreen({
                     ? renderMenuField(
                         "Holgura (cm)",
                         holgura,
-                        holguraMenuVisible,
-                        setHolguraMenuVisible,
                         setHolgura,
                         HOLGURA_OPTIONS,
                       )
@@ -2733,8 +2673,6 @@ export default function RegistrosScreen({
                     renderMenuField(
                       "Accesibilidad",
                       accesibilidad,
-                      cieloModularMenuVisible,
-                      setCieloModularMenuVisible,
                       setAccesibilidad,
                       CIELO_MODULAR_OPTIONS,
                     )
@@ -2743,8 +2681,6 @@ export default function RegistrosScreen({
                     renderMenuField(
                       "Aislación",
                       aislacion,
-                      aislacionMenuVisible,
-                      setAislacionMenuVisible,
                       setAislacion,
                       APLICA_OPTIONS,
                     )
@@ -2753,8 +2689,6 @@ export default function RegistrosScreen({
                     renderMenuField(
                       "Reparación de tabique",
                       reparacionTabique,
-                      reparacionTabiqueMenuVisible,
-                      setReparacionTabiqueMenuVisible,
                       setReparacionTabique,
                       APLICA_OPTIONS,
                     )
@@ -3020,8 +2954,6 @@ export default function RegistrosScreen({
                       ? renderMenuField(
                           "Holgura (cm)",
                           holgura,
-                          holguraMenuVisible,
-                          setHolguraMenuVisible,
                           setHolgura,
                           HOLGURA_OPTIONS,
                         )
@@ -3031,8 +2963,6 @@ export default function RegistrosScreen({
                       renderMenuField(
                         "Accesibilidad",
                         accesibilidad,
-                        cieloModularMenuVisible,
-                        setCieloModularMenuVisible,
                         setAccesibilidad,
                         CIELO_MODULAR_OPTIONS,
                       )
@@ -3042,8 +2972,6 @@ export default function RegistrosScreen({
                       renderMenuField(
                         "Aislación",
                         aislacion,
-                        aislacionMenuVisible,
-                        setAislacionMenuVisible,
                         setAislacion,
                         APLICA_OPTIONS,
                       )
@@ -3053,8 +2981,6 @@ export default function RegistrosScreen({
                       renderMenuField(
                         "Reparación de tabique",
                         reparacionTabique,
-                        reparacionTabiqueMenuVisible,
-                        setReparacionTabiqueMenuVisible,
                         setReparacionTabique,
                         APLICA_OPTIONS,
                       )
