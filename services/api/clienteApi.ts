@@ -1,6 +1,8 @@
 import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 export type ObraCliente = {
   id: string;
@@ -59,7 +61,7 @@ export type RegistroCliente = {
   validadoCliente: boolean;
   validadoClienteAt: string | null;
   firmaClienteUrl: string | null;
-  pdfFirmadoUrl: string | null;
+  pdfDisponible: boolean;
   obraNombre: string | null;
   obraCodigo: string | null;
   obraId: string;
@@ -120,4 +122,42 @@ export async function validarRegistroCliente(
   const result = await readJsonResponse(response);
   if (!response.ok || !result?.success) throw new Error(result?.error || "No se pudo validar el registro");
   return result.data as RegistroCliente;
+}
+
+export async function compartirPdfCliente(
+  registroId: string,
+  codigoBeck?: string | null,
+) {
+  const token = await getToken();
+  const safeName = (codigoBeck || `registro-${registroId.slice(0, 8)}`).replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const fileUri = `${FileSystem.cacheDirectory}beck-${safeName}-${Date.now()}.pdf`;
+
+  try {
+    const result = await FileSystem.downloadAsync(
+      `${API_BASE_URL}/api/cliente/registros/${registroId}/pdf`,
+      fileUri,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (result.status !== 200) {
+      throw new Error("No se pudo descargar el PDF firmado");
+    }
+
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      throw new Error(
+        "Compartir archivos no está disponible en este dispositivo",
+      );
+    }
+
+    await Sharing.shareAsync(result.uri, {
+      mimeType: "application/pdf",
+      dialogTitle: "Compartir PDF firmado",
+      UTI: "com.adobe.pdf",
+    });
+  } finally {
+    await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
+  }
 }

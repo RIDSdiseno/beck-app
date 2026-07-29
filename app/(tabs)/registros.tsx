@@ -635,7 +635,7 @@ export default function RegistrosScreen({
     } finally {
       setRefreshingConfiguracionRegistro(false);
     }
-  }, [editingRegistro?.obras?.id, obra?.id, userRole]);
+  }, [clearSuccessMessage, editingRegistro?.obras?.id, obra?.id, userRole]);
 
   useEffect(() => {
     const obraIdConfiguracion =

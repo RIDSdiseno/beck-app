@@ -5,8 +5,6 @@ export const STORAGE_KEYS = {
   token: "beck_token",
   user: "beck_user",
   obraSeleccionada: "beck_obra_seleccionada",
-  codeVerifier: "beck_code_verifier",
-  redirectUri: "beck_redirect_uri",
   hiddenValidatedRegistros: "beck_historial_registros_ocultos",
 } as const;
 
@@ -133,41 +131,11 @@ export async function clearSession() {
   await Promise.all([
     SecureStore.deleteItemAsync(STORAGE_KEYS.token),
     SecureStore.deleteItemAsync(STORAGE_KEYS.user),
-    clearMicrosoftAuthState(),
     AsyncStorage.multiRemove([
       STORAGE_KEYS.user,
       STORAGE_KEYS.obraSeleccionada,
       STORAGE_KEYS.hiddenValidatedRegistros,
     ]),
-  ]);
-}
-
-export async function saveMicrosoftAuthState(
-  codeVerifier: string,
-  redirectUri: string,
-) {
-  await Promise.all([
-    SecureStore.setItemAsync(STORAGE_KEYS.codeVerifier, codeVerifier),
-    SecureStore.setItemAsync(STORAGE_KEYS.redirectUri, redirectUri),
-  ]);
-}
-
-export async function getMicrosoftAuthState() {
-  const [codeVerifier, redirectUri] = await Promise.all([
-    SecureStore.getItemAsync(STORAGE_KEYS.codeVerifier),
-    SecureStore.getItemAsync(STORAGE_KEYS.redirectUri),
-  ]);
-
-  return {
-    codeVerifier,
-    redirectUri,
-  };
-}
-
-export async function clearMicrosoftAuthState() {
-  await Promise.all([
-    SecureStore.deleteItemAsync(STORAGE_KEYS.codeVerifier),
-    SecureStore.deleteItemAsync(STORAGE_KEYS.redirectUri),
   ]);
 }
 

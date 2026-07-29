@@ -24,7 +24,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -165,6 +165,19 @@ export default function IngenieriaDetalleScreen() {
     PARAMETROS_FIJOS.map((p, i) => ({ orden: i + 1, parametro: p, resultado: "cumple" as ResultadoParametro })),
   );
 
+  const loadControl = useCallback(async () => {
+    if (!id) return;
+    setControlLoading(true);
+    try {
+      const data = await getControlInspeccion(id);
+      setControl(data);
+    } catch {
+      setControl(null);
+    } finally {
+      setControlLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (!id) return;
     const load = async () => {
@@ -203,20 +216,7 @@ export default function IngenieriaDetalleScreen() {
       }
     };
     load();
-  }, [id]);
-
-  const loadControl = async () => {
-    if (!id) return;
-    setControlLoading(true);
-    try {
-      const data = await getControlInspeccion(id);
-      setControl(data);
-    } catch {
-      setControl(null);
-    } finally {
-      setControlLoading(false);
-    }
-  };
+  }, [id, loadControl]);
 
   const handleValidar = () => {
     Alert.alert(
@@ -446,6 +446,21 @@ export default function IngenieriaDetalleScreen() {
       Alert.alert("Requerido", "El campo ensayo es obligatorio");
       return;
     }
+    if (!inspeccionFields.conformidad) {
+      Alert.alert("Requerido", "Debes indicar si el control es conforme o no conforme");
+      return;
+    }
+    const tieneNoCumple = parametros.some((p) => p.resultado === "no_cumple");
+    if (
+      (inspeccionFields.conformidad === "conforme" && tieneNoCumple) ||
+      (inspeccionFields.conformidad === "no_conforme" && !tieneNoCumple)
+    ) {
+      Alert.alert(
+        "Revisar conformidad",
+        "La conformidad debe coincidir con el resultado de los parámetros.",
+      );
+      return;
+    }
     if (fotosControl.length < MIN_FOTOS_CONTROL) {
       Alert.alert("Requerido", "Debes agregar al menos 1 fotografía");
       return;
@@ -456,7 +471,7 @@ export default function IngenieriaDetalleScreen() {
         fecha: inspeccionFields.fecha,
         ensayo: inspeccionFields.ensayo.trim(),
         observacion: inspeccionFields.observacion || undefined,
-        conformidad: inspeccionFields.conformidad || undefined,
+        conformidad: inspeccionFields.conformidad,
         parametros,
       });
       const fotos = await uploadControlInspeccionFotos(id, created.id, fotosControl);

@@ -1,19 +1,10 @@
-import {
-  getMicrosoftAuthRequestConfig,
-  getMicrosoftRedirectUri,
-  microsoftDiscovery,
-} from "@/services/auth/microsoft";
 import { loginWithEmailPassword } from "@/services/api/authApi";
 import { clearMisObrasCache } from "@/services/api/obrasApi";
 import { clearMisRegistrosCache } from "@/services/api/registrosApi";
 import { getInitialRouteForRole } from "@/services/auth/roles";
-import {
-  saveMicrosoftAuthState,
-  saveSession,
-} from "@/services/auth/session";
-import * as AuthSession from "expo-auth-session";
+import { saveSession } from "@/services/auth/session";
 import { router } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -26,7 +17,6 @@ import {
 import {
   Button,
   Card,
-  Divider,
   HelperText,
   Text,
 } from "react-native-paper";
@@ -36,14 +26,8 @@ import {
 } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
 
-const BECK_EMAIL_DOMAIN = "@becksoluciones.cl";
-
-// Login con Microsoft deshabilitado temporalmente mientras se prueba la app
-// por ramas de Expo. Cambiar a true para reactivarlo.
-const MICROSOFT_LOGIN_ENABLED = false;
-
-function isBeckEmail(value: string) {
-  return value.toLowerCase().trim().endsWith(BECK_EMAIL_DOMAIN);
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 export default function LoginScreen() {
@@ -51,20 +35,12 @@ export default function LoginScreen() {
   const { height: screenHeight } = useWindowDimensions();
   const scrollViewRef = useRef<ScrollView>(null);
   const activeInputRef = useRef<"email" | "password" | null>(null);
-  const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [error, setError] = useState("");
-
-  const redirectUri = useMemo(() => getMicrosoftRedirectUri(), []);
-
-  const [request, , promptAsync] = AuthSession.useAuthRequest(
-    getMicrosoftAuthRequestConfig(redirectUri),
-    microsoftDiscovery,
-  );
 
   const onInputFocus = (inputName: "email" | "password") => {
     activeInputRef.current = inputName;
@@ -81,46 +57,11 @@ export default function LoginScreen() {
     }, 80);
   };
 
-  const onMicrosoftLogin = async () => {
-    try {
-      setError("");
-      setIsMicrosoftLoading(true);
-
-      const codeVerifier = request?.codeVerifier ?? "";
-
-      if (!codeVerifier) {
-        throw new Error("No se pudo obtener el code_verifier.");
-      }
-
-      await saveMicrosoftAuthState(codeVerifier, redirectUri);
-
-      const result = await promptAsync();
-
-      if (result.type === "success") {
-        router.replace({
-          pathname: "/auth",
-          params: result.params,
-        });
-        return;
-      }
-
-      if (result.type === "error") {
-        setError(result.error?.message || "Microsoft no completó el login.");
-      }
-
-      setIsMicrosoftLoading(false);
-    } catch (err: any) {
-      if (__DEV__) console.warn("PROMPT MICROSOFT ERROR", err);
-      setError(err?.message || "No se pudo abrir el login de Microsoft.");
-      setIsMicrosoftLoading(false);
-    }
-  };
-
   const onEmailLogin = async () => {
     try {
       setError("");
 
-      if (!isBeckEmail(email)) {
+      if (!isValidEmail(email)) {
         setError("Correo no válido.");
         return;
       }
@@ -139,9 +80,9 @@ export default function LoginScreen() {
     }
   };
 
-  const isLoading = isMicrosoftLoading || isEmailLoading;
+  const isLoading = isEmailLoading;
   const hasEmailValue = Boolean(email.trim());
-  const hasEmailDomainError = hasEmailValue && !isBeckEmail(email);
+  const hasEmailError = hasEmailValue && !isValidEmail(email);
   const isAndroid = Platform.OS === "android";
   const isShortAndroid = isAndroid && screenHeight < 740;
   const keyboardBehavior = isInputFocused
@@ -221,8 +162,7 @@ export default function LoginScreen() {
                       isAndroid && styles.androidSubtitle,
                     ]}
                   >
-                    Accede con tu cuenta corporativa Microsoft o con tus
-                    credenciales Beck
+                    Accede con las credenciales asignadas desde el CRM Beck
                   </Text>
 
                   <TextInput
@@ -235,7 +175,7 @@ export default function LoginScreen() {
                     keyboardType="email-address"
                     textContentType="emailAddress"
                     disabled={isLoading}
-                    error={hasEmailDomainError}
+                    error={hasEmailError}
                     dense={isAndroid}
                     onFocus={() => onInputFocus("email")}
                     onBlur={() => onInputBlur("email")}
@@ -244,7 +184,7 @@ export default function LoginScreen() {
                   />
                   <HelperText
                     type="error"
-                    visible={hasEmailDomainError}
+                    visible={hasEmailError}
                     style={styles.helperText}
                   >
                     Correo no válido.
@@ -280,7 +220,7 @@ export default function LoginScreen() {
                     disabled={
                       isLoading ||
                       !email.trim() ||
-                      hasEmailDomainError ||
+                      hasEmailError ||
                       !password
                     }
                     style={styles.button}
@@ -291,37 +231,6 @@ export default function LoginScreen() {
                     labelStyle={styles.buttonLabel}
                   >
                     {isEmailLoading ? "Ingresando..." : "Ingresar"}
-                  </Button>
-
-                  <View
-                    style={[
-                      styles.dividerRow,
-                      isAndroid && styles.androidDividerRow,
-                    ]}
-                  >
-                    <Divider style={styles.divider} />
-                    <Text style={styles.dividerText}>o</Text>
-                    <Divider style={styles.divider} />
-                  </View>
-
-                  <Button
-                    mode="contained"
-                    icon="microsoft-windows"
-                    onPress={MICROSOFT_LOGIN_ENABLED ? onMicrosoftLogin : undefined}
-                    loading={isMicrosoftLoading}
-                    disabled={!MICROSOFT_LOGIN_ENABLED || !request || isLoading}
-                    style={styles.microsoftButton}
-                    contentStyle={[
-                      styles.buttonContent,
-                      isAndroid && styles.androidButtonContent,
-                    ]}
-                    labelStyle={[styles.buttonLabel, styles.microsoftButtonLabel]}
-                  >
-                    {!MICROSOFT_LOGIN_ENABLED
-                      ? "Microsoft (no disponible)"
-                      : isMicrosoftLoading
-                        ? "Conectando..."
-                        : "Continuar con Microsoft"}
                   </Button>
 
                   {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -439,10 +348,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginTop: 4,
   },
-  microsoftButton: {
-    backgroundColor: "#0f172a",
-    borderRadius: 14,
-  },
   buttonContent: {
     minHeight: 52,
   },
@@ -451,27 +356,6 @@ const styles = StyleSheet.create({
   },
   buttonLabel: {
     fontSize: 15,
-    fontWeight: "700",
-  },
-  microsoftButtonLabel: {
-    color: "#ffffff",
-  },
-  dividerRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    marginVertical: 18,
-  },
-  androidDividerRow: {
-    marginVertical: 12,
-  },
-  divider: {
-    flex: 1,
-    backgroundColor: "#cbd5e1",
-  },
-  dividerText: {
-    color: "#64748b",
-    fontSize: 13,
     fontWeight: "700",
   },
   errorText: {

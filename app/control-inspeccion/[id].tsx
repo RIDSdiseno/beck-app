@@ -129,6 +129,21 @@ export default function ControlInspeccionDetalleScreen() {
 
   const handleEnviarCorreccion = async () => {
     if (!control) return;
+    const parametrosNoCumple =
+      control.controles_inspeccion_parametros?.filter(
+        (parametro) => parametro.resultado === "no_cumple",
+      ) || [];
+    const faltaDescripcion = parametrosNoCumple.some(
+      (parametro) => !textos[parametro.id]?.trim(),
+    );
+    if (faltaDescripcion) {
+      Alert.alert(
+        "Corrección incompleta",
+        "Describe la corrección realizada en cada parámetro que no cumple.",
+      );
+      return;
+    }
+
     Alert.alert(
       "Enviar corrección",
       "¿Confirmas que la corrección está lista para enviar a Ingeniería?",

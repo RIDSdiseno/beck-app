@@ -28,7 +28,7 @@ Aplicación móvil para la gestión de registros de obra de Beck. Permite a téc
 | Estilos | NativeWind v4 (Tailwind CSS para React Native) |
 | UI | React Native Paper (MD3) |
 | Animaciones | Moti + Reanimated v4 |
-| Autenticación | Microsoft Azure AD — OAuth 2.0 PKCE (`expo-auth-session`) |
+| Autenticación | Credenciales creadas en el CRM + JWT |
 | Almacenamiento seguro | `expo-secure-store` (Keychain en iOS / Keystore en Android) |
 | HTTP | `fetch` nativo con wrapper `authenticatedFetch` |
 | Imágenes | `expo-image-picker` + `expo-image-manipulator` |
@@ -44,8 +44,7 @@ beck-app/
 ├── app/                        # Rutas (Expo Router file-based routing)
 │   ├── _layout.tsx             # Root layout: providers globales (Paper, Navigation, Context)
 │   ├── index.tsx               # Splash de arranque y redirección según sesión
-│   ├── login.tsx               # Pantalla de login (Microsoft OAuth + email/password)
-│   ├── auth.tsx                # Callback OAuth del deep-link beckcrmapp://auth
+│   ├── login.tsx               # Pantalla de login con credenciales del CRM
 │   ├── modal.tsx               # Modal genérico reutilizable
 │   └── (tabs)/                 # Navegación por pestañas (requiere sesión activa)
 │       ├── _layout.tsx         # Tab navigator con acceso condicional por rol
@@ -66,7 +65,6 @@ beck-app/
 │   │   ├── registrosApi.ts     # CRUD de registros, fotos y flujo de estados
 │   │   └── itemizadoOpcionesApi.ts # Búsqueda y listado de opciones de itemizado
 │   └── auth/
-│       ├── microsoft.ts        # Configuración del flujo OAuth Microsoft (PKCE)
 │       ├── session.ts          # Lectura/escritura de sesión en SecureStore + migración
 │       └── roles.ts            # Guards y helpers de control de acceso por rol
 │
@@ -99,24 +97,9 @@ beck-app/
 
 ## Autenticación
 
-La app soporta dos métodos de login, ambos gestionados por el backend:
-
-### Microsoft Azure AD (principal)
-
-El flujo usa **OAuth 2.0 Authorization Code + PKCE**, implementado con `expo-auth-session`:
-
-1. El usuario pulsa "Iniciar sesión con Microsoft".
-2. `login.tsx` genera un `codeVerifier` PKCE y abre el navegador del sistema.
-3. Microsoft redirige a `beckcrmapp://auth` con el código de autorización.
-4. `auth.tsx` recibe el código vía deep-link y lo envía al backend.
-5. El backend valida con Azure, crea/actualiza el usuario y devuelve un JWT propio.
-6. El JWT y los datos del usuario se guardan en `SecureStore` (cifrado en reposo).
-
-La configuración de Azure (tenant ID, client ID) se inyecta en tiempo de build via variables de entorno `EXPO_PUBLIC_*`. En producción se gestionan como **EAS secrets**, nunca en el repositorio.
-
-### Email / contraseña (secundario)
-
-Flujo directo contra el endpoint `POST /api/auth/login`. Solo disponible si el backend lo habilita; si el endpoint responde 404 se muestra un error descriptivo.
+La app admite únicamente las credenciales creadas desde el CRM. El inicio de
+sesión se realiza contra `POST /api/mobile/auth/email`; el backend devuelve un
+JWT propio y los datos del usuario autorizado.
 
 ### Gestión de sesión
 
@@ -125,7 +108,7 @@ Flujo directo contra el endpoint `POST /api/auth/login`. Solo disponible si el b
 - **Guardado**: JWT + datos de usuario en `SecureStore`. Al guardar se elimina automáticamente la copia legacy de `AsyncStorage`.
 - **Migración**: Si existe sesión previa en `AsyncStorage` (versiones anteriores de la app), se migra silenciosamente a `SecureStore` en el primer acceso.
 - **Expiración**: `isJwtExpired` decodifica el claim `exp` del JWT. Si el payload es inválido o falta `exp`, la sesión se considera expirada (fail-closed).
-- **Cierre**: `clearSession` borra SecureStore, limpia el estado OAuth de Microsoft y elimina las claves legacy de AsyncStorage.
+- **Cierre**: `clearSession` borra SecureStore y elimina las claves legacy de AsyncStorage.
 
 ---
 
@@ -223,21 +206,11 @@ Los datos sensibles (JWT, información del usuario) se almacenan exclusivamente 
 
 `NSAllowsArbitraryLoads` está deshabilitado en `app.json`. Solo `localhost` tiene excepción explícita para el servidor de desarrollo local. En producción, toda la comunicación va por HTTPS.
 
-### OAuth / PKCE
-
-El flujo de login con Microsoft usa PKCE (`code_challenge` + `code_verifier`). El `code_verifier` nunca sale del dispositivo; el backend solo recibe el código de autorización y lo valida con Azure directamente.
-
-### Parámetros de deep-link
-
-El parámetro `error` que puede llegar por el deep-link `beckcrmapp://auth` se sanitiza antes de mostrarse al usuario: se trunca a 80 caracteres y se filtran todos los caracteres que no sean alfanuméricos, espacios, guiones, puntos o guiones bajos.
-
 ### Credenciales en build
 
-Las variables `EXPO_PUBLIC_AZURE_TENANT_ID`, `EXPO_PUBLIC_AZURE_CLIENT_ID` y `EXPO_PUBLIC_API_BASE_URL` **no están en el repositorio**. En producción se inyectan como **EAS secrets** en la plataforma de Expo:
+`EXPO_PUBLIC_API_BASE_URL` no contiene un secreto, pero se configura por ambiente para separar preview y producción:
 
 ```bash
-eas env:create --scope project --name EXPO_PUBLIC_AZURE_TENANT_ID --value <valor> --environment production
-eas env:create --scope project --name EXPO_PUBLIC_AZURE_CLIENT_ID --value <valor> --environment production
 eas env:create --scope project --name EXPO_PUBLIC_API_BASE_URL --value <valor> --environment production
 ```
 
@@ -251,9 +224,6 @@ Crea un archivo `.env` en la raíz del proyecto para desarrollo local:
 # URL del backend (en dispositivo físico usar la IP de tu máquina, no localhost)
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.x:3001
 
-# Azure AD — obtenerlos desde el portal de Azure
-EXPO_PUBLIC_AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-EXPO_PUBLIC_AZURE_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
 > Las variables `EXPO_PUBLIC_*` son públicas en el bundle de la app. Nunca pongas secrets de servidor aquí.

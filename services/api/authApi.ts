@@ -10,26 +10,6 @@ export type LoginResponse = {
   };
 };
 
-export async function loginWithMicrosoftIdToken(
-  idToken: string,
-): Promise<LoginResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/mobile/auth/microsoft`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ idToken }),
-  });
-
-  const data = await readJsonResponse(response);
-
-  if (!response.ok) {
-    throw new Error(data?.error || "No se pudo iniciar sesión con Microsoft");
-  }
-
-  return data;
-}
-
 export async function loginWithEmailPassword(
   email: string,
   password: string,
