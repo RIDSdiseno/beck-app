@@ -97,9 +97,12 @@ beck-app/
 
 ## Autenticación
 
-La app admite únicamente las credenciales creadas desde el CRM. El inicio de
-sesión se realiza contra `POST /api/mobile/auth/email`; el backend devuelve un
-JWT propio y los datos del usuario autorizado.
+La app admite únicamente usuarios creados y activos en el CRM. El acceso por
+correo se realiza contra `POST /api/mobile/auth/email`. El flujo Microsoft
+también está implementado mediante Authorization Code + PKCE y
+`POST /api/mobile/auth/microsoft`, pero su botón permanece deshabilitado
+mientras las pruebas se hagan con Expo Go. Se habilitará al usar un development
+build de EAS con el esquema nativo `beckcrmapp`.
 
 ### Gestión de sesión
 
@@ -223,10 +226,13 @@ Crea un archivo `.env` en la raíz del proyecto para desarrollo local:
 ```bash
 # URL del backend (en dispositivo físico usar la IP de tu máquina, no localhost)
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.x:3001
-
+EXPO_PUBLIC_AZURE_TENANT_ID=id-del-tenant-de-microsoft-entra
+EXPO_PUBLIC_AZURE_CLIENT_ID=id-de-la-aplicacion-en-microsoft-entra
 ```
 
-> Las variables `EXPO_PUBLIC_*` son públicas en el bundle de la app. Nunca pongas secrets de servidor aquí.
+> Las variables `EXPO_PUBLIC_*` son públicas en el bundle de la app. El tenant
+> y client ID no son secretos; nunca pongas el client secret de Microsoft en la
+> aplicación.
 
 ---
 

@@ -1,0 +1,204 @@
+import { loginWithMicrosoftIdToken } from "@/services/api/authApi";
+import { clearMisObrasCache } from "@/services/api/obrasApi";
+import { clearMisRegistrosCache } from "@/services/api/registrosApi";
+import {
+  getMicrosoftClientId,
+  microsoftDiscovery,
+} from "@/services/auth/microsoft";
+import { getInitialRouteForRole } from "@/services/auth/roles";
+import {
+  clearMicrosoftAuthState,
+  getMicrosoftAuthState,
+  saveSession,
+} from "@/services/auth/session";
+import * as AuthSession from "expo-auth-session";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
+import { Button, Text } from "react-native-paper";
+
+type CallbackStep =
+  | "Preparando autenticación..."
+  | "Validando respuesta de Microsoft..."
+  | "Intercambiando credenciales..."
+  | "Validando acceso con Beck..."
+  | "Cargando tu sesión...";
+
+export default function AuthCallbackScreen() {
+  const params = useLocalSearchParams();
+  const handledRef = useRef(false);
+  const [step, setStep] = useState<CallbackStep>("Preparando autenticación...");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const handleAuth = async () => {
+      if (handledRef.current) return;
+      handledRef.current = true;
+
+      try {
+        setStep("Validando respuesta de Microsoft...");
+
+        const code = typeof params.code === "string" ? params.code : "";
+        const rawAuthError = typeof params.error === "string" ? params.error : "";
+        const authError = rawAuthError
+          .slice(0, 80)
+          .replace(/[^\w\s\-_.]/g, "");
+
+        if (authError) {
+          throw new Error(`Microsoft devolvió un error: ${authError}`);
+        }
+
+        if (!code) {
+          throw new Error("Microsoft no devolvió un código válido.");
+        }
+
+        const { codeVerifier, redirectUri } = await getMicrosoftAuthState();
+
+        if (!codeVerifier || !redirectUri) {
+          throw new Error("No se encontró la información temporal del login.");
+        }
+
+        setStep("Intercambiando credenciales...");
+        const tokenResult = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: getMicrosoftClientId(),
+            code,
+            redirectUri,
+            extraParams: {
+              code_verifier: codeVerifier,
+            },
+          },
+          microsoftDiscovery,
+        );
+
+        if (!tokenResult.idToken) {
+          throw new Error("Microsoft no devolvió una credencial válida.");
+        }
+
+        setStep("Validando acceso con Beck...");
+        const data = await loginWithMicrosoftIdToken(tokenResult.idToken);
+
+        setStep("Cargando tu sesión...");
+        clearMisObrasCache();
+        clearMisRegistrosCache();
+        await saveSession(data.token, data.user);
+        await clearMicrosoftAuthState();
+        router.replace(getInitialRouteForRole(data.user.rol));
+      } catch (err: unknown) {
+        if (__DEV__) console.warn("AUTH CALLBACK ERROR", err);
+        await clearMicrosoftAuthState();
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo completar el inicio de sesión.",
+        );
+      }
+    };
+
+    void handleAuth();
+  }, [params]);
+
+  const volverAlLogin = async () => {
+    await clearMicrosoftAuthState();
+    router.replace("/login");
+  };
+
+  return (
+    <View style={styles.container}>
+      <Image
+        source={require("../assets/images/logo_beck.png")}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+
+      {!error ? (
+        <>
+          <ActivityIndicator size="large" color="#f97316" />
+          <Text style={styles.title}>Conectando con Microsoft</Text>
+          <Text style={styles.subtitle}>
+            Estamos validando tu acceso a la plataforma Beck.
+          </Text>
+          <Text style={styles.step}>{step}</Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.errorTitle}>No se pudo iniciar sesión</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button
+            mode="contained"
+            onPress={volverAlLogin}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+            labelStyle={styles.buttonLabel}
+          >
+            Volver al login
+          </Button>
+        </>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0b0b0f",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  logo: {
+    width: 280,
+    height: 150,
+    marginBottom: 28,
+  },
+  title: {
+    marginTop: 18,
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  subtitle: {
+    marginTop: 8,
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    maxWidth: 320,
+  },
+  step: {
+    marginTop: 16,
+    color: "#f97316",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  errorTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  errorText: {
+    marginTop: 10,
+    color: "#fca5a5",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    maxWidth: 320,
+  },
+  button: {
+    marginTop: 22,
+    backgroundColor: "#f97316",
+    borderRadius: 14,
+  },
+  buttonContent: {
+    minHeight: 48,
+    paddingHorizontal: 10,
+  },
+  buttonLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+});
