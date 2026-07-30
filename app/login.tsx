@@ -1,11 +1,12 @@
-import {
-  getMicrosoftAuthRequestConfig,
-  getMicrosoftRedirectUri,
-  microsoftDiscovery,
-} from "@/services/auth/microsoft";
 import { loginWithEmailPassword } from "@/services/api/authApi";
 import { clearMisObrasCache } from "@/services/api/obrasApi";
 import { clearMisRegistrosCache } from "@/services/api/registrosApi";
+import {
+  getMicrosoftAuthRequestConfig,
+  getMicrosoftRedirectUri,
+  isMicrosoftConfigured,
+  microsoftDiscovery,
+} from "@/services/auth/microsoft";
 import { getInitialRouteForRole } from "@/services/auth/roles";
 import {
   saveMicrosoftAuthState,
@@ -29,18 +30,19 @@ import {
   Divider,
   HelperText,
   Text,
-  TextInput,
 } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
 
-const BECK_EMAIL_DOMAIN = "@becksoluciones.cl";
-
-function isBeckEmail(value: string) {
-  return value.toLowerCase().trim().endsWith(BECK_EMAIL_DOMAIN);
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
+
+// Se habilitará cuando las pruebas se realicen con un development build de EAS.
+const MICROSOFT_LOGIN_ENABLED = false;
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -54,9 +56,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [error, setError] = useState("");
-
   const redirectUri = useMemo(() => getMicrosoftRedirectUri(), []);
-
   const [request, , promptAsync] = AuthSession.useAuthRequest(
     getMicrosoftAuthRequestConfig(redirectUri),
     microsoftDiscovery,
@@ -78,18 +78,23 @@ export default function LoginScreen() {
   };
 
   const onMicrosoftLogin = async () => {
+    if (!MICROSOFT_LOGIN_ENABLED) return;
+
     try {
       setError("");
       setIsMicrosoftLoading(true);
 
+      if (!isMicrosoftConfigured()) {
+        throw new Error("El acceso con Microsoft aún no está configurado.");
+      }
+
       const codeVerifier = request?.codeVerifier ?? "";
 
       if (!codeVerifier) {
-        throw new Error("No se pudo obtener el code_verifier.");
+        throw new Error("No se pudo preparar el acceso con Microsoft.");
       }
 
       await saveMicrosoftAuthState(codeVerifier, redirectUri);
-
       const result = await promptAsync();
 
       if (result.type === "success") {
@@ -103,11 +108,14 @@ export default function LoginScreen() {
       if (result.type === "error") {
         setError(result.error?.message || "Microsoft no completó el login.");
       }
-
-      setIsMicrosoftLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (__DEV__) console.warn("PROMPT MICROSOFT ERROR", err);
-      setError(err?.message || "No se pudo abrir el login de Microsoft.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo abrir el login de Microsoft.",
+      );
+    } finally {
       setIsMicrosoftLoading(false);
     }
   };
@@ -116,7 +124,7 @@ export default function LoginScreen() {
     try {
       setError("");
 
-      if (!isBeckEmail(email)) {
+      if (!isValidEmail(email)) {
         setError("Correo no válido.");
         return;
       }
@@ -137,7 +145,7 @@ export default function LoginScreen() {
 
   const isLoading = isMicrosoftLoading || isEmailLoading;
   const hasEmailValue = Boolean(email.trim());
-  const hasEmailDomainError = hasEmailValue && !isBeckEmail(email);
+  const hasEmailError = hasEmailValue && !isValidEmail(email);
   const isAndroid = Platform.OS === "android";
   const isShortAndroid = isAndroid && screenHeight < 740;
   const keyboardBehavior = isInputFocused
@@ -217,8 +225,7 @@ export default function LoginScreen() {
                       isAndroid && styles.androidSubtitle,
                     ]}
                   >
-                    Accede con tu cuenta corporativa Microsoft o con tus
-                    credenciales Beck
+                    Accede con las credenciales asignadas desde el CRM Beck
                   </Text>
 
                   <TextInput
@@ -231,7 +238,7 @@ export default function LoginScreen() {
                     keyboardType="email-address"
                     textContentType="emailAddress"
                     disabled={isLoading}
-                    error={hasEmailDomainError}
+                    error={hasEmailError}
                     dense={isAndroid}
                     onFocus={() => onInputFocus("email")}
                     onBlur={() => onInputBlur("email")}
@@ -240,7 +247,7 @@ export default function LoginScreen() {
                   />
                   <HelperText
                     type="error"
-                    visible={hasEmailDomainError}
+                    visible={hasEmailError}
                     style={styles.helperText}
                   >
                     Correo no válido.
@@ -276,7 +283,7 @@ export default function LoginScreen() {
                     disabled={
                       isLoading ||
                       !email.trim() ||
-                      hasEmailDomainError ||
+                      hasEmailError ||
                       !password
                     }
                     style={styles.button}
@@ -305,7 +312,9 @@ export default function LoginScreen() {
                     icon="microsoft-windows"
                     onPress={onMicrosoftLogin}
                     loading={isMicrosoftLoading}
-                    disabled={!request || isLoading}
+                    disabled={
+                      !MICROSOFT_LOGIN_ENABLED || !request || isLoading
+                    }
                     style={styles.microsoftButton}
                     contentStyle={[
                       styles.buttonContent,
@@ -313,9 +322,7 @@ export default function LoginScreen() {
                     ]}
                     labelStyle={styles.buttonLabel}
                   >
-                    {isMicrosoftLoading
-                      ? "Conectando..."
-                      : "Continuar con Microsoft"}
+                    Acceso Microsoft próximamente
                   </Button>
 
                   {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -433,10 +440,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginTop: 4,
   },
-  microsoftButton: {
-    backgroundColor: "#0f172a",
-    borderRadius: 14,
-  },
   buttonContent: {
     minHeight: 52,
   },
@@ -448,22 +451,25 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   dividerRow: {
-    alignItems: "center",
     flexDirection: "row",
-    gap: 12,
+    alignItems: "center",
     marginVertical: 18,
   },
   androidDividerRow: {
-    marginVertical: 12,
+    marginVertical: 14,
   },
   divider: {
     flex: 1,
     backgroundColor: "#cbd5e1",
   },
   dividerText: {
+    marginHorizontal: 12,
     color: "#64748b",
     fontSize: 13,
-    fontWeight: "700",
+  },
+  microsoftButton: {
+    backgroundColor: "#334155",
+    borderRadius: 14,
   },
   errorText: {
     marginTop: 14,

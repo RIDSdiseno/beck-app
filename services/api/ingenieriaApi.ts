@@ -365,27 +365,35 @@ export async function uploadControlInspeccionFotos(
 
 export async function descargarRegistroPdf(registroId: string, codigoBeck?: string | null): Promise<void> {
   const token = await getToken();
-  const fileName = `${codigoBeck ?? `registro-${registroId.slice(0, 6)}`}.pdf`;
+  const safeName = (codigoBeck ?? `registro-${registroId.slice(0, 6)}`).replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const fileName = `${safeName}-${Date.now()}.pdf`;
   const fileUri  = `${FileSystem.cacheDirectory}${fileName}`;
 
-  const result = await FileSystem.downloadAsync(
-    `${API_BASE_URL}/api/ingenieria/registros/${registroId}/pdf`,
-    fileUri,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
+  try {
+    const result = await FileSystem.downloadAsync(
+      `${API_BASE_URL}/api/ingenieria/registros/${registroId}/pdf`,
+      fileUri,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
 
-  if (result.status !== 200) {
-    throw new Error("No se pudo descargar el PDF del registro");
+    if (result.status !== 200) {
+      throw new Error("No se pudo descargar el PDF del registro");
+    }
+
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      throw new Error("La función de compartir no está disponible en este dispositivo");
+    }
+
+    await Sharing.shareAsync(result.uri, {
+      mimeType: "application/pdf",
+      dialogTitle: `Registro ${fileName}`,
+      UTI: "com.adobe.pdf",
+    });
+  } finally {
+    await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
   }
-
-  const canShare = await Sharing.isAvailableAsync();
-  if (!canShare) {
-    throw new Error("La función de compartir no está disponible en este dispositivo");
-  }
-
-  await Sharing.shareAsync(result.uri, {
-    mimeType: "application/pdf",
-    dialogTitle: `Registro ${fileName}`,
-    UTI: "com.adobe.pdf",
-  });
 }

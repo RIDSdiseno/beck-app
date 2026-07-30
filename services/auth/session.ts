@@ -158,10 +158,7 @@ export async function getMicrosoftAuthState() {
     SecureStore.getItemAsync(STORAGE_KEYS.redirectUri),
   ]);
 
-  return {
-    codeVerifier,
-    redirectUri,
-  };
+  return { codeVerifier, redirectUri };
 }
 
 export async function clearMicrosoftAuthState() {

@@ -23,11 +23,13 @@ import {
   ActivityIndicator,
   Button,
   Card,
-  Chip,
   Text,
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { SelectSheet } from "../../components/SelectSheet";
+
+const ACCENT = "#3b82f6";
 
 type FiltroEstado = EstadoRegistroIngenieria | "todos";
 
@@ -181,6 +183,9 @@ export default function IngenieriaScreen() {
           placeholderTextColor="#94a3b8"
           value={search}
           onChangeText={setSearch}
+          autoCorrect={false}
+          spellCheck={false}
+          autoComplete="off"
         />
         {search ? (
           <TouchableOpacity onPress={() => setSearch("")}>
@@ -189,57 +194,25 @@ export default function IngenieriaScreen() {
         ) : null}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtrosRow}
-      >
-        {FILTROS.map(({ label, value }) => (
-          <Chip
-            key={value}
-            selected={filtroEstado === value}
-            onPress={() => setFiltroEstado(value)}
-            style={[
-              styles.filtroChip,
-              filtroEstado === value && styles.filtroChipActive,
-            ]}
-            textStyle={[
-              styles.filtroChipText,
-              filtroEstado === value && styles.filtroChipTextActive,
-            ]}
-          >
-            {label}
-          </Chip>
-        ))}
-      </ScrollView>
-
-      {obras.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtrosRow}
-        >
-          <Chip
-            selected={obraFiltro === "todas"}
-            onPress={() => setObraFiltro("todas")}
-            style={[styles.obraChip, obraFiltro === "todas" && styles.obraChipActive]}
-            textStyle={[styles.obraChipText, obraFiltro === "todas" && styles.obraChipTextActive]}
-          >
-            Todas las obras
-          </Chip>
-          {obras.map((obra) => (
-            <Chip
-              key={obra.id}
-              selected={obraFiltro === obra.id}
-              onPress={() => setObraFiltro(obra.id)}
-              style={[styles.obraChip, obraFiltro === obra.id && styles.obraChipActive]}
-              textStyle={[styles.obraChipText, obraFiltro === obra.id && styles.obraChipTextActive]}
-            >
-              {obra.nombre}
-            </Chip>
-          ))}
-        </ScrollView>
-      ) : null}
+      <View style={styles.dropdownRow}>
+        <SelectSheet
+          label="Estado"
+          value={filtroEstado}
+          placeholder="Todos"
+          accentColor={ACCENT}
+          options={FILTROS.map(({ label, value }) => ({ label, value }))}
+          onChange={(v) => setFiltroEstado((v as FiltroEstado) ?? "todos")}
+        />
+        <SelectSheet
+          label="Obra"
+          value={obraFiltro === "todas" ? null : obraFiltro}
+          placeholder="Todas las obras"
+          accentColor={ACCENT}
+          includeAllOption={{ label: "Todas las obras" }}
+          options={obras.map((obra) => ({ value: obra.id, label: obra.nombre }))}
+          onChange={(v) => setObraFiltro(v ?? "todas")}
+        />
+      </View>
 
       {error ? (
         <Card style={styles.errorCard}>
@@ -264,7 +237,7 @@ export default function IngenieriaScreen() {
       edges={["top", "left", "right"]}
     >
       <FlatList
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderHeader()}
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -385,18 +358,7 @@ const styles = StyleSheet.create({
   },
   searchIcon: {},
   searchInput: { flex: 1, fontSize: 14, color: "#0f172a" },
-  filtrosRow: { gap: 8, paddingBottom: 10 },
-  filtroChip: {
-    backgroundColor: "#e2e8f0",
-    borderRadius: 999,
-  },
-  filtroChipActive: { backgroundColor: "#3b82f6" },
-  filtroChipText: { color: "#475569", fontSize: 12, fontWeight: "600" },
-  filtroChipTextActive: { color: "#ffffff" },
-  obraChip: { backgroundColor: "#f1f5f9", borderRadius: 999 },
-  obraChipActive: { backgroundColor: "#0f172a" },
-  obraChipText: { color: "#475569", fontSize: 12 },
-  obraChipTextActive: { color: "#ffffff" },
+  dropdownRow: { flexDirection: "row", gap: 8, paddingBottom: 10 },
   countLabel: { color: "#94a3b8", fontSize: 12, marginBottom: 10 },
   errorCard: {
     backgroundColor: "#fff7ed",

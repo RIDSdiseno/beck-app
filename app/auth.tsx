@@ -27,7 +27,6 @@ type CallbackStep =
 export default function AuthCallbackScreen() {
   const params = useLocalSearchParams();
   const handledRef = useRef(false);
-
   const [step, setStep] = useState<CallbackStep>("Preparando autenticación...");
   const [error, setError] = useState("");
 
@@ -37,21 +36,20 @@ export default function AuthCallbackScreen() {
       handledRef.current = true;
 
       try {
-        setError("");
         setStep("Validando respuesta de Microsoft...");
 
         const code = typeof params.code === "string" ? params.code : "";
         const rawAuthError = typeof params.error === "string" ? params.error : "";
-        // Sanitizar el parámetro error del deep-link antes de mostrarlo —
-        // cualquier app instalada puede disparar beckcrmapp://auth con un error arbitrario.
-        const authError = rawAuthError.slice(0, 80).replace(/[^\w\s\-_.]/g, "");
+        const authError = rawAuthError
+          .slice(0, 80)
+          .replace(/[^\w\s\-_.]/g, "");
 
         if (authError) {
           throw new Error(`Microsoft devolvió un error: ${authError}`);
         }
 
         if (!code) {
-          throw new Error("Microsoft no devolvió un code válido.");
+          throw new Error("Microsoft no devolvió un código válido.");
         }
 
         const { codeVerifier, redirectUri } = await getMicrosoftAuthState();
@@ -61,7 +59,6 @@ export default function AuthCallbackScreen() {
         }
 
         setStep("Intercambiando credenciales...");
-
         const tokenResult = await AuthSession.exchangeCodeAsync(
           {
             clientId: getMicrosoftClientId(),
@@ -74,35 +71,31 @@ export default function AuthCallbackScreen() {
           microsoftDiscovery,
         );
 
-        const idToken = tokenResult.idToken;
-
-        if (!idToken) {
-          throw new Error("No se recibió id_token desde Microsoft.");
+        if (!tokenResult.idToken) {
+          throw new Error("Microsoft no devolvió una credencial válida.");
         }
 
         setStep("Validando acceso con Beck...");
-
-        const data = await loginWithMicrosoftIdToken(idToken);
+        const data = await loginWithMicrosoftIdToken(tokenResult.idToken);
 
         setStep("Cargando tu sesión...");
-
         clearMisObrasCache();
         clearMisRegistrosCache();
         await saveSession(data.token, data.user);
-
         await clearMicrosoftAuthState();
-
         router.replace(getInitialRouteForRole(data.user.rol));
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (__DEV__) console.warn("AUTH CALLBACK ERROR", err);
-
         await clearMicrosoftAuthState();
-
-        setError(err?.message || "No se pudo completar el inicio de sesión.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo completar el inicio de sesión.",
+        );
       }
     };
 
-    handleAuth();
+    void handleAuth();
   }, [params]);
 
   const volverAlLogin = async () => {
@@ -131,7 +124,6 @@ export default function AuthCallbackScreen() {
         <>
           <Text style={styles.errorTitle}>No se pudo iniciar sesión</Text>
           <Text style={styles.errorText}>{error}</Text>
-
           <Button
             mode="contained"
             onPress={volverAlLogin}

@@ -4,7 +4,11 @@ import {
   getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
-import { getClienteHistorial, RegistroCliente } from "@/services/api/clienteApi";
+import {
+  compartirPdfCliente,
+  getClienteHistorial,
+  RegistroCliente,
+} from "@/services/api/clienteApi";
 import { clearSession, getSession } from "@/services/auth/session";
 import {
   estadoColor,
@@ -14,12 +18,10 @@ import {
   shouldShowRejectionContext,
 } from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system/legacy";
 import { router, useFocusEffect } from "expo-router";
-import * as Sharing from "expo-sharing";
 import React, { useCallback, useState } from "react";
 import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import { ActivityIndicator, Avatar, Button, Card, Chip, Text } from "react-native-paper";
+import { Avatar, Button, Card, Chip, Text } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -185,24 +187,19 @@ export default function PerfilScreen() {
     }
   };
 
-  const handleSharePdf = async (pdfUrl: string, codigoBeck: string | null) => {
+  const handleSharePdf = async (
+    registroId: string,
+    codigoBeck: string | null,
+  ) => {
     try {
       setSharing(true);
-      const safeName = (codigoBeck || "registro").replace(/[^a-zA-Z0-9-_]/g, "_");
-      const localUri = `${FileSystem.cacheDirectory}beck-${safeName}.pdf`;
-      await FileSystem.downloadAsync(pdfUrl, localUri);
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert("No disponible", "Compartir archivos no está disponible en este dispositivo.");
-        return;
-      }
-      await Sharing.shareAsync(localUri, {
-        mimeType: "application/pdf",
-        dialogTitle: "Compartir PDF firmado",
-        UTI: "com.adobe.pdf",
-      });
-    } catch {
-      Alert.alert("Error", "No se pudo descargar el PDF. Verifica tu conexión e intenta nuevamente.");
+      await compartirPdfCliente(registroId, codigoBeck);
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.message ||
+          "No se pudo descargar el PDF. Verifica tu conexión e intenta nuevamente.",
+      );
     } finally {
       setSharing(false);
     }
@@ -257,7 +254,7 @@ export default function PerfilScreen() {
             {historialCliente.length > 0 ? (
               historialCliente.map((item) => {
                 const isJunta = item.tipoRegistro === "junta_lineal_espuma";
-                const hasPdf = Boolean(item.pdfFirmadoUrl);
+                const hasPdf = item.pdfDisponible;
                 return (
                   <Pressable
                     key={item.id}
@@ -347,7 +344,7 @@ export default function PerfilScreen() {
                   Código BECK: {selectedRegistro.codigoBeck || "-"}
                 </Text>
 
-                {selectedRegistro.pdfFirmadoUrl ? (
+                {selectedRegistro.pdfDisponible ? (
                   <>
                     <View style={styles.pdfPreviewBox}>
                       <MaterialCommunityIcons name="file-pdf-box" size={64} color="#16a34a" />
@@ -362,7 +359,12 @@ export default function PerfilScreen() {
                     <Button
                       mode="contained"
                       icon={sharing ? undefined : "share-variant"}
-                      onPress={() => handleSharePdf(selectedRegistro.pdfFirmadoUrl!, selectedRegistro.codigoBeck)}
+                      onPress={() =>
+                        handleSharePdf(
+                          selectedRegistro.id,
+                          selectedRegistro.codigoBeck,
+                        )
+                      }
                       loading={sharing}
                       disabled={sharing}
                       style={styles.pdfShareBtn}

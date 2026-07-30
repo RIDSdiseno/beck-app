@@ -3,13 +3,17 @@ import * as WebBrowser from "expo-web-browser";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const tenantId = process.env.EXPO_PUBLIC_AZURE_TENANT_ID!;
-const clientId = process.env.EXPO_PUBLIC_AZURE_CLIENT_ID!;
+const tenantId = process.env.EXPO_PUBLIC_AZURE_TENANT_ID?.trim() || "";
+const clientId = process.env.EXPO_PUBLIC_AZURE_CLIENT_ID?.trim() || "";
 
 export const microsoftDiscovery = {
-  authorizationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
-  tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+  authorizationEndpoint: `https://login.microsoftonline.com/${tenantId || "common"}/oauth2/v2.0/authorize`,
+  tokenEndpoint: `https://login.microsoftonline.com/${tenantId || "common"}/oauth2/v2.0/token`,
 };
+
+export function isMicrosoftConfigured() {
+  return Boolean(tenantId && clientId);
+}
 
 export function getMicrosoftRedirectUri() {
   return AuthSession.makeRedirectUri({
@@ -20,7 +24,7 @@ export function getMicrosoftRedirectUri() {
 
 export function getMicrosoftAuthRequestConfig(redirectUri: string) {
   return {
-    clientId,
+    clientId: clientId || "microsoft-login-disabled",
     scopes: ["openid", "profile", "email", "offline_access"],
     redirectUri,
     responseType: AuthSession.ResponseType.Code,
@@ -32,5 +36,9 @@ export function getMicrosoftAuthRequestConfig(redirectUri: string) {
 }
 
 export function getMicrosoftClientId() {
+  if (!clientId) {
+    throw new Error("El acceso con Microsoft aún no está configurado.");
+  }
+
   return clientId;
 }

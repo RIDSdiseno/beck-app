@@ -2,7 +2,11 @@ const DEFAULT_API_BASE_URL = "https://beck-mobile-backend-production.up.railway.
 
 function normalizeApiBaseUrl(value?: string | null) {
   const url = value?.trim() || DEFAULT_API_BASE_URL;
-  return url.replace(/\/+$/, "");
+  const normalized = url.replace(/\/+$/, "");
+  if (!__DEV__ && !normalized.startsWith("https://")) {
+    throw new Error("EXPO_PUBLIC_API_BASE_URL debe usar HTTPS");
+  }
+  return normalized;
 }
 
 export const API_BASE_URL = normalizeApiBaseUrl(

@@ -31,14 +31,26 @@ export async function authenticatedFetch(
   init?: RequestInit,
 ) {
   let response: Response;
+  const controller = init?.signal ? null : new AbortController();
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), 60_000)
+    : null;
 
   try {
-    response = await fetch(input, init);
+    response = await fetch(input, {
+      ...init,
+      signal: init?.signal || controller?.signal,
+    });
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("La solicitud tardó demasiado. Intenta nuevamente.");
+    }
     if (error instanceof TypeError && error.message.toLowerCase().includes("network request failed")) {
       throw new Error("Sin conexión. Verifica tu red e intenta nuevamente.");
     }
     throw error;
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 
   if (response.status === 401) {

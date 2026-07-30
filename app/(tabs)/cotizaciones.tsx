@@ -1,11 +1,12 @@
 import dayjs from "dayjs";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Card, Chip, DataTable, Text, TextInput } from "react-native-paper";
+import { Card, Chip, DataTable, Text } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { TextInput } from "@/components/AppTextInput";
 import { BrandHeader } from "../../components/BrandHeader";
 
 type EstadoCotizacion = "borrador" | "enviada" | "aceptada" | "rechazada";

@@ -1,12 +1,15 @@
-import { getClienteRegistrosObra, RegistroCliente, validarRegistroCliente } from "@/services/api/clienteApi";
+import {
+  compartirPdfCliente,
+  getClienteRegistrosObra,
+  RegistroCliente,
+  validarRegistroCliente,
+} from "@/services/api/clienteApi";
 import {
   CampoConfiguracionRegistro,
   getConfiguracionRegistro,
 } from "@/services/api/obrasApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system/legacy";
 import { router, useLocalSearchParams } from "expo-router";
-import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -56,7 +59,6 @@ type SignatureCanvasProps = {
 function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
   const [completedPaths, setCompletedPaths] = useState<string[]>([]);
   const [currentPath, setCurrentPath] = useState<string>("");
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const currentPathRef = useRef<string>("");
   const completedPathsRef = useRef<string[]>([]);
   const dimensionsRef = useRef({ width: 0, height: 0 });
@@ -128,7 +130,6 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
           dimensionsRef.current = { width, height };
-          setDimensions({ width, height });
         }}
         {...panResponder.panHandlers}
       >
@@ -213,7 +214,7 @@ export default function ClienteRegistroScreen() {
   // Validación
   const [validando, setValidando] = useState(false);
   const [validado, setValidado] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfDisponible, setPdfDisponible] = useState(false);
   const [sharing, setSharing] = useState(false);
 
   // Galería de fotos
@@ -300,7 +301,7 @@ export default function ClienteRegistroScreen() {
                 canvasHeight,
               });
               setValidado(true);
-              if (updated.pdfFirmadoUrl) setPdfUrl(updated.pdfFirmadoUrl);
+              setPdfDisponible(updated.pdfDisponible);
               Alert.alert(
                 "¡Registro validado!",
                 "El registro fue firmado y el PDF final fue generado. Puedes compartirlo desde esta pantalla.",
@@ -318,25 +319,16 @@ export default function ClienteRegistroScreen() {
   };
 
   const handleSharePdf = async () => {
-    const url = pdfUrl || registro?.pdfFirmadoUrl;
-    if (!url) return;
+    if (!registro || (!pdfDisponible && !registro.pdfDisponible)) return;
     try {
       setSharing(true);
-      const safeName = (codigoBeck ?? "registro").replace(/[^a-zA-Z0-9-_]/g, "_");
-      const localUri = `${FileSystem.cacheDirectory}beck-${safeName}.pdf`;
-      await FileSystem.downloadAsync(url, localUri);
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert("No disponible", "Compartir archivos no está disponible en este dispositivo.");
-        return;
-      }
-      await Sharing.shareAsync(localUri, {
-        mimeType: "application/pdf",
-        dialogTitle: "Compartir PDF firmado",
-        UTI: "com.adobe.pdf",
-      });
-    } catch {
-      Alert.alert("Error", "No se pudo descargar el PDF. Verifica tu conexión e intenta nuevamente.");
+      await compartirPdfCliente(registro.id, codigoBeck);
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.message ||
+          "No se pudo descargar el PDF. Verifica tu conexión e intenta nuevamente.",
+      );
     } finally {
       setSharing(false);
     }
@@ -474,7 +466,8 @@ export default function ClienteRegistroScreen() {
           ) : null}
 
           {/* PDF firmado disponible */}
-          {(registro.validadoCliente || validado) && (pdfUrl || registro.pdfFirmadoUrl) ? (
+          {(registro.validadoCliente || validado) &&
+          (pdfDisponible || registro.pdfDisponible) ? (
             <TouchableOpacity
               style={styles.pdfBox}
               onPress={handleSharePdf}
