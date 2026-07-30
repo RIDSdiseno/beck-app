@@ -341,10 +341,6 @@ function toApiNumber(value: string) {
   return Number(value.replace(",", "."));
 }
 
-function factorValue(value: string) {
-  return value === "0" ? 1 : toApiNumber(value);
-}
-
 function buildCalendarDays(viewDate: Date) {
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -1111,14 +1107,10 @@ export default function RegistrosScreen({
           isJuntaLineal || !campoConfiguradoVisible("holgura")
             ? 0
             : toApiNumber(holgura),
-        factorHolguras:
-          isJuntaLineal || !campoConfiguradoVisible("holgura")
-            ? undefined
-            : factorValue(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
             ? 1
-            : factorValue(accesibilidad),
+            : toApiNumber(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
@@ -1224,14 +1216,10 @@ export default function RegistrosScreen({
           isJuntaLineal || !campoConfiguradoVisible("holgura")
             ? 0
             : toApiNumber(holgura),
-        factorHolguras:
-          isJuntaLineal || !campoConfiguradoVisible("holgura")
-            ? undefined
-            : factorValue(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
             ? 1
-            : factorValue(accesibilidad),
+            : toApiNumber(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
@@ -1317,14 +1305,10 @@ export default function RegistrosScreen({
           isJuntaLineal || !campoConfiguradoVisible("holgura")
             ? 0
             : toApiNumber(holgura),
-        factorHolguras:
-          isJuntaLineal || !campoConfiguradoVisible("holgura")
-            ? undefined
-            : factorValue(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
             ? 1
-            : factorValue(accesibilidad),
+            : toApiNumber(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
@@ -2006,12 +1990,8 @@ export default function RegistrosScreen({
                       : null}
                     {campoConfiguradoVisible("factorPorHolguras") ? (
                       <TextInput
-                        label="Factor por Holguras"
-                        value={String(
-                          holgura.trim()
-                            ? factorValue(holgura)
-                            : editingRegistro.factor_por_holguras ?? "",
-                        )}
+                        label="Factor por Holguras (calculado al guardar)"
+                        value={String(editingRegistro.factor_por_holguras ?? "")}
                         mode="outlined"
                         editable={false}
                         style={styles.input}
@@ -2027,11 +2007,9 @@ export default function RegistrosScreen({
                     ) : null}
                     {campoConfiguradoVisible("cantidadSellosConFactores") ? (
                       <TextInput
-                        label="Cantidad de sellos con factores sin reparaciones"
+                        label="Cantidad con factores (calculada al guardar)"
                         value={String(
-                          cantidadSellos.trim() && holgura.trim()
-                            ? toApiNumber(cantidadSellos) * factorValue(holgura)
-                            : editingRegistro.cantidad_sellos_con_factores ?? "",
+                          editingRegistro.cantidad_sellos_con_factores ?? "",
                         )}
                         mode="outlined"
                         editable={false}

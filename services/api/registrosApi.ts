@@ -18,7 +18,6 @@ export type CreateRegistroPayload = {
   cantidadSellos: number;
   nombreSellador: string;
   holgura: number;
-  factorHolguras?: number;
   accesibilidad?: number;
   cieloModular?: number;
   aislacion?: number;
