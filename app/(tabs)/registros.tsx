@@ -140,6 +140,9 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   observaciones: true,
   folio: false,
   eje: true,
+  rendimientoSellosEsperadoDiario: false,
+  rendimientoReparacionEsperadoDiario: true,
+  rendimientoIndividual: true,
 };
 
 const ITEMIZADO_BECK_OPTIONS = [
@@ -1105,11 +1108,11 @@ export default function RegistrosScreen({
             : toApiNumber(cantidadSellos),
         holgura:
           isJuntaLineal || !campoConfiguradoVisible("holgura")
-            ? 0
+            ? undefined
             : toApiNumber(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
-            ? 1
+            ? undefined
             : toApiNumber(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
@@ -1214,11 +1217,11 @@ export default function RegistrosScreen({
             : toApiNumber(cantidadSellos),
         holgura:
           isJuntaLineal || !campoConfiguradoVisible("holgura")
-            ? 0
+            ? undefined
             : toApiNumber(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
-            ? 1
+            ? undefined
             : toApiNumber(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
@@ -1303,11 +1306,11 @@ export default function RegistrosScreen({
             : toApiNumber(cantidadSellos),
         holgura:
           isJuntaLineal || !campoConfiguradoVisible("holgura")
-            ? 0
+            ? undefined
             : toApiNumber(holgura),
         accesibilidad:
           isJuntaLineal || !campoConfiguradoVisible("cieloModular")
-            ? 1
+            ? undefined
             : toApiNumber(accesibilidad),
         cieloModular:
           !isJuntaLineal && campoConfiguradoVisible("cieloModular")
@@ -1367,16 +1370,16 @@ export default function RegistrosScreen({
 
   const getPayloadCommonFields = () => ({
     fecha,
-    recinto: campoConfiguradoVisible("recinto") ? recinto : "No aplica",
-    modulo: campoConfiguradoVisible("modulo") ? modulo : "No aplica",
-    moduloEdificio: campoConfiguradoVisible("modulo") ? modulo : "No aplica",
-    piso: campoConfiguradoVisible("piso") ? piso : "0",
+    recinto: campoConfiguradoVisible("recinto") ? recinto : undefined,
+    modulo: campoConfiguradoVisible("modulo") ? modulo : undefined,
+    moduloEdificio: campoConfiguradoVisible("modulo") ? modulo : undefined,
+    piso,
     ejeNumerico: campoConfiguradoVisible("ejeNumerico")
       ? ejeNumerico.trim()
-      : "0-0",
+      : undefined,
     ejeAlfabetico: campoConfiguradoVisible("ejeAlfabetico")
       ? ejeAlfabetico
-      : "A-A",
+      : undefined,
     nombreSellador,
   });
 

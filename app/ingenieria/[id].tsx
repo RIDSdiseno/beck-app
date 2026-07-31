@@ -16,6 +16,10 @@ import {
 } from "@/services/api/ingenieriaApi";
 import { uploadRegistroFotos } from "@/services/api/registrosApi";
 import {
+  CampoConfiguracionRegistro,
+  getConfiguracionRegistro,
+} from "@/services/api/obrasApi";
+import {
   getItemizadoOpciones,
   ItemizadoOpcionApi,
 } from "@/services/api/itemizadoOpcionesApi";
@@ -118,6 +122,9 @@ export default function IngenieriaDetalleScreen() {
   const [saving, setSaving] = useState(false);
   const [registro, setRegistro] = useState<RegistroIngenieriaApi | null>(null);
   const [error, setError] = useState("");
+  const [camposConfigurados, setCamposConfigurados] = useState<
+    Partial<Record<CampoConfiguracionRegistro, boolean>>
+  >({});
 
   const [showEdit, setShowEdit] = useState(false);
   const [showRechazo, setShowRechazo] = useState(false);
@@ -186,6 +193,20 @@ export default function IngenieriaDetalleScreen() {
         setError("");
         const data = await getIngenieriaRegistroById(id);
         setRegistro(data);
+        try {
+          const configuracion = await getConfiguracionRegistro(
+            data.obra_id,
+            "ingenieria",
+            true,
+          );
+          setCamposConfigurados(
+            Object.fromEntries(
+              configuracion.map((campo) => [campo.campo, campo.visible]),
+            ),
+          );
+        } catch {
+          setCamposConfigurados({});
+        }
         setEditFields({
           codigoBeck: data.codigo_beck || "",
           itemizadoBeck: data.itemizado_beck || "",
@@ -217,6 +238,9 @@ export default function IngenieriaDetalleScreen() {
     };
     load();
   }, [id, loadControl]);
+
+  const campoVisible = (campo: CampoConfiguracionRegistro) =>
+    camposConfigurados[campo] ?? true;
 
   const handleValidar = () => {
     Alert.alert(
@@ -527,21 +551,21 @@ export default function IngenieriaDetalleScreen() {
         <InfoRow label="Cliente" value={registro.obra?.cliente} />
 
         <SectionTitle title="REGISTRO" />
-        <InfoRow label="Código BECK" value={registro.codigo_beck} />
-        <InfoRow label="Itemizado BECK" value={registro.itemizado_beck} />
-        {registro.itemizado_mandante ? (
+        {campoVisible("codigoBeck") ? <InfoRow label="Código BECK" value={registro.codigo_beck} /> : null}
+        {campoVisible("itemizadoBeck") ? <InfoRow label="Itemizado BECK" value={registro.itemizado_beck} /> : null}
+        {campoVisible("itemizadoMandante") && registro.itemizado_mandante ? (
           <InfoRow label="Itemizado Mandante" value={registro.itemizado_mandante} />
         ) : null}
-        <InfoRow label="Fecha ejecución" value={formatShortDate(registro.fecha)} />
-        {registro.dia_semana ? (
+        {campoVisible("fechaEjecucionSello") ? <InfoRow label="Fecha ejecución" value={formatShortDate(registro.fecha)} /> : null}
+        {campoVisible("diaSemana") && registro.dia_semana ? (
           <InfoRow label="Día" value={registro.dia_semana} />
         ) : null}
-        <InfoRow label="Piso" value={registro.piso} />
-        <InfoRow label="Eje alfabético" value={registro.eje_alfabetico} />
-        <InfoRow label="Eje numérico" value={registro.eje_numerico} />
-        <InfoRow label="Sellador" value={registro.nombre_sellador} />
+        {campoVisible("piso") ? <InfoRow label="Piso" value={registro.piso} /> : null}
+        {campoVisible("ejeAlfabetico") ? <InfoRow label="Eje alfabético" value={registro.eje_alfabetico} /> : null}
+        {campoVisible("ejeNumerico") ? <InfoRow label="Eje numérico" value={registro.eje_numerico} /> : null}
+        {campoVisible("nombreSellador") ? <InfoRow label="Sellador" value={registro.nombre_sellador} /> : null}
 
-        {(registro.fotos?.length ?? 0) > 0 ? (
+        {campoVisible("foto") && (registro.fotos?.length ?? 0) > 0 ? (
           <>
             <SectionTitle title="FOTOGRAFÍAS" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
@@ -552,22 +576,24 @@ export default function IngenieriaDetalleScreen() {
           </>
         ) : null}
 
-        <InfoRow label="Recinto" value={registro.recinto} />
-        <InfoRow label="Módulo / Edificio" value={registro.modulo} />
-        <InfoRow label="Nº Sello" value={registro.numero_sello} />
-        <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} />
-        <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} />
-        <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} />
-        <InfoRow label="Accesibilidad" value={registro.accesibilidad} />
-        <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} />
-        <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} />
-        <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} />
-        {registro.observaciones ? (
+        {campoVisible("recinto") ? <InfoRow label="Recinto" value={registro.recinto} /> : null}
+        {campoVisible("modulo") ? <InfoRow label="Módulo / Edificio" value={registro.modulo} /> : null}
+        {campoVisible("numeroSello") ? <InfoRow label="Nº Sello" value={registro.numero_sello} /> : null}
+        {campoVisible("cantidadSellos") ? <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} /> : null}
+        {campoVisible("holgura") ? <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} /> : null}
+        {campoVisible("factorPorHolguras") ? <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} /> : null}
+        {campoVisible("cieloModular") ? <InfoRow label="Accesibilidad" value={registro.accesibilidad} /> : null}
+        {campoVisible("cantidadSellosConFactores") ? <InfoRow label="Sellos con factores" value={formatDecimal(registro.cantidad_sellos_con_factores)} /> : null}
+        {campoVisible("aislacion") ? <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} /> : null}
+        {campoVisible("cantidadSellosAislacion") ? <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} /> : null}
+        {campoVisible("reparacionTabique") ? <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} /> : null}
+        {campoVisible("cantidadFinal") ? <InfoRow label="Cantidad final" value={formatDecimal(registro.cantidad_final)} /> : null}
+        {campoVisible("observaciones") && registro.observaciones ? (
           <InfoRow label="Observaciones" value={registro.observaciones} />
         ) : null}
-        <InfoRow label="Folio" value={registro.folio} />
-        <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} />
-        {registro.metros_lineales ? (
+        {campoVisible("folio") ? <InfoRow label="Folio" value={registro.folio} /> : null}
+        {campoVisible("tipoRegistro") ? <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} /> : null}
+        {campoVisible("metrosLineales") && registro.metros_lineales ? (
           <InfoRow label="Longitud (m)" value={`${registro.metros_lineales} m`} />
         ) : null}
 

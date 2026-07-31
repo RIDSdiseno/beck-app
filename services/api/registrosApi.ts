@@ -10,14 +10,14 @@ export type CreateRegistroPayload = {
   itemizadoBeck?: string;
   recinto?: string;
   moduloEdificio?: string;
-  modulo: string;
+  modulo?: string;
   piso: string;
-  ejeNumerico: string;
-  ejeAlfabetico: string;
+  ejeNumerico?: string;
+  ejeAlfabetico?: string;
   numeroSello: string;
   cantidadSellos: number;
   nombreSellador: string;
-  holgura: number;
+  holgura?: number;
   accesibilidad?: number;
   cieloModular?: number;
   aislacion?: number;

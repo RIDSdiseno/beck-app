@@ -193,6 +193,14 @@ const DEFAULT_CAMPOS_CLIENTE: Partial<Record<CampoConfiguracionRegistro, boolean
   holgura: true,
   factorPorHolguras: true,
   cieloModular: true,
+  fechaEjecucionSello: true,
+  foto: true,
+  ejeAlfabetico: true,
+  ejeNumerico: true,
+  cantidadSellosConFactores: true,
+  aislacion: true,
+  cantidadSellosAislacion: true,
+  reparacionTabique: true,
 };
 
 export default function ClienteRegistroScreen() {
@@ -396,7 +404,7 @@ export default function ClienteRegistroScreen() {
           <SectionTitle title="INFORMACIÓN GENERAL" />
           <View style={styles.section}>
             <FieldRow label="Código BECK"   value={campoVisible("codigoBeck") ? codigoBeck : null} />
-            <FieldRow label="Fecha"         value={formatDate(registro.fecha)} />
+            <FieldRow label="Fecha"         value={campoVisible("fechaEjecucionSello") ? formatDate(registro.fecha) : null} />
             <FieldRow label="Día semana"    value={campoVisible("diaSemana") ? registro.diaSemana : null} />
             <FieldRow label="Folio"         value={campoVisible("folio") ? registro.folio : null} />
             <FieldRow label="Observaciones" value={registro.observaciones} />
@@ -405,11 +413,21 @@ export default function ClienteRegistroScreen() {
           {/* Datos técnicos */}
           <SectionTitle title="DATOS TÉCNICOS" />
           <View style={styles.section}>
-            <FieldRow label="Material"        value={registro.descripcionMaterial} />
+            <FieldRow label="Material"        value={campoVisible("itemizadoBeck") ? registro.descripcionMaterial : null} />
             <FieldRow label="Recinto"         value={campoVisible("recinto") ? registro.recinto : null} />
             <FieldRow label="Módulo"          value={campoVisible("modulo") ? registro.modulo : null} />
             <FieldRow label="Piso"            value={campoVisible("piso") ? registro.piso : null} />
-            <FieldRow label="Eje"             value={campoVisible("eje") ? registro.eje : null} />
+            <FieldRow
+              label="Eje"
+              value={
+                campoVisible("ejeAlfabetico") || campoVisible("ejeNumerico")
+                  ? [
+                      campoVisible("ejeAlfabetico") ? registro.ejeAlfabetico : null,
+                      campoVisible("ejeNumerico") ? registro.ejeNumerico : null,
+                    ].filter(Boolean).join("-")
+                  : null
+              }
+            />
             {!isJunta && campoVisible("numeroSello") && (
               <FieldRow label="N° de sello" value={registro.numeroSello} />
             )}
@@ -426,12 +444,16 @@ export default function ClienteRegistroScreen() {
             <FieldRow label="Holgura (cm)"    value={campoVisible("holgura") ? registro.holgura : null} />
             <FieldRow label="Factor holgura"  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
             <FieldRow label="Accesibilidad"   value={campoVisible("cieloModular") ? registro.accesibilidad : null} />
+            <FieldRow label="Sellos con factores" value={campoVisible("cantidadSellosConFactores") ? registro.cantidadSellosConFactores : null} />
+            <FieldRow label="Aislación" value={campoVisible("aislacion") ? registro.aislacion : null} />
+            <FieldRow label="Sellos aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />
+            <FieldRow label="Reparación tabique" value={campoVisible("reparacionTabique") ? registro.reparacionTabique : null} />
             <FieldRow label="Itemizado BECK"     value={campoVisible("itemizadoBeck") ? registro.itemizadoBeck : null} />
             <FieldRow label="Itemizado mandante" value={campoVisible("itemizadoMandante") ? registro.itemizadoMandante : null} />
           </View>
 
           {/* Fotografías */}
-          {fotos.length > 0 ? (
+          {campoVisible("foto") && fotos.length > 0 ? (
             <>
               <SectionTitle title={`FOTOGRAFÍAS (${fotos.length})`} />
               <ScrollView
