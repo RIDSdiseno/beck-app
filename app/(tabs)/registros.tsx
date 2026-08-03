@@ -1889,9 +1889,8 @@ export default function RegistrosScreen({
                   <TextInput
                     label="Piso"
                     value={piso}
-                    onChangeText={(value) => setPiso(onlyDigits(value))}
+                    onChangeText={setPiso}
                     mode="outlined"
-                    keyboardType="numeric"
                     style={styles.input}
                   />
                 ) : null}
@@ -2540,9 +2539,8 @@ export default function RegistrosScreen({
                 <TextInput
                   label="Piso"
                   value={piso}
-                  onChangeText={(value) => setPiso(onlyDigits(value))}
+                  onChangeText={setPiso}
                   mode="outlined"
-                  keyboardType="numeric"
                   style={styles.input}
                 />
               ) : null}
@@ -2822,9 +2820,8 @@ export default function RegistrosScreen({
                   <TextInput
                     label="Piso"
                     value={piso}
-                    onChangeText={(value) => setPiso(onlyDigits(value))}
+                    onChangeText={setPiso}
                     mode="outlined"
-                    keyboardType="numeric"
                     style={styles.input}
                   />
                 ) : null}
