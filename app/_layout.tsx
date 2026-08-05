@@ -53,6 +53,7 @@ export default function RootLayout() {
                 <Stack.Screen name="login" />
                 <Stack.Screen name="auth" />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="(firemat)" />
                 <Stack.Screen
                   name="modal"
                   options={{ presentation: "modal" }}

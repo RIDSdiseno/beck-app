@@ -7,18 +7,20 @@ export type LoginResponse = {
     nombre: string;
     email: string;
     rol: string;
+    empresa: "beck" | "firemat";
   };
 };
 
 export async function loginWithMicrosoftIdToken(
   idToken: string,
+  empresa?: "beck" | "firemat",
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/mobile/auth/microsoft`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ idToken, empresa }),
   });
 
   const data = await readJsonResponse(response);
@@ -33,13 +35,14 @@ export async function loginWithMicrosoftIdToken(
 export async function loginWithEmailPassword(
   email: string,
   password: string,
+  empresa: "beck" | "firemat",
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/mobile/auth/email`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, empresa }),
   });
 
   // 404 aquí significa que el endpoint de login por email no está habilitado.

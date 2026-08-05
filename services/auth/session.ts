@@ -15,6 +15,7 @@ export type SessionUser = {
   nombre: string;
   email: string;
   rol: string;
+  empresa: "beck" | "firemat";
 };
 
 export type SelectedObra = {
@@ -107,6 +108,15 @@ export async function getSession(): Promise<{
 
   try {
     user = userRaw ? (JSON.parse(userRaw) as SessionUser) : null;
+    if (user && user.empresa !== "beck" && user.empresa !== "firemat") {
+      user = {
+        ...user,
+        empresa: ["vendedor_firemat", "bodeguero", "visualizador_firemat"].includes(user.rol)
+          ? "firemat"
+          : "beck",
+      };
+      await SecureStore.setItemAsync(STORAGE_KEYS.user, JSON.stringify(user));
+    }
   } catch {
     user = null;
     await SecureStore.deleteItemAsync(STORAGE_KEYS.user);

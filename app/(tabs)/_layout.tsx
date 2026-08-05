@@ -31,6 +31,7 @@ export default function TabLayout() {
   const [loading, setLoading] = React.useState(true);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [userRole, setUserRole] = React.useState<string | null>(null);
+  const [empresa, setEmpresa] = React.useState<"beck" | "firemat" | null>(null);
 
   React.useEffect(() => {
     const checkSession = async () => {
@@ -38,6 +39,7 @@ export default function TabLayout() {
         const session = await getSession();
         setIsAuthenticated(session.isAuthenticated);
         setUserRole(session.user?.rol ?? null);
+        setEmpresa(session.user?.empresa ?? null);
       } finally {
         setLoading(false);
       }
@@ -59,6 +61,10 @@ export default function TabLayout() {
 
   if (!isAuthenticated) {
     return <Redirect href="/login" />;
+  }
+
+  if (empresa === "firemat") {
+    return <Redirect href="/(firemat)/productos" />;
   }
 
   const currentTab = String(segments[segments.length - 1] || "index");

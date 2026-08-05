@@ -56,6 +56,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [error, setError] = useState("");
+  const [empresa, setEmpresa] = useState<"beck" | "firemat">("beck");
+  const isFiremat = empresa === "firemat";
   const redirectUri = useMemo(() => getMicrosoftRedirectUri(), []);
   const [request, , promptAsync] = AuthSession.useAuthRequest(
     getMicrosoftAuthRequestConfig(redirectUri),
@@ -131,7 +133,7 @@ export default function LoginScreen() {
 
       setIsEmailLoading(true);
 
-      const data = await loginWithEmailPassword(email, password);
+      const data = await loginWithEmailPassword(email, password, empresa);
       clearMisObrasCache();
       clearMisRegistrosCache();
       await saveSession(data.token, data.user);
@@ -161,7 +163,7 @@ export default function LoginScreen() {
     : insets.bottom + 28;
 
   return (
-    <View style={styles.background}>
+    <View style={[styles.background, isFiremat && styles.firematBackground]}>
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
@@ -187,6 +189,34 @@ export default function LoginScreen() {
                 isAndroid && styles.androidContainer,
               ]}
             >
+              <View style={styles.empresaSelector}>
+                <Button
+                  compact
+                  mode={empresa === "beck" ? "contained" : "outlined"}
+                  buttonColor={empresa === "beck" ? "#111827" : undefined}
+                  textColor={empresa === "beck" ? "#ffffff" : isFiremat ? "#ffffff" : "#111827"}
+                  style={styles.empresaButton}
+                  onPress={() => {
+                    setEmpresa("beck");
+                    setError("");
+                  }}
+                >
+                  BECK
+                </Button>
+                <Button
+                  compact
+                  mode={empresa === "firemat" ? "contained" : "outlined"}
+                  buttonColor={empresa === "firemat" ? "#dc2626" : undefined}
+                  textColor={empresa === "firemat" ? "#ffffff" : "#111827"}
+                  style={styles.empresaButton}
+                  onPress={() => {
+                    setEmpresa("firemat");
+                    setError("");
+                  }}
+                >
+                  FIREMAT
+                </Button>
+              </View>
               <View
                 style={[
                   styles.logoContainer,
@@ -195,7 +225,11 @@ export default function LoginScreen() {
                 ]}
               >
                 <Image
-                  source={require("../assets/images/beck-splash-logo.png")}
+                  source={
+                    isFiremat
+                      ? require("../assets/images/Firemat_logo.png")
+                      : require("../assets/images/beck-splash-logo.png")
+                  }
                   style={[
                     styles.logo,
                     isAndroid && styles.androidLogo,
@@ -210,7 +244,9 @@ export default function LoginScreen() {
                 elevation={3}
               >
                 <Card.Content>
-                  <Text style={styles.eyebrow}>CRM BECK</Text>
+                  <Text style={[styles.eyebrow, isFiremat && styles.firematEyebrow]}>
+                    {isFiremat ? "FIREMAT" : "CRM BECK"}
+                  </Text>
 
                   <Text
                     variant="headlineMedium"
@@ -225,7 +261,7 @@ export default function LoginScreen() {
                       isAndroid && styles.androidSubtitle,
                     ]}
                   >
-                    Accede con las credenciales asignadas desde el CRM Beck
+                    Accede con las credenciales asignadas desde el CRM {isFiremat ? "Firemat" : "Beck"}
                   </Text>
 
                   <TextInput
@@ -287,6 +323,7 @@ export default function LoginScreen() {
                       !password
                     }
                     style={styles.button}
+                    buttonColor={isFiremat ? "#dc2626" : "#f97316"}
                     contentStyle={[
                       styles.buttonContent,
                       isAndroid && styles.androidButtonContent,
@@ -340,6 +377,20 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     backgroundColor: "#FDC10B",
+  },
+  firematBackground: {
+    backgroundColor: "#090909",
+  },
+  empresaSelector: {
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  empresaButton: {
+    borderColor: "#dc2626",
+    borderRadius: 999,
+    minWidth: 112,
   },
   safeArea: {
     flex: 1,
@@ -401,6 +452,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: "#1a1a1a",
     marginBottom: 8,
+  },
+  firematEyebrow: {
+    color: "#dc2626",
   },
   title: {
     textAlign: "center",
