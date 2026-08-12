@@ -3,6 +3,8 @@ import { TextInput as PaperTextInput } from "react-native-paper";
 
 type PaperTextInputProps = React.ComponentProps<typeof PaperTextInput>;
 
+const DEFAULT_OUTLINE_STYLE = { borderRadius: 14 } as const;
+
 /**
  * Wrapper de TextInput con autocorrector y corrector ortografico
  * desactivados por defecto. Los tecnicos reportaron que el
@@ -12,6 +14,7 @@ function AppTextInput({
   autoCorrect = false,
   spellCheck = false,
   autoComplete = "off",
+  outlineStyle,
   ...rest
 }: PaperTextInputProps) {
   return (
@@ -19,6 +22,7 @@ function AppTextInput({
       autoCorrect={autoCorrect}
       spellCheck={spellCheck}
       autoComplete={autoComplete}
+      outlineStyle={[DEFAULT_OUTLINE_STYLE, outlineStyle]}
       {...rest}
     />
   );

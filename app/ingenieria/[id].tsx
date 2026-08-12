@@ -31,7 +31,6 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -48,6 +47,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
+import { ExpandableImage } from "@/components/ExpandableImage";
 
 type FotoLocal = { uri: string; name: string; type: string };
 
@@ -570,7 +570,7 @@ export default function IngenieriaDetalleScreen() {
             <SectionTitle title="FOTOGRAFÍAS" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
               {registro.fotos!.map((foto) => (
-                <Image key={foto.id} source={{ uri: foto.url }} style={styles.foto} />
+                <ExpandableImage key={foto.id} uri={foto.url} style={styles.foto} />
               ))}
             </ScrollView>
           </>
@@ -665,7 +665,7 @@ export default function IngenieriaDetalleScreen() {
                         </Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
                           {control.fotos_control_inspeccion!.map((f) => (
-                            <Image key={f.id} source={{ uri: f.url }} style={styles.fotoThumb} />
+                            <ExpandableImage key={f.id} uri={f.url} style={styles.fotoThumb} />
                           ))}
                         </ScrollView>
                       </>
@@ -880,7 +880,7 @@ export default function IngenieriaDetalleScreen() {
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
                   {registro.fotos!.map((f) => (
-                    <Image key={f.id} source={{ uri: f.url }} style={styles.fotoThumb} />
+                    <ExpandableImage key={f.id} uri={f.url} style={styles.fotoThumb} />
                   ))}
                 </ScrollView>
               </>
@@ -892,17 +892,22 @@ export default function IngenieriaDetalleScreen() {
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
                   {fotosNuevas.map((f, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => setFotosNuevas((prev) => prev.filter((_, idx) => idx !== i))}
-                    >
-                      <View style={styles.fotoThumbWrap}>
-                        <Image source={{ uri: f.uri }} style={styles.fotoThumb} />
-                        <View style={styles.fotoRemoveBadge}>
+                    <View key={i} style={styles.fotoThumbWrap}>
+                      <ExpandableImage
+                        uri={f.uri}
+                        style={styles.fotoThumb}
+                        accessibilityLabel={`Ver fotografía nueva ${i + 1} en pantalla completa`}
+                      />
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={`Quitar fotografía ${i + 1}`}
+                        hitSlop={8}
+                        style={styles.fotoRemoveBadge}
+                        onPress={() => setFotosNuevas((prev) => prev.filter((_, idx) => idx !== i))}
+                      >
                           <MaterialCommunityIcons name="close" size={12} color="#ffffff" />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </View>
                   ))}
                 </ScrollView>
               </>
@@ -1064,17 +1069,22 @@ export default function IngenieriaDetalleScreen() {
             {fotosControl.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
                 {fotosControl.map((f, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() => setFotosControl((prev) => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <View style={styles.fotoThumbWrap}>
-                      <Image source={{ uri: f.uri }} style={styles.fotoThumb} />
-                      <View style={styles.fotoRemoveBadge}>
+                  <View key={i} style={styles.fotoThumbWrap}>
+                    <ExpandableImage
+                      uri={f.uri}
+                      style={styles.fotoThumb}
+                      accessibilityLabel={`Ver fotografía del control ${i + 1} en pantalla completa`}
+                    />
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={`Quitar fotografía ${i + 1}`}
+                      hitSlop={8}
+                      style={styles.fotoRemoveBadge}
+                      onPress={() => setFotosControl((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
                         <MaterialCommunityIcons name="close" size={12} color="#ffffff" />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </ScrollView>
             ) : null}

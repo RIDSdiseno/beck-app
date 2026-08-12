@@ -1,5 +1,6 @@
 import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
+import { getSession } from "@/services/auth/session";
 
 export type FirematProducto = {
   id: number;
@@ -40,7 +41,18 @@ export type FirematInventarioResumen = {
 };
 
 async function request(path: string, init?: RequestInit) {
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/firemat${path}`, init);
+  const session = await getSession();
+  if (!session.token) {
+    throw new Error("No existe una sesión activa");
+  }
+
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${session.token}`);
+
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/firemat${path}`, {
+    ...init,
+    headers,
+  });
   const data = await readJsonResponse(response);
   if (!response.ok) throw new Error(data?.error || "No se pudo completar la operación Firemat");
   return data;

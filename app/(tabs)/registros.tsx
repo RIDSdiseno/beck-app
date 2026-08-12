@@ -33,7 +33,6 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Image,
   Keyboard,
   Modal,
   Pressable,
@@ -57,6 +56,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
+import { ExpandableImage } from "@/components/ExpandableImage";
 import { SelectSheet } from "@/components/SelectSheet";
 import { BrandHeader } from "../../components/BrandHeader";
 
@@ -224,6 +224,16 @@ function formatDisplayDate(value?: string | null) {
   });
 }
 
+function formatExecutionDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+
+  const datePart = value.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+  if (!match) return value;
+
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
 function getRegistroEstadoLabel(estado: RegistroHistorialApi["estado"]) {
   return estado.replace("_", " ");
 }
@@ -247,26 +257,32 @@ function getRegistroFotos(registro?: RegistroHistorialApi | null) {
 
   const relationFotos = registro.fotos || [];
   const originFotos = registro.registro_origen?.fotos || [];
-  const fallbackUrls = [
+  const ownFallbackUrls = [
     ...(Array.isArray(registro.fotos_urls) ? registro.fotos_urls : []),
     registro.foto_url,
+  ].filter((url): url is string => Boolean(url));
+  const originFallbackUrls = [
     ...(Array.isArray(registro.registro_origen?.fotos_urls)
       ? registro.registro_origen.fotos_urls
       : []),
     registro.registro_origen?.foto_url,
   ].filter((url): url is string => Boolean(url));
 
+  const preferredFotos = relationFotos.length
+    ? relationFotos
+    : originFotos.length
+      ? originFotos
+      : (ownFallbackUrls.length ? ownFallbackUrls : originFallbackUrls).map(
+          (url, index) => ({
+            id: `${registro.id}-fallback-${index}`,
+            url,
+            created_at: registro.created_at,
+          }),
+        );
+
   const seen = new Set<string>();
 
-  return [
-    ...relationFotos,
-    ...originFotos,
-    ...fallbackUrls.map((url, index) => ({
-      id: `${registro.id}-fallback-${index}`,
-      url,
-      created_at: registro.created_at,
-    })),
-  ].filter((foto) => {
+  return preferredFotos.filter((foto) => {
     if (!foto.url || seen.has(foto.url)) return false;
     seen.add(foto.url);
     return true;
@@ -325,6 +341,23 @@ function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
         </Text>
       ) : null}
       {fecha ? <Text style={styles.contextText}>Fecha: {fecha}</Text> : null}
+    </View>
+  );
+}
+
+function RegistroDetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
+  if (value === undefined || value === null || value === "") return null;
+
+  return (
+    <View style={styles.terrenoDetailField}>
+      <Text style={styles.terrenoDetailFieldLabel}>{label}</Text>
+      <Text style={styles.terrenoDetailFieldValue}>{String(value)}</Text>
     </View>
   );
 }
@@ -397,6 +430,8 @@ export default function RegistrosScreen({
   >("todos");
   const [selectedJefeObraId, setSelectedJefeObraId] = useState<string | null>(null);
   const [tecnicoRegistros, setTecnicoRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [selectedTecnicoRegistro, setSelectedTecnicoRegistro] =
+    useState<RegistroHistorialApi | null>(null);
   const [editingRegistro, setEditingRegistro] =
     useState<RegistroHistorialApi | null>(null);
 
@@ -526,7 +561,7 @@ export default function RegistrosScreen({
     if (!term) return visibles;
 
     return visibles.filter((registro) =>
-      `${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.tipo_registro}`
+      `${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.numero_sello || ""} ${registro.tipo_registro}`
         .toLowerCase()
         .includes(term),
     );
@@ -561,7 +596,7 @@ export default function RegistrosScreen({
     if (!term) return visibles;
 
     return visibles.filter((registro) =>
-      `${registro.obras?.nombre || ""} ${registro.piso || ""}`
+      `${registro.obras?.nombre || ""} ${registro.obras?.codigo || ""} ${registro.piso || ""} ${registro.numero_sello || ""}`
         .toLowerCase()
         .includes(term),
     );
@@ -1561,12 +1596,27 @@ export default function RegistrosScreen({
   const renderFotos = (options?: {
     existingFotos?: NonNullable<RegistroHistorialApi["fotos"]>;
     replacementMode?: boolean;
+    terrainCreate?: boolean;
   }) => {
     if (!campoConfiguradoVisible("foto")) return null;
 
     return (
       <>
-      <Text style={styles.photosTitle}>Foto</Text>
+      {options?.terrainCreate ? (
+        <View style={styles.terrenoSectionHeader}>
+          <View style={styles.terrenoSectionIcon}>
+            <MaterialCommunityIcons name="camera-outline" size={18} color="#0f172a" />
+          </View>
+          <View style={styles.terrenoSectionHeading}>
+            <Text style={styles.terrenoSectionTitle}>Evidencia fotográfica</Text>
+            <Text style={styles.terrenoSectionHint}>
+              Agrega al menos una fotografía clara del trabajo realizado.
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.photosTitle}>Foto</Text>
+      )}
 
       {options?.existingFotos?.length ? (
         <>
@@ -1574,7 +1624,7 @@ export default function RegistrosScreen({
           <View style={styles.photosGrid}>
             {options.existingFotos.map((foto) => (
               <View key={foto.id} style={styles.photoItem}>
-                <Image source={{ uri: foto.url }} style={styles.photoPreview} />
+                <ExpandableImage uri={foto.url} style={styles.photoPreview} />
               </View>
             ))}
           </View>
@@ -1589,10 +1639,22 @@ export default function RegistrosScreen({
       ) : null}
 
       <View style={styles.photoActions}>
-        <Button mode="outlined" onPress={pickFromLibrary}>
+        <Button
+          mode="outlined"
+          icon="image-multiple-outline"
+          onPress={pickFromLibrary}
+          style={options?.terrainCreate ? styles.terrenoPhotoButton : undefined}
+          textColor={options?.terrainCreate ? "#0f172a" : undefined}
+        >
           Elegir de galeria
         </Button>
-        <Button mode="outlined" onPress={takePhoto}>
+        <Button
+          mode="outlined"
+          icon="camera-outline"
+          onPress={takePhoto}
+          style={options?.terrainCreate ? styles.terrenoPhotoButton : undefined}
+          textColor={options?.terrainCreate ? "#0f172a" : undefined}
+        >
           Tomar foto
         </Button>
       </View>
@@ -1605,7 +1667,11 @@ export default function RegistrosScreen({
           <View style={styles.photosGrid}>
             {fotos.map((foto, index) => (
               <View key={`${foto.uri}-${index}`} style={styles.photoItem}>
-                <Image source={{ uri: foto.uri }} style={styles.photoPreview} />
+                <ExpandableImage
+                  uri={foto.uri}
+                  style={styles.photoPreview}
+                  accessibilityLabel={`Ver fotografía nueva ${index + 1} en pantalla completa`}
+                />
                 <Button
                   mode="text"
                   onPress={() => removeFoto(index)}
@@ -1631,17 +1697,10 @@ export default function RegistrosScreen({
       >
         {isJefeObraObrasList ? (
           <View style={styles.fixedHeader}>
-            <BrandHeader subtitle="Registros · Supervisor" />
-            <Text variant="titleLarge" style={styles.title}>
-              Registro de Operarios
-            </Text>
-            <Text style={styles.subtitle}>
-              Busca una obra activa o pausada para revisar registros pendientes,
-              corregirlos y enviarlos a ingeniería.
-            </Text>
+            <BrandHeader subtitle="Registros de Operarios · Supervisor" />
 
             <TextInput
-              label="Buscar obra"
+              label="Buscar obra por nombre o código"
               value={jefeObraSearch}
               onChangeText={setJefeObraSearch}
               mode="outlined"
@@ -1655,7 +1714,7 @@ export default function RegistrosScreen({
           <View style={styles.fixedHeader}>
             <View style={styles.fixedTopRow}>
               <View style={styles.fixedBrand}>
-                <BrandHeader subtitle="Registros · Supervisor" />
+                <BrandHeader subtitle="Registros de Operarios · Supervisor" />
               </View>
               <Button
                 mode="text"
@@ -1669,14 +1728,6 @@ export default function RegistrosScreen({
                 Volver
               </Button>
             </View>
-            <Text variant="titleLarge" style={styles.title}>
-              Registro de Operarios
-            </Text>
-            <Text style={styles.subtitle}>
-              Busca una obra activa o pausada para revisar registros pendientes,
-              corregirlos y enviarlos a ingeniería.
-            </Text>
-
             <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
             <Text style={styles.recordMeta}>
               Código: {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
@@ -1684,7 +1735,7 @@ export default function RegistrosScreen({
             </Text>
 
             <TextInput
-              label="Buscar por Operario, piso o eje"
+              label="Buscar por operario, sello, piso o eje"
               value={jefeRegistroSearch}
               onChangeText={setJefeRegistroSearch}
               mode="outlined"
@@ -1766,16 +1817,7 @@ export default function RegistrosScreen({
           }
         >
           {!isJefeObraObrasList && !isJefeObraRegistrosList ? (
-            <>
-              <BrandHeader subtitle="Registros · Supervisor" />
-              <Text variant="titleLarge" style={styles.title}>
-                Registro de Operarios
-              </Text>
-              <Text style={styles.subtitle}>
-                Busca una obra activa o pausada para revisar registros pendientes,
-                corregirlos y enviarlos a ingeniería.
-              </Text>
-            </>
+            <BrandHeader subtitle="Registros de Operarios · Supervisor" />
           ) : null}
 
           {loadingJefeRegistros ? (
@@ -1798,18 +1840,58 @@ export default function RegistrosScreen({
               </Card.Content>
             </Card>
           ) : editingRegistro ? (
-            <Card style={styles.card}>
-              <Card.Content>
-                <View style={styles.cardHeaderRow}>
-                  <View>
-                    <Text style={styles.formTitle}>Editar registro</Text>
-                    <Text style={styles.emptyText}>
-                      Operario: {editingRegistro.usuarios?.nombre || "Sin Operario"}
+            <Card style={[styles.card, styles.jefeEditCard]}>
+              <View style={styles.jefeEditClip}>
+              <View style={styles.jefeEditAccent} />
+              <Card.Content style={styles.jefeEditContent}>
+                <View style={styles.jefeEditHeader}>
+                  <View style={styles.jefeEditHeaderIcon}>
+                    <MaterialCommunityIcons
+                      name={isJuntaLineal ? "ruler" : "fire"}
+                      size={24}
+                      color="#0f172a"
+                    />
+                  </View>
+                  <View style={styles.jefeEditHeaderInfo}>
+                    <Text style={styles.jefeEditTitle}>Editar registro</Text>
+                    <Text style={styles.jefeEditOperator} numberOfLines={1}>
+                      {editingRegistro.usuarios?.nombre || "Sin operario"}
                     </Text>
                   </View>
-                  <Button mode="text" onPress={() => setEditingRegistro(null)}>
+                  <Button
+                    mode="text"
+                    compact
+                    textColor="#0f172a"
+                    onPress={() => setEditingRegistro(null)}
+                  >
                     Cancelar
                   </Button>
+                </View>
+
+                <View style={styles.jefeEditSummary}>
+                  <View style={styles.jefeEditSummaryItem}>
+                    <Text style={styles.jefeEditSummaryLabel}>Obra</Text>
+                    <Text style={styles.jefeEditSummaryValue} numberOfLines={1}>
+                      {editingRegistro.obras?.nombre || "Sin obra"}
+                    </Text>
+                  </View>
+                  <View style={styles.jefeEditSummaryItem}>
+                    <Text style={styles.jefeEditSummaryLabel}>Fecha</Text>
+                    <Text style={styles.jefeEditSummaryValue}>
+                      {formatExecutionDate(editingRegistro.fecha)}
+                    </Text>
+                  </View>
+                  <View style={styles.jefeEditSummaryItem}>
+                    <Text style={styles.jefeEditSummaryLabel}>Nº sello</Text>
+                    <Text style={styles.jefeEditSummaryValue}>
+                      {editingRegistro.numero_sello || "—"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.jefeEditSectionHeader}>
+                  <MaterialCommunityIcons name="file-document-edit-outline" size={18} color="#f97316" />
+                  <Text style={styles.jefeEditSectionTitle}>Datos generales</Text>
                 </View>
 
                 {campoConfiguradoVisible("tipoRegistro") ? (
@@ -1941,6 +2023,11 @@ export default function RegistrosScreen({
                   replacementMode: true,
                 })}
 
+                <View style={styles.jefeEditSectionHeader}>
+                  <MaterialCommunityIcons name="map-marker-outline" size={18} color="#f97316" />
+                  <Text style={styles.jefeEditSectionTitle}>Ubicación y cantidades</Text>
+                </View>
+
                 {campoConfiguradoVisible("recinto") ? (
                   <TextInput
                     label="Recinto"
@@ -2065,15 +2152,21 @@ export default function RegistrosScreen({
                 ) : null}
 
                 {campoConfiguradoVisible("observaciones") ? (
-                  <TextInput
-                    label="Observaciones"
-                    value={observaciones}
-                    onChangeText={setObservaciones}
-                    mode="outlined"
-                    multiline
-                    numberOfLines={6}
-                    style={[styles.input, styles.observacionesInput]}
-                  />
+                  <>
+                    <View style={styles.jefeEditSectionHeader}>
+                      <MaterialCommunityIcons name="text-box-outline" size={18} color="#f97316" />
+                      <Text style={styles.jefeEditSectionTitle}>Observaciones</Text>
+                    </View>
+                    <TextInput
+                      label="Observaciones"
+                      value={observaciones}
+                      onChangeText={setObservaciones}
+                      mode="outlined"
+                      multiline
+                      numberOfLines={6}
+                      style={[styles.input, styles.observacionesInput]}
+                    />
+                  </>
                 ) : null}
 
                 <Button
@@ -2081,13 +2174,16 @@ export default function RegistrosScreen({
                   onPress={submitJefeEdit}
                   loading={saving}
                   disabled={saving}
-                  style={styles.button}
+                  style={[styles.button, styles.jefeEditSubmit]}
+                  buttonColor="#f97316"
+                  icon="send-outline"
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.buttonLabel}
                 >
                   {saving ? "Enviando..." : "Enviar a ingeniería"}
                 </Button>
               </Card.Content>
+              </View>
             </Card>
           ) : selectedJefeObra ? (
             <>
@@ -2114,7 +2210,7 @@ export default function RegistrosScreen({
                   </View>
 
                   <TextInput
-                    label="Buscar por Operario, piso o eje"
+                    label="Buscar por operario, sello, piso o eje"
                     value={jefeRegistroSearch}
                     onChangeText={setJefeRegistroSearch}
                     mode="outlined"
@@ -2177,36 +2273,48 @@ export default function RegistrosScreen({
               ) : null}
               {filteredJefeRegistros.length ? (
                 filteredJefeRegistros.map((registro) => (
-                  <Card key={registro.id} style={styles.historyCard}>
-                    <Card.Content>
-                      <View style={styles.recordHeader}>
-                        <View style={styles.recordIcon}>
+                  <Card key={registro.id} style={[styles.historyCard, styles.jefeHistoryCard]}>
+                    <View style={styles.jefeHistoryClip}>
+                    <View
+                      style={[
+                        styles.jefeRegistroCardAccent,
+                        registro.estado === "rechazado" &&
+                          styles.jefeRegistroCardAccentRejected,
+                      ]}
+                    />
+                    <Card.Content style={styles.jefeCardContent}>
+                      <View style={[styles.recordHeader, styles.jefeRecordHeader]}>
+                        <View style={[styles.recordIcon, styles.jefeRecordIcon]}>
                           <MaterialCommunityIcons
                             name={
                               registro.tipo_registro === "junta_lineal_espuma"
                                 ? "ruler"
                                 : "fire"
                             }
-                            size={22}
-                            color="#f97316"
+                            size={19}
+                            color="#0f172a"
                           />
                         </View>
                         <View style={styles.recordInfo}>
-                          <Text style={styles.recordTitle}>
+                          <Text style={[styles.recordTitle, styles.jefeRecordTitle]}>
                             {registro.tipo_registro === "junta_lineal_espuma"
                               ? "Junta lineal espuma"
                               : "Sello cortafuego"}
                           </Text>
-                          <Text style={styles.recordMeta}>
+                          <Text style={[styles.recordMeta, styles.jefeRecordMeta]}>
                             Piso {registro.piso} · Eje {registro.eje_alfabetico}-{registro.eje_numerico}
                           </Text>
-                          <Text style={styles.recordMeta}>
+                          <Text style={[styles.recordMeta, styles.jefeRecordMeta]}>
+                            Fecha: {formatExecutionDate(registro.fecha)} · Sello: {registro.numero_sello || "Sin número"}
+                          </Text>
+                          <Text style={[styles.recordMeta, styles.jefeRecordMeta]}>
                             Operario: {registro.usuarios?.nombre || registro.nombre_sellador}
                           </Text>
                         </View>
                         <Text
                           style={[
                             styles.statusPill,
+                            styles.jefeStatusPill,
                             registro.estado === "rechazado" &&
                               styles.statusRechazado,
                           ]}
@@ -2217,11 +2325,15 @@ export default function RegistrosScreen({
 
                       <RegistroContextBox registro={registro} />
 
-                      <View style={styles.actionRow}>
+                      <View style={[styles.actionRow, styles.jefeActionRow]}>
                         <Button
                           mode={registro.estado === "pendiente" ? "contained" : "outlined"}
+                          buttonColor={registro.estado === "pendiente" ? "#f97316" : undefined}
+                          textColor={registro.estado === "pendiente" ? "#ffffff" : "#0f172a"}
                           onPress={() => fillFormFromRegistro(registro)}
-                          style={styles.inlineButton}
+                          style={[styles.inlineButton, styles.jefeInlineButton]}
+                          contentStyle={styles.jefeButtonContent}
+                          labelStyle={styles.jefeButtonLabel}
                         >
                           {registro.estado === "pendiente"
                             ? "Editar y enviar"
@@ -2230,16 +2342,21 @@ export default function RegistrosScreen({
                         {registro.estado === "rechazado" ? (
                           <Button
                             mode="contained"
+                            buttonColor="#0f172a"
+                            textColor="#ffffff"
                             onPress={() => handleEnviarTecnico(registro)}
                             loading={saving}
                             disabled={saving}
-                            style={styles.inlineButton}
+                            style={[styles.inlineButton, styles.jefeInlineButton]}
+                            contentStyle={styles.jefeButtonContent}
+                            labelStyle={styles.jefeButtonLabel}
                           >
                             Enviar a Operario
                           </Button>
                         ) : null}
                       </View>
                     </Card.Content>
+                    </View>
                   </Card>
                 ))
               ) : (
@@ -2257,7 +2374,7 @@ export default function RegistrosScreen({
               {!isJefeObraObrasList ? (
                 <>
                   <TextInput
-                    label="Buscar obra"
+                    label="Buscar obra por nombre o código"
                     value={jefeObraSearch}
                     onChangeText={setJefeObraSearch}
                     mode="outlined"
@@ -2272,30 +2389,57 @@ export default function RegistrosScreen({
                 <Card
                   key={item.id}
                   style={[
-                    styles.card,
+                    styles.jefeObraCard,
                     selectedJefeObraId === item.id && styles.selectedCard,
                   ]}
                 >
-                  <Card.Content>
-                    <View style={styles.cardHeaderRow}>
+                  <View style={styles.jefeObraCardClip}>
+                  <View style={styles.jefeObraCardAccent} />
+                  <Card.Content style={styles.jefeObraCardContent}>
+                    <View style={styles.jefeObraCardRow}>
+                      <View style={styles.jefeObraIcon}>
+                        <MaterialCommunityIcons
+                          name="office-building-outline"
+                          size={24}
+                          color="#0f172a"
+                        />
+                      </View>
                       <View style={styles.recordInfo}>
-                        <Text style={styles.recordTitle}>{item.nombre}</Text>
-                        <Text style={styles.recordMeta}>
-                          {item.codigo || "Sin codigo"} · {item.estado || "Sin estado"}
-                        </Text>
+                        <Text style={styles.jefeObraCardTitle}>{item.nombre}</Text>
+                        <View style={styles.jefeObraBadges}>
+                          <Text style={styles.jefeObraCodeBadge}>
+                            {item.codigo || "Sin código"}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.jefeObraStateBadge,
+                              item.estado === "pausada" && styles.jefeObraStatePaused,
+                            ]}
+                          >
+                            {item.estado || "Sin estado"}
+                          </Text>
+                        </View>
                       </View>
                       <Button
-                        mode={selectedJefeObraId === item.id ? "contained" : "outlined"}
+                        mode="contained"
+                        compact
+                        icon="arrow-right"
+                        buttonColor="#0f172a"
+                        textColor="#ffffff"
+                        style={styles.jefeObraViewButton}
+                        contentStyle={styles.jefeObraViewButtonContent}
+                        labelStyle={styles.jefeObraViewButtonLabel}
                         onPress={() => {
                           setSelectedJefeObraId(item.id);
                           setJefeRegistroSearch("");
                           setJefeEstadoFiltro("todos");
                         }}
                       >
-                        Ver registros
+                        Ver
                       </Button>
                     </View>
                   </Card.Content>
+                  </View>
                 </Card>
               ))}
 
@@ -2315,16 +2459,9 @@ export default function RegistrosScreen({
     >
       {isTerrenoRegistroList ? (
         <View style={styles.fixedHeader}>
-          <BrandHeader subtitle="Registro de terreno · BECK" />
-          <Text variant="titleLarge" style={styles.title}>
-            Registros
-          </Text>
-          <Text style={styles.subtitle}>
-            Carga avances, fotos y datos de instalacion por obra seleccionada.
-          </Text>
-
+          <BrandHeader subtitle="Registro de operario · BECK" />
           <TextInput
-            label="Buscar por obra o piso"
+            label="Buscar por obra, piso o N° de sello"
             value={tecnicoRegistroSearch}
             onChangeText={setTecnicoRegistroSearch}
             mode="outlined"
@@ -2402,15 +2539,7 @@ export default function RegistrosScreen({
         }
       >
         {!isTerrenoRegistroList ? (
-          <>
-            <BrandHeader subtitle="Registro de terreno · BECK" />
-            <Text variant="titleLarge" style={styles.title}>
-              Registros
-            </Text>
-            <Text style={styles.subtitle}>
-              Carga avances, fotos y datos de instalacion por obra seleccionada.
-            </Text>
-          </>
+          <BrandHeader subtitle="Registro de operario · BECK" />
         ) : null}
 
         {userRole === "terreno" && !isFormMode && !editingRegistro ? (
@@ -2422,39 +2551,105 @@ export default function RegistrosScreen({
                 isCorreccionEditable(registro);
 
               return (
-                <Card key={registro.id} style={styles.historyCard}>
-                  <Card.Content>
-                    <View style={styles.cardHeaderRow}>
+                <Card
+                  key={registro.id}
+                  style={[styles.historyCard, styles.terrenoPendingCard]}
+                  onPress={() => setSelectedTecnicoRegistro(registro)}
+                  accessibilityLabel={`Ver detalle del registro ${registro.numero_sello || registro.id}`}
+                >
+                  <View style={styles.terrenoPendingClip}>
+                  <View
+                    style={[
+                      styles.terrenoPendingAccent,
+                      registro.estado === "rechazado" &&
+                        styles.terrenoPendingAccentRejected,
+                    ]}
+                  />
+                  <Card.Content style={styles.terrenoPendingContent}>
+                    <View style={styles.terrenoPendingHeader}>
+                      <View style={styles.terrenoPendingIcon}>
+                        <MaterialCommunityIcons
+                          name={
+                            registro.tipo_registro === "junta_lineal_espuma"
+                              ? "ruler"
+                              : "fire"
+                          }
+                          size={20}
+                          color="#0f172a"
+                        />
+                      </View>
                       <View style={styles.recordInfo}>
-                        <Text style={styles.recordTitle}>
-                          {registro.obras?.nombre || "Sin obra"} · Piso {registro.piso}
-                        </Text>
-                        <Text style={styles.recordMeta}>
+                        <Text style={styles.terrenoPendingType}>
                           {registro.tipo_registro === "junta_lineal_espuma"
                             ? "Junta lineal espuma"
                             : "Sello cortafuego"}
+                        </Text>
+                        <Text style={styles.terrenoPendingObra} numberOfLines={1}>
+                          {registro.obras?.nombre || "Sin obra"} · {registro.obras?.codigo || "Sin código"}
                         </Text>
                       </View>
                       <Text
                         style={[
                           styles.statusPill,
+                          styles.terrenoPendingStatus,
                           registro.estado === "rechazado" && styles.statusRechazado,
                         ]}
                       >
                         {getRegistroEstadoLabel(registro.estado)}
                       </Text>
                     </View>
+
+                    <View style={styles.terrenoPendingDetails}>
+                      <View style={styles.terrenoPendingDetailRow}>
+                        <MaterialCommunityIcons
+                          name="map-marker-outline"
+                          size={14}
+                          color="#c2410c"
+                        />
+                        <Text style={styles.terrenoPendingDetailValue}>
+                          Piso {registro.piso || "—"} · Eje {registro.eje_alfabetico || "—"}-{registro.eje_numerico || "—"}
+                        </Text>
+                      </View>
+                      <View style={styles.terrenoPendingDetailRow}>
+                        <MaterialCommunityIcons
+                          name="calendar-outline"
+                          size={14}
+                          color="#c2410c"
+                        />
+                        <Text style={styles.terrenoPendingDetailValue}>
+                          {formatExecutionDate(registro.fecha)}
+                          {registro.tipo_registro !== "junta_lineal_espuma"
+                            ? ` · Sello ${registro.numero_sello || "Sin número"}`
+                            : ""}
+                        </Text>
+                      </View>
+                    </View>
+
                     <RegistroContextBox registro={registro} />
+                    <View style={styles.terrenoPendingOpenHint}>
+                      <MaterialCommunityIcons name="eye-outline" size={14} color="#c2410c" />
+                      <Text style={styles.terrenoPendingOpenHintText}>
+                        Ver registro completo y fotografías
+                      </Text>
+                      <MaterialCommunityIcons name="chevron-right" size={16} color="#c2410c" />
+                    </View>
                     {canEditCorrection ? (
                       <Button
                         mode="contained"
-                        onPress={() => fillFormFromRegistro(registro)}
-                        style={styles.button}
+                        icon="file-document-edit-outline"
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          fillFormFromRegistro(registro);
+                        }}
+                        style={styles.terrenoCorrectionButton}
+                        contentStyle={styles.terrenoCorrectionButtonContent}
+                        labelStyle={styles.terrenoCorrectionButtonLabel}
                       >
                         Corregir registro
                       </Button>
                     ) : null}
                   </Card.Content>
+                  </View>
                 </Card>
               );
             })}
@@ -2724,31 +2919,49 @@ export default function RegistrosScreen({
           </Card>
         ) : isFormMode && obra ? (
           <>
-            <Card style={styles.card}>
-              <Card.Content>
-                <View style={styles.cardHeaderRow}>
-                  <View style={styles.cardHeaderInfo}>
-                    <Text style={styles.label}>Obra seleccionada</Text>
-                    <Text style={styles.value}>{obra.nombre}</Text>
-
-                    <Text style={styles.label}>Codigo</Text>
-                    <Text style={styles.value}>{obra.codigo}</Text>
-
-                    <Text style={styles.label}>Estado</Text>
-                    <Text style={styles.value}>
-                      {obra.estado || "Sin estado"}
-                    </Text>
+            <Card style={[styles.card, styles.terrenoObraCard]}>
+              <View style={styles.terrenoObraClip}>
+              <View style={styles.terrenoObraAccent} />
+              <Card.Content style={styles.terrenoObraContent}>
+                <View style={styles.terrenoObraRow}>
+                  <View style={styles.terrenoObraIcon}>
+                    <MaterialCommunityIcons
+                      name="office-building-outline"
+                      size={25}
+                      color="#0f172a"
+                    />
+                  </View>
+                  <View style={styles.terrenoObraInfo}>
+                    <Text style={styles.terrenoObraLabel}>Obra seleccionada</Text>
+                    <Text style={styles.terrenoObraName}>{obra.nombre}</Text>
+                    <View style={styles.terrenoObraBadges}>
+                      <Text style={styles.terrenoObraCode}>
+                        {obra.codigo || "Sin código"}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.terrenoObraState,
+                          obra.estado === "pausada" && styles.terrenoObraStatePaused,
+                        ]}
+                      >
+                        {obra.estado || "Sin estado"}
+                      </Text>
+                    </View>
                   </View>
 
                   <Button
-                    mode="outlined"
+                    mode="text"
+                    compact
                     onPress={goToObras}
-                    style={styles.changeButton}
+                    style={styles.terrenoChangeButton}
+                    labelStyle={styles.terrenoChangeButtonLabel}
+                    textColor="#c2410c"
                   >
                     Cambiar obra
                   </Button>
                 </View>
               </Card.Content>
+              </View>
             </Card>
 
             {loadingConfiguracionRegistro ? (
@@ -2761,13 +2974,38 @@ export default function RegistrosScreen({
                 </Card.Content>
               </Card>
             ) : (
-            <Card style={styles.card}>
-              <Card.Content>
-                <Text style={styles.formTitle}>Nuevo registro de terreno</Text>
+            <Card style={[styles.card, styles.terrenoFormCard]}>
+              <View style={styles.terrenoFormClip}>
+              <View style={styles.terrenoFormAccent} />
+              <Card.Content style={styles.terrenoFormContent}>
+                <View style={styles.terrenoFormHeader}>
+                  <View style={styles.terrenoFormHeaderIcon}>
+                    <MaterialCommunityIcons
+                      name="clipboard-plus-outline"
+                      size={25}
+                      color="#0f172a"
+                    />
+                  </View>
+                  <View style={styles.terrenoSectionHeading}>
+                    <Text style={styles.terrenoFormTitle}>Nuevo registro</Text>
+                    <Text style={styles.terrenoFormSubtitle}>
+                      Completa los datos del trabajo ejecutado.
+                    </Text>
+                  </View>
+                </View>
 
                 {campoConfiguradoVisible("tipoRegistro") ? (
                   <>
-                    <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                    <View style={styles.terrenoSectionHeader}>
+                      <View style={styles.terrenoSectionIcon}>
+                        <MaterialCommunityIcons
+                          name="fire"
+                          size={18}
+                          color="#0f172a"
+                        />
+                      </View>
+                      <Text style={styles.terrenoSectionTitle}>Tipo de registro</Text>
+                    </View>
                     <SegmentedButtons
                       value={tipoRegistro}
                       onValueChange={(value) => {
@@ -2791,6 +3029,17 @@ export default function RegistrosScreen({
                 ) : null}
 
                 {!isJuntaLineal ? renderItemizadoTerreno() : null}
+
+                <View style={styles.terrenoSectionHeader}>
+                  <View style={styles.terrenoSectionIcon}>
+                    <MaterialCommunityIcons
+                      name="map-marker-outline"
+                      size={18}
+                      color="#0f172a"
+                    />
+                  </View>
+                  <Text style={styles.terrenoSectionTitle}>Ubicación y ejecución</Text>
+                </View>
 
                 {campoConfiguradoVisible("fechaEjecucionSello") ? (
                   <Pressable onPress={() => setCalendarVisible(true)}>
@@ -2878,13 +3127,10 @@ export default function RegistrosScreen({
                           style={[styles.input, styles.observacionesInput]}
                         />
                       ) : null}
-                      {renderFotos()}
                     </>
                   ) : null
                 ) : (
                   <>
-                    {renderFotos()}
-
                     {campoConfiguradoVisible("recinto") ? (
                       <TextInput
                         label="Recinto"
@@ -2978,6 +3224,8 @@ export default function RegistrosScreen({
                   </>
                 )}
 
+                {renderFotos({ terrainCreate: true })}
+
                 {error ? <Text style={styles.errorText}>{error}</Text> : null}
                 {success ? (
                   <Text style={styles.successText}>{success}</Text>
@@ -2988,19 +3236,175 @@ export default function RegistrosScreen({
                   onPress={openConfirm}
                   loading={saving}
                   disabled={saving}
-                  style={styles.button}
+                  style={[styles.button, styles.terrenoSubmitButton]}
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.buttonLabel}
+                  icon="send-outline"
                 >
                   {saving ? "Enviando..." : "Enviar Registro"}
                 </Button>
               </Card.Content>
+              </View>
             </Card>
             )}
           </>
         ) : null}
       </ScrollView>
       </TouchableWithoutFeedback>
+
+      <Modal
+        visible={selectedTecnicoRegistro !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedTecnicoRegistro(null)}
+      >
+        <SafeAreaView style={styles.terrenoDetailScreen} edges={["top", "left", "right"]}>
+          {selectedTecnicoRegistro ? (
+            <>
+              <View style={styles.terrenoDetailTopBar}>
+                <View style={styles.terrenoDetailTopTitle}>
+                  <View style={styles.terrenoDetailTopIcon}>
+                    <MaterialCommunityIcons
+                      name={
+                        selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma"
+                          ? "ruler"
+                          : "fire"
+                      }
+                      size={22}
+                      color="#0f172a"
+                    />
+                  </View>
+                  <View style={styles.recordInfo}>
+                    <Text style={styles.terrenoDetailTitle}>Detalle del registro</Text>
+                    <Text style={styles.terrenoDetailSubtitle}>
+                      Información enviada al Supervisor
+                    </Text>
+                  </View>
+                </View>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => setSelectedTecnicoRegistro(null)}
+                  textColor="#c2410c"
+                >
+                  Cerrar
+                </Button>
+              </View>
+
+              <ScrollView
+                contentContainerStyle={styles.terrenoDetailContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.terrenoDetailHero}>
+                  <View style={styles.terrenoDetailHeroHeading}>
+                    <View style={styles.recordInfo}>
+                      <Text style={styles.terrenoDetailObra}>
+                        {selectedTecnicoRegistro.obras?.nombre || "Obra sin nombre"}
+                      </Text>
+                      <Text style={styles.terrenoDetailObraCode}>
+                        {selectedTecnicoRegistro.obras?.codigo || "Sin código"}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.statusPill,
+                        styles.terrenoPendingStatus,
+                        selectedTecnicoRegistro.estado === "rechazado" &&
+                          styles.statusRechazado,
+                        selectedTecnicoRegistro.estado === "validado" &&
+                          styles.statusValidado,
+                      ]}
+                    >
+                      {getRegistroEstadoLabel(selectedTecnicoRegistro.estado)}
+                    </Text>
+                  </View>
+                  <Text style={styles.terrenoDetailType}>
+                    {selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma"
+                      ? "Junta lineal espuma"
+                      : "Sello cortafuego"}
+                  </Text>
+                </View>
+
+                <View style={styles.terrenoDetailSection}>
+                  <View style={styles.terrenoDetailSectionHeader}>
+                    <MaterialCommunityIcons name="clipboard-text-outline" size={19} color="#c2410c" />
+                    <Text style={styles.terrenoDetailSectionTitle}>Datos enviados</Text>
+                  </View>
+                  <View style={styles.terrenoDetailGrid}>
+                    <RegistroDetailField label="Fecha de ejecución" value={formatExecutionDate(selectedTecnicoRegistro.fecha)} />
+                    <RegistroDetailField label="Día" value={selectedTecnicoRegistro.dia_semana} />
+                    <RegistroDetailField label="Responsable" value={selectedTecnicoRegistro.usuarios?.nombre || selectedTecnicoRegistro.nombre_sellador} />
+                    <RegistroDetailField label="Itemizado Beck" value={selectedTecnicoRegistro.itemizado_beck || selectedTecnicoRegistro.descripcion_material} />
+                    <RegistroDetailField label="Código Beck" value={selectedTecnicoRegistro.codigo_beck} />
+                    <RegistroDetailField label="Itemizado mandante" value={selectedTecnicoRegistro.itemizado_mandante || selectedTecnicoRegistro.itemizado_sacyr} />
+                    <RegistroDetailField label="Recinto" value={selectedTecnicoRegistro.recinto} />
+                    <RegistroDetailField label="Módulo o edificio" value={selectedTecnicoRegistro.modulo} />
+                    <RegistroDetailField label="Piso" value={selectedTecnicoRegistro.piso} />
+                    <RegistroDetailField label="Eje alfabético" value={selectedTecnicoRegistro.eje_alfabetico} />
+                    <RegistroDetailField label="Eje numérico" value={selectedTecnicoRegistro.eje_numerico} />
+                    {selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma" ? (
+                      <RegistroDetailField label="Metros lineales" value={selectedTecnicoRegistro.metros_lineales} />
+                    ) : (
+                      <>
+                        <RegistroDetailField label="N° del sello" value={selectedTecnicoRegistro.numero_sello} />
+                        <RegistroDetailField label="Cantidad de sellos" value={selectedTecnicoRegistro.cantidad_sellos} />
+                        <RegistroDetailField label="Holgura" value={selectedTecnicoRegistro.holgura} />
+                        <RegistroDetailField label="Factor por holguras" value={selectedTecnicoRegistro.factor_por_holguras} />
+                        <RegistroDetailField label="Accesibilidad" value={selectedTecnicoRegistro.accesibilidad} />
+                        <RegistroDetailField label="Sellos con factores" value={selectedTecnicoRegistro.cantidad_sellos_con_factores} />
+                        <RegistroDetailField label="Aislación" value={selectedTecnicoRegistro.aislacion} />
+                        <RegistroDetailField label="Sellos por aislación" value={selectedTecnicoRegistro.cantidad_sellos_aislacion} />
+                        <RegistroDetailField label="Reparación de tabique" value={selectedTecnicoRegistro.reparacion_tabique} />
+                        <RegistroDetailField label="Cantidad final" value={selectedTecnicoRegistro.cantidad_final} />
+                      </>
+                    )}
+                  </View>
+                  {selectedTecnicoRegistro.observaciones ? (
+                    <View style={styles.terrenoDetailObservation}>
+                      <Text style={styles.terrenoDetailFieldLabel}>Observaciones</Text>
+                      <Text style={styles.terrenoDetailFieldValue}>
+                        {selectedTecnicoRegistro.observaciones}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <RegistroContextBox registro={selectedTecnicoRegistro} />
+
+                <View style={styles.terrenoDetailSection}>
+                  <View style={styles.terrenoDetailSectionHeader}>
+                    <MaterialCommunityIcons name="camera-outline" size={19} color="#c2410c" />
+                    <Text style={styles.terrenoDetailSectionTitle}>Fotografías enviadas</Text>
+                  </View>
+                  {getRegistroFotos(selectedTecnicoRegistro).length ? (
+                    <View style={styles.terrenoDetailPhotos}>
+                      {getRegistroFotos(selectedTecnicoRegistro).map((foto, index) => (
+                        <View key={foto.id} style={styles.terrenoDetailPhotoCard}>
+                          <ExpandableImage
+                            uri={foto.url}
+                            style={styles.terrenoDetailPhoto}
+                            accessibilityLabel={`Ver fotografía enviada ${index + 1} en pantalla completa`}
+                          />
+                          <Text style={styles.terrenoDetailPhotoHint}>
+                            Toca la fotografía para verla en grande
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.terrenoDetailNoPhotos}>
+                      <MaterialCommunityIcons name="image-off-outline" size={28} color="#94a3b8" />
+                      <Text style={styles.terrenoDetailNoPhotosText}>
+                        Este registro no tiene fotografías disponibles.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            </>
+          ) : null}
+        </SafeAreaView>
+      </Modal>
 
       <Modal
         visible={calendarVisible}
@@ -3155,6 +3559,97 @@ const styles = StyleSheet.create({
     borderColor: "#f97316",
     backgroundColor: "#fff7ed",
   },
+  jefeEditCard: {
+    backgroundColor: "#fffdf7",
+    borderColor: "#FDC10B",
+    borderRadius: 20,
+  },
+  jefeEditClip: {
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  jefeEditAccent: {
+    backgroundColor: "#f97316",
+    height: 6,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  jefeEditContent: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+  },
+  jefeEditHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  jefeEditHeaderIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 13,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  jefeEditHeaderInfo: {
+    flex: 1,
+  },
+  jefeEditTitle: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  jefeEditOperator: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  jefeEditSummary: {
+    backgroundColor: "#0f172a",
+    borderRadius: 14,
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+    padding: 11,
+  },
+  jefeEditSummaryItem: {
+    flex: 1,
+  },
+  jefeEditSummaryLabel: {
+    color: "#FDC10B",
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  jefeEditSummaryValue: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  jefeEditSectionHeader: {
+    alignItems: "center",
+    borderBottomColor: "#fde68a",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 12,
+    marginTop: 8,
+    paddingBottom: 7,
+  },
+  jefeEditSectionTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  jefeEditSubmit: {
+    borderRadius: 14,
+    marginTop: 12,
+  },
   cardHeaderRow: {
     gap: 16,
   },
@@ -3164,6 +3659,183 @@ const styles = StyleSheet.create({
   changeButton: {
     alignSelf: "flex-start",
     borderRadius: 12,
+  },
+  terrenoObraCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+  },
+  terrenoObraClip: {
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  terrenoObraAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  terrenoObraContent: {
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+  },
+  terrenoObraRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  terrenoObraIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 13,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  terrenoObraInfo: {
+    flex: 1,
+  },
+  terrenoObraLabel: {
+    color: "#c2410c",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  terrenoObraName: {
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 6,
+    marginTop: 2,
+  },
+  terrenoObraBadges: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  terrenoObraCode: {
+    backgroundColor: "#0f172a",
+    borderRadius: 999,
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  terrenoObraState: {
+    backgroundColor: "#dcfce7",
+    borderRadius: 999,
+    color: "#166534",
+    fontSize: 9,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    textTransform: "capitalize",
+  },
+  terrenoObraStatePaused: {
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+  },
+  terrenoChangeButton: {
+    flexShrink: 0,
+  },
+  terrenoChangeButtonLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    marginHorizontal: 3,
+  },
+  terrenoFormCard: {
+    backgroundColor: "#fffdf7",
+    borderColor: "#FDC10B",
+    borderRadius: 20,
+  },
+  terrenoFormClip: {
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  terrenoFormAccent: {
+    backgroundColor: "#FDC10B",
+    height: 6,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  terrenoFormContent: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  terrenoFormHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 11,
+    marginBottom: 18,
+  },
+  terrenoFormHeaderIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 14,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  terrenoFormTitle: {
+    color: "#0f172a",
+    fontSize: 19,
+    fontWeight: "900",
+  },
+  terrenoFormSubtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  terrenoSectionHeader: {
+    alignItems: "center",
+    borderBottomColor: "#fde68a",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 8,
+    paddingBottom: 8,
+  },
+  terrenoSectionIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 9,
+    height: 30,
+    justifyContent: "center",
+    width: 30,
+  },
+  terrenoSectionHeading: {
+    flex: 1,
+  },
+  terrenoSectionTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  terrenoSectionHint: {
+    color: "#64748b",
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  terrenoPhotoButton: {
+    borderColor: "#FDC10B",
+    borderRadius: 14,
+    flexGrow: 1,
+  },
+  terrenoSubmitButton: {
+    backgroundColor: "#0f172a",
+    borderRadius: 14,
+    marginTop: 14,
   },
   formTitle: {
     color: "#0f172a",
@@ -3321,6 +3993,93 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 8,
   },
+  jefeObraCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  jefeObraCardClip: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  jefeObraCardAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  jefeObraCardContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  jefeObraCardRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  jefeObraIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 12,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  jefeObraCardTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  jefeObraBadges: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  jefeObraCodeBadge: {
+    backgroundColor: "#0f172a",
+    borderRadius: 999,
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  jefeObraStateBadge: {
+    backgroundColor: "#ffedd5",
+    borderRadius: 999,
+    color: "#c2410c",
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    textTransform: "capitalize",
+  },
+  jefeObraStatePaused: {
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+  },
+  jefeObraViewButton: {
+    borderRadius: 10,
+    flexShrink: 0,
+  },
+  jefeObraViewButtonContent: {
+    flexDirection: "row-reverse",
+    minHeight: 38,
+    paddingHorizontal: 2,
+  },
+  jefeObraViewButtonLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    marginHorizontal: 5,
+  },
   recordHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -3347,6 +4106,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  jefeRecordHeader: {
+    alignItems: "flex-start",
+    gap: 9,
+  },
+  jefeRecordIcon: {
+    backgroundColor: "#FDC10B",
+    borderRadius: 11,
+    height: 36,
+    width: 36,
+  },
+  jefeRecordTitle: {
+    fontSize: 14,
+  },
+  jefeRecordMeta: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
   recordDetails: {
     borderTopColor: "#e2e8f0",
     borderTopWidth: 1,
@@ -3360,6 +4136,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
     marginTop: 12,
+  },
+  jefeActionRow: {
+    gap: 7,
+    marginTop: 8,
   },
   contextBox: {
     backgroundColor: "#fff7ed",
@@ -3394,12 +4174,150 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     flexGrow: 1,
   },
+  jefeInlineButton: {
+    borderRadius: 10,
+  },
+  jefeButtonContent: {
+    minHeight: 36,
+  },
+  jefeButtonLabel: {
+    fontSize: 12,
+    marginVertical: 6,
+  },
   historyCard: {
     backgroundColor: "#ffffff",
     borderColor: "#e2e8f0",
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 10,
+  },
+  terrenoPendingCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 15,
+    marginBottom: 7,
+  },
+  terrenoPendingClip: {
+    borderRadius: 15,
+    overflow: "hidden",
+  },
+  terrenoPendingAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  terrenoPendingAccentRejected: {
+    backgroundColor: "#dc2626",
+  },
+  terrenoPendingContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  terrenoPendingHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+  },
+  terrenoPendingIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 10,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  terrenoPendingType: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  terrenoPendingObra: {
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  terrenoPendingStatus: {
+    backgroundColor: "#FDC10B",
+    color: "#0f172a",
+    flexShrink: 0,
+    fontSize: 9,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  terrenoPendingDetails: {
+    backgroundColor: "#ffffff",
+    borderColor: "#fde68a",
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4,
+    marginTop: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  terrenoPendingDetailRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  terrenoPendingDetailValue: {
+    color: "#334155",
+    fontSize: 10,
+    flexShrink: 1,
+    fontWeight: "700",
+  },
+  terrenoCorrectionButton: {
+    backgroundColor: "#dc2626",
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  terrenoPendingOpenHint: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 7,
+  },
+  terrenoPendingOpenHintText: {
+    color: "#c2410c",
+    flex: 1,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  terrenoCorrectionButtonContent: {
+    minHeight: 38,
+  },
+  terrenoCorrectionButtonLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    marginVertical: 5,
+  },
+  jefeHistoryCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 16,
+    marginBottom: 7,
+  },
+  jefeHistoryClip: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  jefeRegistroCardAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  jefeRegistroCardAccentRejected: {
+    backgroundColor: "#dc2626",
+  },
+  jefeCardContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   statusPill: {
     alignSelf: "flex-start",
@@ -3413,6 +4331,13 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     textTransform: "capitalize",
   },
+  jefeStatusPill: {
+    backgroundColor: "#FDC10B",
+    color: "#0f172a",
+    fontSize: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   statusValidado: {
     backgroundColor: "#dcfce7",
     color: "#16a34a",
@@ -3420,6 +4345,169 @@ const styles = StyleSheet.create({
   statusRechazado: {
     backgroundColor: "#fee2e2",
     color: "#dc2626",
+  },
+  terrenoDetailScreen: {
+    backgroundColor: "#f5f7fb",
+    flex: 1,
+  },
+  terrenoDetailTopBar: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderBottomColor: "#e2e8f0",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  terrenoDetailTopTitle: {
+    alignItems: "center",
+    flexDirection: "row",
+    flex: 1,
+    gap: 10,
+  },
+  terrenoDetailTopIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 11,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  terrenoDetailTitle: {
+    color: "#0f172a",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  terrenoDetailSubtitle: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  terrenoDetailContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  terrenoDetailHero: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 13,
+  },
+  terrenoDetailHeroHeading: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+  },
+  terrenoDetailObra: {
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  terrenoDetailObraCode: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  terrenoDetailType: {
+    color: "#c2410c",
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 9,
+  },
+  terrenoDetailSection: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 13,
+  },
+  terrenoDetailSectionHeader: {
+    alignItems: "center",
+    borderBottomColor: "#fde68a",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 10,
+    paddingBottom: 8,
+  },
+  terrenoDetailSectionTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  terrenoDetailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  terrenoDetailField: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 10,
+    minWidth: "47%",
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  terrenoDetailFieldLabel: {
+    color: "#94a3b8",
+    fontSize: 8,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  terrenoDetailFieldValue: {
+    color: "#334155",
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  terrenoDetailObservation: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#fde68a",
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 9,
+    padding: 9,
+  },
+  terrenoDetailPhotos: {
+    gap: 10,
+  },
+  terrenoDetailPhotoCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#fde68a",
+    borderRadius: 13,
+    borderWidth: 1,
+    overflow: "hidden",
+    padding: 7,
+  },
+  terrenoDetailPhoto: {
+    backgroundColor: "#e2e8f0",
+    borderRadius: 9,
+    height: 210,
+    width: "100%",
+  },
+  terrenoDetailPhotoHint: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "600",
+    paddingBottom: 2,
+    paddingTop: 7,
+    textAlign: "center",
+  },
+  terrenoDetailNoPhotos: {
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 18,
+  },
+  terrenoDetailNoPhotosText: {
+    color: "#64748b",
+    fontSize: 11,
+    textAlign: "center",
   },
   modalBackdrop: {
     flex: 1,

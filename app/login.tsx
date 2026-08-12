@@ -14,11 +14,13 @@ import {
 } from "@/services/auth/session";
 import * as AuthSession from "expo-auth-session";
 import { router } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -148,6 +150,10 @@ export default function LoginScreen() {
   const isLoading = isMicrosoftLoading || isEmailLoading;
   const hasEmailValue = Boolean(email.trim());
   const hasEmailError = hasEmailValue && !isValidEmail(email);
+  const isEmailLoginDisabled =
+    isLoading || !email.trim() || hasEmailError || !password;
+  const isMicrosoftLoginDisabled =
+    !MICROSOFT_LOGIN_ENABLED || !request || isLoading;
   const isAndroid = Platform.OS === "android";
   const isShortAndroid = isAndroid && screenHeight < 740;
   const keyboardBehavior = isInputFocused
@@ -189,34 +195,6 @@ export default function LoginScreen() {
                 isAndroid && styles.androidContainer,
               ]}
             >
-              <View style={styles.empresaSelector}>
-                <Button
-                  compact
-                  mode={empresa === "beck" ? "contained" : "outlined"}
-                  buttonColor={empresa === "beck" ? "#111827" : undefined}
-                  textColor={empresa === "beck" ? "#ffffff" : isFiremat ? "#ffffff" : "#111827"}
-                  style={styles.empresaButton}
-                  onPress={() => {
-                    setEmpresa("beck");
-                    setError("");
-                  }}
-                >
-                  BECK
-                </Button>
-                <Button
-                  compact
-                  mode={empresa === "firemat" ? "contained" : "outlined"}
-                  buttonColor={empresa === "firemat" ? "#dc2626" : undefined}
-                  textColor={empresa === "firemat" ? "#ffffff" : "#111827"}
-                  style={styles.empresaButton}
-                  onPress={() => {
-                    setEmpresa("firemat");
-                    setError("");
-                  }}
-                >
-                  FIREMAT
-                </Button>
-              </View>
               <View
                 style={[
                   styles.logoContainer,
@@ -232,6 +210,7 @@ export default function LoginScreen() {
                   }
                   style={[
                     styles.logo,
+                    isFiremat && styles.firematLogo,
                     isAndroid && styles.androidLogo,
                     isShortAndroid && styles.shortAndroidLogo,
                   ]}
@@ -316,14 +295,14 @@ export default function LoginScreen() {
                     icon="email-outline"
                     onPress={onEmailLogin}
                     loading={isEmailLoading}
-                    disabled={
-                      isLoading ||
-                      !email.trim() ||
-                      hasEmailError ||
-                      !password
-                    }
-                    style={styles.button}
-                    buttonColor={isFiremat ? "#dc2626" : "#f97316"}
+                    disabled={isEmailLoginDisabled}
+                    style={[
+                      styles.button,
+                      isFiremat && styles.firematButton,
+                      isFiremat && isEmailLoginDisabled && styles.firematButtonDisabled,
+                    ]}
+                    buttonColor={isFiremat ? "#f20d13" : "#f97316"}
+                    textColor="#ffffff"
                     contentStyle={[
                       styles.buttonContent,
                       isAndroid && styles.androidButtonContent,
@@ -349,10 +328,14 @@ export default function LoginScreen() {
                     icon="microsoft-windows"
                     onPress={onMicrosoftLogin}
                     loading={isMicrosoftLoading}
-                    disabled={
-                      !MICROSOFT_LOGIN_ENABLED || !request || isLoading
-                    }
-                    style={styles.microsoftButton}
+                    disabled={isMicrosoftLoginDisabled}
+                    style={[
+                      styles.microsoftButton,
+                      isFiremat && styles.firematButton,
+                      isFiremat && isMicrosoftLoginDisabled && styles.firematButtonDisabled,
+                    ]}
+                    buttonColor={isFiremat ? "#f20d13" : "#334155"}
+                    textColor="#ffffff"
                     contentStyle={[
                       styles.buttonContent,
                       isAndroid && styles.androidButtonContent,
@@ -368,6 +351,29 @@ export default function LoginScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isFiremat ? "Volver al acceso Beck" : "Ir al acceso Firemat"}
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.companySwitch,
+            {
+              top: Math.max(insets.top, 12),
+              backgroundColor: isFiremat ? "#FDC10B" : "#111827",
+            },
+            pressed && styles.companySwitchPressed,
+          ]}
+          onPress={() => {
+            setEmpresa(isFiremat ? "beck" : "firemat");
+            setError("");
+          }}
+        >
+          {isFiremat ? (
+            <Text style={styles.beckSwitchLetter}>B</Text>
+          ) : (
+            <MaterialCommunityIcons name="fire" size={28} color="#ef4444" />
+          )}
+        </Pressable>
       </SafeAreaView>
     </View>
   );
@@ -381,16 +387,26 @@ const styles = StyleSheet.create({
   firematBackground: {
     backgroundColor: "#090909",
   },
-  empresaSelector: {
-    flexDirection: "row",
-    gap: 10,
+  companySwitch: {
+    position: "absolute",
+    right: 14,
+    zIndex: 100,
+    elevation: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
   },
-  empresaButton: {
-    borderColor: "#dc2626",
-    borderRadius: 999,
-    minWidth: 112,
+  companySwitchPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
+  },
+  beckSwitchLetter: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 28,
   },
   safeArea: {
     flex: 1,
@@ -426,6 +442,9 @@ const styles = StyleSheet.create({
     height: 250,
     maxWidth: 500,
     width: "100%",
+  },
+  firematLogo: {
+    transform: [{ translateX: 12 }],
   },
   androidLogo: {
     height: 235,
@@ -524,6 +543,12 @@ const styles = StyleSheet.create({
   microsoftButton: {
     backgroundColor: "#334155",
     borderRadius: 14,
+  },
+  firematButton: {
+    backgroundColor: "#f20d13",
+  },
+  firematButtonDisabled: {
+    opacity: 0.55,
   },
   errorText: {
     marginTop: 14,

@@ -21,7 +21,7 @@ import {
   View,
 } from "react-native";
 import { ActivityIndicator, Button, Card, FAB, Searchbar, Text } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
 
 const emptyForm = {
@@ -41,6 +41,7 @@ function money(value: number | null | undefined) {
 }
 
 export default function FirematProductosScreen() {
+  const insets = useSafeAreaInsets();
   const [productos, setProductos] = React.useState<FirematProducto[]>([]);
   const [categorias, setCategorias] = React.useState<FirematCategoria[]>([]);
   const [query, setQuery] = React.useState("");
@@ -191,15 +192,28 @@ export default function FirematProductosScreen() {
       {isBodeguero ? <FAB icon="plus" color="#ffffff" style={styles.fab} onPress={openCreate} /> : null}
 
       <Modal visible={modalOpen} animationType="slide" onRequestClose={() => setModalOpen(false)}>
-        <SafeAreaView style={styles.modalSafe}>
+        <SafeAreaView
+          edges={["left", "right", "bottom"]}
+          style={[styles.modalSafe, { paddingTop: Math.max(insets.top, 16) }]}
+        >
           <View style={styles.modalHeader}>
-            <Text variant="titleLarge" style={styles.modalTitle}>{editing ? "Editar producto" : "Nuevo producto"}</Text>
-            <Button textColor="#ef4444" onPress={() => setModalOpen(false)}>Cerrar</Button>
+            <Text variant="titleLarge" style={styles.modalTitle} numberOfLines={2}>
+              {editing ? "Editar producto" : "Nuevo producto"}
+            </Text>
+            <Button
+              compact
+              textColor="#ef4444"
+              style={styles.closeButton}
+              contentStyle={styles.closeButtonContent}
+              onPress={() => setModalOpen(false)}
+            >
+              Cerrar
+            </Button>
           </View>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <TextInput label="Nombre" value={form.nombre} onChangeText={(nombre) => setForm((v) => ({ ...v, nombre }))} mode="outlined" style={styles.input} />
-            <TextInput label="SKU" value={form.sku} onChangeText={(sku) => setForm((v) => ({ ...v, sku }))} mode="outlined" style={styles.input} autoCapitalize="characters" />
-            <TextInput label="Descripción" value={form.descripcion} onChangeText={(descripcion) => setForm((v) => ({ ...v, descripcion }))} mode="outlined" style={styles.input} multiline />
+            <TextInput label="Nombre" value={form.nombre} onChangeText={(nombre) => setForm((v) => ({ ...v, nombre }))} mode="outlined" style={styles.input} outlineStyle={styles.inputOutline} />
+            <TextInput label="SKU" value={form.sku} onChangeText={(sku) => setForm((v) => ({ ...v, sku }))} mode="outlined" style={styles.input} outlineStyle={styles.inputOutline} autoCapitalize="characters" />
+            <TextInput label="Descripción" value={form.descripcion} onChangeText={(descripcion) => setForm((v) => ({ ...v, descripcion }))} mode="outlined" style={styles.input} outlineStyle={styles.inputOutline} multiline />
             <Text style={styles.fieldLabel}>Categoría</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {categorias.map((categoria) => (
@@ -213,10 +227,10 @@ export default function FirematProductosScreen() {
                 >{categoria.nombre}</Button>
               ))}
             </ScrollView>
-            <TextInput label="Precio CLP" value={form.precio} onChangeText={(precio) => setForm((v) => ({ ...v, precio }))} mode="outlined" keyboardType="decimal-pad" style={styles.input} />
-            {!editing ? <TextInput label="Stock inicial" value={form.stockInicial} onChangeText={(stockInicial) => setForm((v) => ({ ...v, stockInicial }))} mode="outlined" keyboardType="number-pad" style={styles.input} /> : null}
-            <TextInput label="Stock mínimo" value={form.stockMinimo} onChangeText={(stockMinimo) => setForm((v) => ({ ...v, stockMinimo }))} mode="outlined" keyboardType="number-pad" style={styles.input} />
-            <TextInput label="Ubicación" value={form.ubicacion} onChangeText={(ubicacion) => setForm((v) => ({ ...v, ubicacion }))} mode="outlined" style={styles.input} />
+            <TextInput label="Precio CLP" value={form.precio} onChangeText={(precio) => setForm((v) => ({ ...v, precio }))} mode="outlined" keyboardType="decimal-pad" style={styles.input} outlineStyle={styles.inputOutline} />
+            {!editing ? <TextInput label="Stock inicial" value={form.stockInicial} onChangeText={(stockInicial) => setForm((v) => ({ ...v, stockInicial }))} mode="outlined" keyboardType="number-pad" style={styles.input} outlineStyle={styles.inputOutline} /> : null}
+            <TextInput label="Stock mínimo" value={form.stockMinimo} onChangeText={(stockMinimo) => setForm((v) => ({ ...v, stockMinimo }))} mode="outlined" keyboardType="number-pad" style={styles.input} outlineStyle={styles.inputOutline} />
+            <TextInput label="Ubicación" value={form.ubicacion} onChangeText={(ubicacion) => setForm((v) => ({ ...v, ubicacion }))} mode="outlined" style={styles.input} outlineStyle={styles.inputOutline} />
             <Text style={styles.fieldLabel}>Criticidad</Text>
             <View style={styles.chips}>
               {["Baja", "Media", "Alta"].map((criticidad) => (
@@ -255,8 +269,10 @@ const styles = StyleSheet.create({
   muted: { color: "#a3a3a3" }, error: { color: "#f87171", textAlign: "center" }, empty: { color: "#a3a3a3", textAlign: "center", marginTop: 50 },
   fab: { position: "absolute", right: 18, bottom: 84, backgroundColor: "#dc2626" },
   modalSafe: { flex: 1, backgroundColor: "#0a0a0a" },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#292929" },
-  modalTitle: { color: "#ffffff", fontWeight: "800" }, form: { padding: 18, paddingBottom: 48, gap: 12 },
-  input: { backgroundColor: "#171717" }, fieldLabel: { color: "#d4d4d4", fontWeight: "700", marginTop: 4 },
+  modalHeader: { width: "100%", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#292929" },
+  modalTitle: { flex: 1, minWidth: 0, color: "#ffffff", fontWeight: "800" },
+  closeButton: { flexShrink: 0 }, closeButtonContent: { minHeight: 40, paddingHorizontal: 4 },
+  form: { padding: 18, paddingBottom: 48, gap: 12 },
+  input: { backgroundColor: "#171717" }, inputOutline: { borderRadius: 14 }, fieldLabel: { color: "#d4d4d4", fontWeight: "700", marginTop: 4 },
   chips: { flexDirection: "row", gap: 8 }, save: { marginTop: 14 },
 });

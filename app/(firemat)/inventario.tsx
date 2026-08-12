@@ -159,9 +159,9 @@ export default function FirematInventarioScreen() {
             <Card.Content>
               <Text variant="titleLarge" style={styles.modalTitle}>Ajustar inventario</Text>
               <Text style={styles.modalProduct}>{selected?.nombre}</Text>
-              <TextInput label="Stock nuevo" value={stockNuevo} onChangeText={setStockNuevo} keyboardType="number-pad" mode="outlined" style={styles.input} />
-              <TextInput label="Ubicación" value={ubicacion} onChangeText={setUbicacion} mode="outlined" style={styles.input} />
-              <TextInput label="Motivo del ajuste" value={motivo} onChangeText={setMotivo} mode="outlined" multiline style={styles.input} />
+              <TextInput label="Stock nuevo" value={stockNuevo} onChangeText={setStockNuevo} keyboardType="number-pad" mode="outlined" style={styles.input} outlineStyle={styles.inputOutline} />
+              <TextInput label="Ubicación" value={ubicacion} onChangeText={setUbicacion} mode="outlined" style={styles.input} outlineStyle={styles.inputOutline} />
+              <TextInput label="Motivo del ajuste" value={motivo} onChangeText={setMotivo} mode="outlined" multiline style={styles.input} outlineStyle={styles.inputOutline} />
               <View style={styles.actions}>
                 <Button textColor="#d4d4d4" onPress={() => setSelected(null)} disabled={saving}>Cancelar</Button>
                 <Button mode="contained" buttonColor="#dc2626" onPress={saveAdjust} loading={saving} disabled={saving}>Guardar</Button>
@@ -186,5 +186,5 @@ const styles = StyleSheet.create({
   badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" }, badgeText: { fontSize: 9, fontWeight: "800" },
   stockRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 15 }, metricLabel: { color: "#737373", fontSize: 10 }, metricValue: { color: "#f5f5f5", fontSize: 17, fontWeight: "800", marginTop: 2 }, location: { color: "#a3a3a3", fontSize: 12, marginTop: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 }, muted: { color: "#a3a3a3" }, error: { color: "#f87171", textAlign: "center" }, empty: { color: "#a3a3a3", textAlign: "center", marginTop: 50 },
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.82)", justifyContent: "center", padding: 20 }, modalCard: { backgroundColor: "#171717", borderColor: "#404040", borderWidth: 1 }, modalTitle: { color: "#ffffff", fontWeight: "800" }, modalProduct: { color: "#ef4444", marginTop: 4, marginBottom: 14 }, input: { backgroundColor: "#202020", marginBottom: 12 }, actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 8 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.82)", justifyContent: "center", padding: 20 }, modalCard: { backgroundColor: "#171717", borderColor: "#404040", borderWidth: 1 }, modalTitle: { color: "#ffffff", fontWeight: "800" }, modalProduct: { color: "#ef4444", marginTop: 4, marginBottom: 14 }, input: { backgroundColor: "#202020", marginBottom: 12 }, inputOutline: { borderRadius: 14 }, actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 8 },
 });

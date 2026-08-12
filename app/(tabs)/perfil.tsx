@@ -125,16 +125,40 @@ type ProfileActionProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
   onPress: () => void;
+  beckStyle?: boolean;
 };
 
-function ProfileAction({ icon, label, onPress }: ProfileActionProps) {
+function ProfileAction({ icon, label, onPress, beckStyle = false }: ProfileActionProps) {
   return (
-    <Pressable style={styles.actionCard} onPress={onPress}>
-      <View style={styles.actionIcon}>
-        <MaterialCommunityIcons name={icon} size={28} color="#f97316" />
+    <Pressable
+      style={({ pressed }) => [
+        styles.actionCard,
+        beckStyle && styles.terrenoActionCard,
+        pressed && styles.actionPressed,
+      ]}
+      onPress={onPress}
+    >
+      {beckStyle ? <View style={styles.terrenoActionAccent} /> : null}
+      <View style={[styles.actionIcon, beckStyle && styles.terrenoActionIcon]}>
+        <MaterialCommunityIcons
+          name={icon}
+          size={beckStyle ? 23 : 28}
+          color={beckStyle ? "#0f172a" : "#f97316"}
+        />
       </View>
-      <Text style={styles.actionLabel}>{label}</Text>
-      <MaterialCommunityIcons name="chevron-right" size={32} color="#64748b" />
+      <View style={styles.actionInfo}>
+        <Text style={[styles.actionLabel, beckStyle && styles.terrenoActionLabel]}>
+          {label}
+        </Text>
+        {beckStyle ? (
+          <Text style={styles.terrenoActionHint}>Consulta el estado de tus registros</Text>
+        ) : null}
+      </View>
+      <MaterialCommunityIcons
+        name="chevron-right"
+        size={beckStyle ? 25 : 32}
+        color={beckStyle ? "#c2410c" : "#64748b"}
+      />
     </Pressable>
   );
 }
@@ -223,7 +247,10 @@ export default function PerfilScreen() {
     setRefreshingHistory(false);
   };
   const isFixedProfileHeader =
-    user?.rol === "terreno" || user?.rol === "jefeobra" || user?.rol === "cliente";
+    user?.rol === "terreno" ||
+    user?.rol === "jefeobra" ||
+    user?.rol === "ingenieria" ||
+    user?.rol === "cliente";
 
   // ── Historial cliente ─────────────────────────────────────────────────────────
   if (showHistory && user?.rol === "cliente") {
@@ -416,9 +443,11 @@ export default function PerfilScreen() {
                 Volver
               </Button>
             </View>
-            <Text variant="titleLarge" style={styles.title}>
-              {historyTitle}
-            </Text>
+            {user?.rol !== "terreno" && user?.rol !== "jefeobra" ? (
+              <Text variant="titleLarge" style={styles.title}>
+                {historyTitle}
+              </Text>
+            ) : null}
             <Text style={styles.subtitle}>
               Revisa el estado de los registros y actualiza la lista para ver
               cambios recientes.
@@ -461,17 +490,79 @@ export default function PerfilScreen() {
             registros.map((item) => {
               const obraNombre = item.obras?.nombre || "Obra sin nombre";
               const isJunta = item.tipo_registro === "junta_lineal_espuma";
+              const isTerrenoHistory = user?.rol === "terreno";
 
               return (
-                <Card key={item.id} style={styles.historyFullCard}>
-                  <Card.Content>
+                <Card
+                  key={item.id}
+                  style={[
+                    styles.historyFullCard,
+                    user?.rol === "jefeobra" && styles.jefeHistoryFullCard,
+                    isTerrenoHistory && styles.terrenoHistoryFullCard,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.historyCardClip,
+                      user?.rol === "jefeobra" && styles.jefeHistoryCardClip,
+                      isTerrenoHistory && styles.terrenoHistoryCardClip,
+                    ]}
+                  >
+                  {user?.rol === "jefeobra" || isTerrenoHistory ? (
+                    <View
+                      style={[
+                        styles.jefeHistoryAccent,
+                        item.estado === "rechazado" && styles.jefeHistoryAccentRejected,
+                        item.estado === "validado" && styles.jefeHistoryAccentValidated,
+                      ]}
+                    />
+                  ) : null}
+                  <Card.Content
+                    style={[
+                      user?.rol === "jefeobra" && styles.jefeHistoryContent,
+                      isTerrenoHistory && styles.terrenoHistoryContent,
+                    ]}
+                  >
                     <View style={styles.historyCardHeader}>
+                      {user?.rol === "jefeobra" || isTerrenoHistory ? (
+                        <View
+                          style={[
+                            styles.jefeHistoryIcon,
+                            isTerrenoHistory && styles.terrenoHistoryIcon,
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name={isJunta ? "ruler" : "fire"}
+                            size={21}
+                            color="#0f172a"
+                          />
+                        </View>
+                      ) : null}
                       <View style={styles.historyTitleGroup}>
-                        <Text style={styles.historyItemTitle}>{obraNombre}</Text>
-                        <Text style={styles.historyItemMeta}>
-                          {item.obras?.codigo || "Sin código"} ·{" "}
-                          {formatDate(item.fecha)}
+                        <Text
+                          style={[
+                            styles.historyItemTitle,
+                            user?.rol === "jefeobra" && styles.jefeHistoryTitle,
+                            isTerrenoHistory && styles.terrenoHistoryTitle,
+                          ]}
+                        >
+                          {obraNombre}
                         </Text>
+                        {user?.rol === "jefeobra" || isTerrenoHistory ? (
+                          <View style={styles.jefeHistoryBadges}>
+                            <Text style={styles.jefeHistoryCodeBadge}>
+                              {item.obras?.codigo || "Sin código"}
+                            </Text>
+                            <Text style={styles.jefeHistoryDateBadge}>
+                              {formatDate(item.fecha)}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.historyItemMeta}>
+                            {item.obras?.codigo || "Sin código"} ·{" "}
+                            {formatDate(item.fecha)}
+                          </Text>
+                        )}
                       </View>
 
                       <Chip
@@ -489,40 +580,99 @@ export default function PerfilScreen() {
                       </Chip>
                     </View>
 
-                    <Text style={styles.historyItemDetail}>
+                    <Text
+                      style={[
+                        styles.historyItemDetail,
+                        isTerrenoHistory && styles.terrenoHistoryItemDetail,
+                      ]}
+                    >
                       {item.descripcion_material}
                     </Text>
 
-                    <View style={styles.historyDetailGrid}>
-                      <Text style={styles.historyDetailItem}>
+                    <View
+                      style={[
+                        styles.historyDetailGrid,
+                        user?.rol === "jefeobra" && styles.jefeHistoryDetailGrid,
+                        isTerrenoHistory && styles.terrenoHistoryDetailGrid,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.historyDetailItem,
+                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                        ]}
+                      >
                         Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}
                       </Text>
-                      <Text style={styles.historyDetailItem}>
+                      <Text
+                        style={[
+                          styles.historyDetailItem,
+                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                        ]}
+                      >
                         Módulo: {item.modulo}
                       </Text>
-                      <Text style={styles.historyDetailItem}>Piso: {item.piso}</Text>
-                      <Text style={styles.historyDetailItem}>
+                      <Text
+                        style={[
+                          styles.historyDetailItem,
+                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                        ]}
+                      >
+                        Piso: {item.piso}
+                      </Text>
+                      {user?.rol === "jefeobra" || isTerrenoHistory ? (
+                        <Text
+                          style={[
+                            styles.historyDetailItem,
+                            isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                          ]}
+                        >
+                          Nº sello: {item.numero_sello || "—"}
+                        </Text>
+                      ) : null}
+                      <Text
+                        style={[
+                          styles.historyDetailItem,
+                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                        ]}
+                      >
                         Eje: {item.eje_numerico}-{item.eje_alfabetico}
                       </Text>
-                      <Text style={styles.historyDetailItem}>
+                      <Text
+                        style={[
+                          styles.historyDetailItem,
+                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                        ]}
+                      >
                         {isJunta
                           ? `Metros lineales: ${item.metros_lineales || 0}`
                           : `Sellos: ${item.cantidad_sellos}`}
                       </Text>
-                      <Text style={styles.historyDetailItem}>
+                      <Text
+                        style={[
+                          styles.historyDetailItem,
+                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
+                        ]}
+                      >
                         Responsable:{" "}
                         {item.usuarios?.nombre || item.nombre_sellador}
                       </Text>
                     </View>
 
                     {item.observaciones ? (
-                      <Text style={styles.historyObservaciones}>
+                      <Text
+                        style={[
+                          styles.historyObservaciones,
+                          isTerrenoHistory && styles.terrenoHistoryObservaciones,
+                        ]}
+                      >
                         Observaciones: {item.observaciones}
                       </Text>
                     ) : null}
 
                     <RegistroContextBox registro={item} />
                   </Card.Content>
+                  </View>
                 </Card>
               );
             })
@@ -541,6 +691,12 @@ export default function PerfilScreen() {
     );
   }
 
+  const isTerrenoProfile = user?.rol === "terreno";
+  const isSupervisorProfile = user?.rol === "jefeobra";
+  const isEngineeringProfile = user?.rol === "ingenieria";
+  const isBeckFieldProfile =
+    isTerrenoProfile || isSupervisorProfile || isEngineeringProfile;
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 2 }]}
@@ -548,15 +704,27 @@ export default function PerfilScreen() {
     >
       {isFixedProfileHeader ? (
         <View style={styles.fixedHeader}>
-          <BrandHeader subtitle="Perfil · BECK" />
-          <Text variant="titleLarge" style={styles.title}>Perfil</Text>
-          <Text style={styles.subtitle}>
-            {user?.rol === "jefeobra"
-              ? "Sesión activa del Supervisor."
-              : user?.rol === "cliente"
-              ? "Sesión activa del Cliente."
-              : "Sesión activa del Operario."}
-          </Text>
+          <BrandHeader
+            subtitle={
+              isTerrenoProfile
+                ? "Perfil · Operario"
+                : isSupervisorProfile
+                  ? "Perfil · Supervisor"
+                  : isEngineeringProfile
+                    ? "Perfil · Ingeniería"
+                  : "Perfil · BECK"
+            }
+          />
+          {!isBeckFieldProfile ? (
+            <>
+              <Text variant="titleLarge" style={styles.title}>Perfil</Text>
+              <Text style={styles.subtitle}>
+                {user?.rol === "jefeobra"
+                  ? "Sesión activa del Supervisor."
+                  : "Sesión activa del Cliente."}
+              </Text>
+            </>
+          ) : null}
         </View>
       ) : null}
       <ScrollView
@@ -575,24 +743,42 @@ export default function PerfilScreen() {
           </>
         ) : null}
 
-        <View style={styles.profileCard}>
+        <View style={[styles.profileCard, isBeckFieldProfile && styles.terrenoProfileCard]}>
+          {isBeckFieldProfile ? <View style={styles.terrenoProfileAccent} /> : null}
+          {isBeckFieldProfile ? (
+            <View style={styles.terrenoSessionBadge}>
+              <View style={styles.terrenoSessionDot} />
+              <Text style={styles.terrenoSessionText}>Sesión activa</Text>
+            </View>
+          ) : null}
           <Avatar.Text
-            size={82}
+            size={isBeckFieldProfile ? 74 : 82}
             label={getInitials(user?.nombre)}
-            style={styles.avatar}
-            labelStyle={styles.avatarLabel}
+            style={[styles.avatar, isBeckFieldProfile && styles.terrenoAvatar]}
+            labelStyle={[styles.avatarLabel, isBeckFieldProfile && styles.terrenoAvatarLabel]}
           />
 
-          <Text style={styles.name}>{user?.nombre || "Usuario Beck"}</Text>
-          <Text style={styles.email}>{user?.email || "Sin correo"}</Text>
+          <Text style={[styles.name, isBeckFieldProfile && styles.terrenoName]}>
+            {user?.nombre || "Usuario Beck"}
+          </Text>
+          {isBeckFieldProfile ? (
+            <View style={styles.terrenoEmailRow}>
+              <MaterialCommunityIcons name="email-outline" size={15} color="#64748b" />
+              <Text style={styles.terrenoEmail}>{user?.email || "Sin correo"}</Text>
+            </View>
+          ) : (
+            <Text style={styles.email}>{user?.email || "Sin correo"}</Text>
+          )}
 
-          <View style={styles.rolePill}>
+          <View style={[styles.rolePill, isBeckFieldProfile && styles.terrenoRolePill]}>
             <MaterialCommunityIcons
               name="badge-account-outline"
               size={16}
-              color="#ffffff"
+              color={isBeckFieldProfile ? "#0f172a" : "#ffffff"}
             />
-            <Text style={styles.roleText}>{getRoleLabel(user?.rol)}</Text>
+            <Text style={[styles.roleText, isBeckFieldProfile && styles.terrenoRoleText]}>
+              {isTerrenoProfile ? "Operario" : getRoleLabel(user?.rol)}
+            </Text>
           </View>
 
           <View style={styles.divider} />
@@ -602,19 +788,23 @@ export default function PerfilScreen() {
             onPress={handleLogout}
             buttonColor="#dc2626"
             textColor="#ffffff"
-            style={styles.logoutButton}
+            style={[styles.logoutButton, isBeckFieldProfile && styles.terrenoLogoutButton]}
             contentStyle={styles.logoutButtonContent}
             labelStyle={styles.logoutLabel}
           >
-            Cerrar sesion
+            Cerrar sesión
           </Button>
         </View>
 
+        {isBeckFieldProfile ? (
+          <Text style={styles.terrenoProfileSectionTitle}>Mi actividad</Text>
+        ) : null}
         <View style={styles.actions}>
           <ProfileAction
             icon="clipboard-text-clock-outline"
-            label="Historial de Registro"
+            label="Historial de registros"
             onPress={handleHistoryPress}
+            beckStyle={isBeckFieldProfile}
           />
         </View>
 
@@ -675,13 +865,62 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 6,
   },
+  terrenoProfileCard: {
+    backgroundColor: "#fffdf7",
+    borderColor: "#FDC10B",
+    borderRadius: 20,
+    marginBottom: 14,
+    overflow: "hidden",
+    paddingBottom: 18,
+    paddingTop: 20,
+    shadowOpacity: 0.08,
+  },
+  terrenoProfileAccent: {
+    backgroundColor: "#FDC10B",
+    height: 6,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  terrenoSessionBadge: {
+    alignItems: "center",
+    alignSelf: "flex-end",
+    backgroundColor: "#dcfce7",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
+    marginBottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  terrenoSessionDot: {
+    backgroundColor: "#16a34a",
+    borderRadius: 4,
+    height: 7,
+    width: 7,
+  },
+  terrenoSessionText: {
+    color: "#166534",
+    fontSize: 9,
+    fontWeight: "900",
+  },
   avatar: {
     backgroundColor: "#fff7ed",
+  },
+  terrenoAvatar: {
+    backgroundColor: "#FDC10B",
+    borderColor: "#0f172a",
+    borderWidth: 3,
   },
   avatarLabel: {
     color: "#f97316",
     fontSize: 24,
     fontWeight: "900",
+  },
+  terrenoAvatarLabel: {
+    color: "#0f172a",
+    fontSize: 22,
   },
   name: {
     color: "#0f172a",
@@ -690,11 +929,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
+  terrenoName: {
+    fontSize: 19,
+    marginTop: 12,
+  },
   email: {
     color: "#64748b",
     fontSize: 14,
     marginTop: 5,
     textAlign: "center",
+  },
+  terrenoEmailRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 5,
+  },
+  terrenoEmail: {
+    color: "#64748b",
+    fontSize: 12,
   },
   rolePill: {
     alignItems: "center",
@@ -707,10 +960,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
+  terrenoRolePill: {
+    backgroundColor: "#FDC10B",
+    marginTop: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
   roleText: {
     color: "#ffffff",
     fontSize: 12,
     fontWeight: "800",
+  },
+  terrenoRoleText: {
+    color: "#0f172a",
+    fontSize: 11,
+    fontWeight: "900",
   },
   divider: {
     alignSelf: "stretch",
@@ -723,6 +987,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     minWidth: 144,
   },
+  terrenoLogoutButton: {
+    alignSelf: "stretch",
+    borderRadius: 13,
+  },
   logoutButtonContent: {
     minHeight: 46,
     paddingHorizontal: 8,
@@ -734,6 +1002,13 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 10,
+  },
+  terrenoProfileSectionTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 9,
+    marginTop: 2,
   },
   actionCard: {
     alignItems: "center",
@@ -751,6 +1026,26 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 4,
   },
+  terrenoActionCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 15,
+    minHeight: 64,
+    overflow: "hidden",
+    paddingHorizontal: 12,
+    shadowOpacity: 0.05,
+  },
+  terrenoActionAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  actionPressed: {
+    opacity: 0.72,
+  },
   actionIcon: {
     alignItems: "center",
     backgroundColor: "#fff7ed",
@@ -759,11 +1054,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 46,
   },
+  terrenoActionIcon: {
+    backgroundColor: "#FDC10B",
+    borderRadius: 11,
+    height: 40,
+    width: 40,
+  },
+  actionInfo: {
+    flex: 1,
+  },
   actionLabel: {
     color: "#0f172a",
     flex: 1,
     fontSize: 17,
     fontWeight: "900",
+  },
+  terrenoActionLabel: {
+    flex: 0,
+    fontSize: 14,
+  },
+  terrenoActionHint: {
+    color: "#64748b",
+    fontSize: 10,
+    marginTop: 2,
   },
   historyPanel: {
     backgroundColor: "#ffffff",
@@ -834,13 +1147,69 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 12,
+  },
+  historyCardClip: {
+    borderRadius: 14,
     overflow: "hidden",
+  },
+  jefeHistoryFullCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 16,
+    marginBottom: 9,
+  },
+  jefeHistoryCardClip: {
+    borderRadius: 16,
+  },
+  terrenoHistoryFullCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderRadius: 15,
+    marginBottom: 7,
+  },
+  terrenoHistoryCardClip: {
+    borderRadius: 15,
+  },
+  jefeHistoryAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  jefeHistoryAccentRejected: {
+    backgroundColor: "#dc2626",
+  },
+  jefeHistoryAccentValidated: {
+    backgroundColor: "#16a34a",
+  },
+  jefeHistoryContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  terrenoHistoryContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   historyCardHeader: {
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 10,
     justifyContent: "space-between",
+  },
+  jefeHistoryIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 11,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  terrenoHistoryIcon: {
+    borderRadius: 10,
+    height: 34,
+    width: 34,
   },
   historyTitleGroup: {
     flex: 1,
@@ -849,6 +1218,41 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 16,
     fontWeight: "800",
+  },
+  jefeHistoryTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  terrenoHistoryTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  jefeHistoryBadges: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 5,
+  },
+  jefeHistoryCodeBadge: {
+    backgroundColor: "#0f172a",
+    borderRadius: 999,
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  jefeHistoryDateBadge: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 999,
+    color: "#92400e",
+    fontSize: 9,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   historyItemMeta: {
     color: "#64748b",
@@ -863,19 +1267,56 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 10,
   },
+  terrenoHistoryItemDetail: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 15,
+    marginBottom: 6,
+    marginTop: 7,
+  },
   historyDetailGrid: {
     gap: 4,
+  },
+  jefeHistoryDetailGrid: {
+    backgroundColor: "rgba(253, 193, 11, 0.12)",
+    borderRadius: 11,
+    padding: 9,
+  },
+  terrenoHistoryDetailGrid: {
+    backgroundColor: "#ffffff",
+    borderColor: "#fde68a",
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
   },
   historyDetailItem: {
     color: "#475569",
     fontSize: 13,
     lineHeight: 18,
   },
+  terrenoHistoryDetailItem: {
+    flexGrow: 1,
+    fontSize: 10,
+    lineHeight: 14,
+    minWidth: "46%",
+  },
   historyObservaciones: {
     color: "#334155",
     fontSize: 13,
     lineHeight: 18,
     marginTop: 8,
+  },
+  terrenoHistoryObservaciones: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 9,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 6,
+    padding: 7,
   },
   contextBox: {
     backgroundColor: "#fff7ed",

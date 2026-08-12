@@ -151,34 +151,66 @@ export default function TabLayout() {
                   ),
                 }}
               />
-              <Tabs.Screen
-                name="control-inspeccion"
-                options={{
-                  title: "Correcciones",
-                  href: userRole === "jefeobra" || userRole === "administrador" ? undefined : null,
-                  tabBarIcon: ({ color, size }) => (
-                    <MaterialCommunityIcons
-                      name="clipboard-alert-outline"
-                      color={color}
-                      size={size}
-                    />
-                  ),
-                }}
-              />
-              <Tabs.Screen
-                name="registros"
-                options={{
-                  title: "Registro",
-                  href: userRole === "ingenieria" || userRole === "cliente" ? null : undefined,
-                  tabBarIcon: ({ color, size }) => (
-                    <MaterialCommunityIcons
-                      name="clipboard-text-outline"
-                      color={color}
-                      size={size}
-                    />
-                  ),
-                }}
-              />
+              {userRole === "jefeobra" ? (
+                <Tabs.Screen
+                  name="registros"
+                  options={{
+                    title: "Registro",
+                    tabBarIcon: ({ color, size }) => (
+                      <MaterialCommunityIcons
+                        name="clipboard-text-outline"
+                        color={color}
+                        size={size}
+                      />
+                    ),
+                  }}
+                />
+              ) : (
+                <Tabs.Screen
+                  name="control-inspeccion"
+                  options={{
+                    title: "Correcciones",
+                    href: userRole === "administrador" ? undefined : null,
+                    tabBarIcon: ({ color, size }) => (
+                      <MaterialCommunityIcons
+                        name="clipboard-alert-outline"
+                        color={color}
+                        size={size}
+                      />
+                    ),
+                  }}
+                />
+              )}
+              {userRole === "jefeobra" ? (
+                <Tabs.Screen
+                  name="control-inspeccion"
+                  options={{
+                    title: "Correcciones",
+                    tabBarIcon: ({ color, size }) => (
+                      <MaterialCommunityIcons
+                        name="clipboard-alert-outline"
+                        color={color}
+                        size={size}
+                      />
+                    ),
+                  }}
+                />
+              ) : (
+                <Tabs.Screen
+                  name="registros"
+                  options={{
+                    title: "Registro",
+                    href: userRole === "ingenieria" || userRole === "cliente" ? null : undefined,
+                    tabBarIcon: ({ color, size }) => (
+                      <MaterialCommunityIcons
+                        name="clipboard-text-outline"
+                        color={color}
+                        size={size}
+                      />
+                    ),
+                  }}
+                />
+              )}
               <Tabs.Screen
                 name="cotizaciones"
                 options={{
