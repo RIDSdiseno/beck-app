@@ -6,6 +6,7 @@ import {
 } from "@/services/api/firematApi";
 import { getSession } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import {
   Alert,
@@ -21,6 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
 
 export default function FirematInventarioScreen() {
+  const router = useRouter();
   const [productos, setProductos] = React.useState<FirematProducto[]>([]);
   const [resumen, setResumen] = React.useState<FirematInventarioResumen | null>(null);
   const [query, setQuery] = React.useState("");
@@ -54,10 +56,12 @@ export default function FirematInventarioScreen() {
     }
   }, [bajoStock, query]);
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => void load(), 300);
-    return () => clearTimeout(timer);
-  }, [load]);
+  useFocusEffect(
+    React.useCallback(() => {
+      const timer = setTimeout(() => void load(), 300);
+      return () => clearTimeout(timer);
+    }, [load]),
+  );
 
   const openAdjust = (producto: FirematProducto) => {
     if (!isBodeguero) return;
@@ -138,6 +142,17 @@ export default function FirematInventarioScreen() {
         <Text style={styles.filterLabel}>Sólo alertas de stock</Text>
         <Switch value={bajoStock} onValueChange={setBajoStock} color="#dc2626" />
       </View>
+      {isBodeguero ? (
+        <Button
+          mode="contained"
+          buttonColor="#dc2626"
+          icon="barcode-scan"
+          onPress={() => router.push("/(firemat)/escanear")}
+          style={styles.scanButton}
+        >
+          Recibir stock con cámara
+        </Button>
+      ) : null}
       {loading && !refreshing ? (
         <View style={styles.center}><ActivityIndicator color="#ef4444" /><Text style={styles.muted}>Cargando inventario...</Text></View>
       ) : error ? (
@@ -181,6 +196,7 @@ const styles = StyleSheet.create({
   summaryValue: { color: "#ffffff", fontWeight: "900", fontSize: 20 }, summaryLabel: { color: "#a3a3a3", fontSize: 11, marginTop: 2 }, warning: { color: "#f59e0b" }, danger: { color: "#ef4444" },
   search: { marginHorizontal: 16, backgroundColor: "#202020", borderWidth: 1, borderColor: "#404040" }, searchInput: { color: "#ffffff" },
   filterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 10 }, filterLabel: { color: "#d4d4d4" },
+  scanButton: { marginHorizontal: 16, marginBottom: 12, borderRadius: 16 },
   list: { paddingHorizontal: 16, paddingBottom: 90, gap: 10 }, card: { backgroundColor: "#171717", borderColor: "#303030", borderWidth: 1 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", gap: 10 }, flex: { flex: 1 }, name: { color: "#ffffff", fontWeight: "700" }, sku: { color: "#a3a3a3", fontSize: 12, marginTop: 3 },
   badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" }, badgeText: { fontSize: 9, fontWeight: "800" },

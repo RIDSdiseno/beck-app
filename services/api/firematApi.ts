@@ -29,6 +29,17 @@ export type FirematProducto = {
 
 export type FirematCategoria = { id: number; nombre: string };
 
+export type FirematBarcodeLookup = {
+  encontrado: boolean;
+  asociado: boolean;
+  codigo: string;
+  producto?: FirematProducto;
+  unidadesPorEscaneo?: number;
+  unidadesSugeridas?: number | null;
+  skuSugerido?: string;
+  descripcion?: string | null;
+};
+
 export type FirematInventarioResumen = {
   totalProductos: number;
   productosActivos: number;
@@ -107,4 +118,43 @@ export async function updateFirematInventario(
     body: JSON.stringify(payload),
   });
   return data.data as FirematProducto;
+}
+
+export async function getFirematProductoPorCodigo(codigo: string) {
+  const data = await request(`/inventario/codigo/${encodeURIComponent(codigo)}`);
+  return data as FirematBarcodeLookup & { success: true };
+}
+
+export async function associateFirematBarcode(payload: {
+  codigo: string;
+  productoId: number;
+  unidadesPorEscaneo: number;
+  descripcion?: string;
+}) {
+  const data = await request("/inventario/codigos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return data.data as {
+    codigo: string;
+    unidadesPorEscaneo: number;
+    producto: FirematProducto;
+  };
+}
+
+export async function createFirematScanReception(payload: {
+  recepcionId: string;
+  motivo: string;
+  items: Array<{ codigo: string; cantidadEscaneos: number }>;
+}) {
+  const data = await request("/inventario/recepciones", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return {
+    duplicada: Boolean(data.duplicada),
+    productos: ensureArray(data?.data, "Respuesta de recepción inválida") as FirematProducto[],
+  };
 }

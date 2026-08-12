@@ -86,6 +86,7 @@ export default function FirematLayout() {
             ),
           }}
         />
+        <Tabs.Screen name="escanear" options={{ href: null, tabBarStyle: { display: "none" } }} />
       </Tabs>
     </PaperProvider>
   );
