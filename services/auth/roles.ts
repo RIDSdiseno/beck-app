@@ -7,5 +7,7 @@ export function canViewAllModules(rol?: string | null) {
 }
 
 export function getInitialRouteForRole(rol?: string | null): Href {
-  return "/(tabs)";
+  return ["vendedor_firemat", "bodeguero", "visualizador_firemat"].includes(rol || "")
+    ? "/(firemat)/productos"
+    : "/(tabs)";
 }

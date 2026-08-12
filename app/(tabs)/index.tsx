@@ -89,9 +89,9 @@ export default function DashboardScreen() {
   );
 
   const metrics = useMemo(() => {
-    const sellos = registros
-      .filter((registro) => registro.tipo_registro !== "junta_lineal_espuma")
-      .reduce((total, registro) => total + (registro.cantidad_sellos || 0), 0);
+    const registrosRealizados = registros.filter(
+      (registro) => !registro.es_correccion && !registro.registro_origen_id,
+    ).length;
     const enRevision = registros.filter(
       (registro) => registro.estado === "en_revision",
     ).length;
@@ -117,7 +117,7 @@ export default function DashboardScreen() {
       "Sin actividad";
 
     return {
-      sellos,
+      registrosRealizados,
       enRevision,
       validados,
       pendientes,
@@ -195,31 +195,43 @@ export default function DashboardScreen() {
         edges={["top", "left", "right"]}
       >
         <View style={styles.fixedHeader}>
-          <BrandHeader subtitle="Inicio · Supervisor" />
+          <View style={styles.supervisorWelcome}>
+            <View style={styles.supervisorWelcomeIcon}>
+              <MaterialCommunityIcons name="account-hard-hat-outline" size={25} color="#0f172a" />
+            </View>
+            <View style={styles.terrenoWelcomeInfo}>
+              <Text style={styles.supervisorWelcomeEyebrow}>Panel de supervisión</Text>
+              <Text style={styles.supervisorWelcomeTitle}>
+                Hola, {userName.split(" ")[0] || "Supervisor"}
+              </Text>
+              <Text style={styles.supervisorWelcomeSubtitle}>
+                Controla el avance y revisa los registros de los operarios.
+              </Text>
+            </View>
+          </View>
 
-          <Text variant="titleLarge" style={styles.title}>
-            Hola, {userName || "Supervisor"}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isJunta
-              ? "Control diario de juntas lineales con fotos, longitud en metros y avance de terreno."
-              : "Control diario de sellos con fotos, factores de holgura y avance de protección pasiva."}
-          </Text>
-
-          <View style={styles.tipoTabs}>
+          <View style={styles.supervisorTipoTabs}>
             <Button
               mode={activeTipo === "sello_cortafuego" ? "contained" : "text"}
               icon="fire"
+              compact
+              buttonColor={activeTipo === "sello_cortafuego" ? "#0f172a" : undefined}
+              textColor={activeTipo === "sello_cortafuego" ? "#ffffff" : "#475569"}
               onPress={() => setActiveTipo("sello_cortafuego")}
+              style={styles.supervisorTipoButton}
             >
-              Sellos Cortafuego
+              Sellos
             </Button>
             <Button
               mode={activeTipo === "junta_lineal_espuma" ? "contained" : "text"}
               icon="ruler"
+              compact
+              buttonColor={activeTipo === "junta_lineal_espuma" ? "#0f172a" : undefined}
+              textColor={activeTipo === "junta_lineal_espuma" ? "#ffffff" : "#475569"}
               onPress={() => setActiveTipo("junta_lineal_espuma")}
+              style={styles.supervisorTipoButton}
             >
-              Junta Lineal Espuma
+              Junta lineal
             </Button>
           </View>
         </View>
@@ -248,9 +260,13 @@ export default function DashboardScreen() {
             </Card>
           ) : null}
 
+          <Text style={styles.supervisorSectionLabel}>Resumen general</Text>
           <View style={styles.summaryGrid}>
-            <Card style={[styles.summaryCard, styles.summaryWarm]}>
-              <Card.Content>
+            <Card style={[styles.summaryCard, styles.summaryWarm, styles.supervisorSummaryHalf]}>
+              <Card.Content style={styles.supervisorSummaryContent}>
+                <View style={[styles.supervisorMetricIcon, styles.supervisorMetricYellow]}>
+                  <MaterialCommunityIcons name="clipboard-text-outline" size={20} color="#0f172a" />
+                </View>
                 <Text style={styles.summaryLabel}>Registros en vista</Text>
                 <Text style={styles.summaryValue}>
                   {jefeObraMetrics.registrosVista}
@@ -259,8 +275,11 @@ export default function DashboardScreen() {
               </Card.Content>
             </Card>
 
-            <Card style={[styles.summaryCard, styles.summaryBlue]}>
-              <Card.Content>
+            <Card style={[styles.summaryCard, styles.summaryBlue, styles.supervisorSummaryHalf]}>
+              <Card.Content style={styles.supervisorSummaryContent}>
+                <View style={[styles.supervisorMetricIcon, styles.supervisorMetricBlue]}>
+                  <MaterialCommunityIcons name={isJunta ? "ruler" : "fire"} size={20} color="#2563eb" />
+                </View>
                 <Text style={styles.summaryLabel}>
                   {isJunta ? "Metros lineales registrados" : "Sellos registrados"}
                 </Text>
@@ -275,8 +294,12 @@ export default function DashboardScreen() {
               </Card.Content>
             </Card>
 
-            <Card style={[styles.summaryCard, styles.summaryGreen]}>
-              <Card.Content>
+            <Card style={[styles.summaryCard, styles.summaryGreen, styles.supervisorSummaryFull]}>
+              <Card.Content style={styles.supervisorWeightedContent}>
+                <View style={[styles.supervisorMetricIcon, styles.supervisorMetricGreen]}>
+                  <MaterialCommunityIcons name="chart-line" size={21} color="#16a34a" />
+                </View>
+                <View style={styles.terrenoCardHeadingText}>
                 <Text style={styles.summaryLabel}>
                   {isJunta ? "Metros ponderados" : "Sellos ponderados"}
                 </Text>
@@ -288,12 +311,13 @@ export default function DashboardScreen() {
                 <Text style={styles.helperText}>
                   Equivalente por factor de holgura y tipo de cielo
                 </Text>
+                </View>
               </Card.Content>
             </Card>
           </View>
 
           <View style={styles.smallSummaryGrid}>
-            <Card style={styles.smallSummaryCard}>
+            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
                 <MaterialCommunityIcons name="stairs" size={22} color="#ea580c" />
                 <View>
@@ -302,7 +326,7 @@ export default function DashboardScreen() {
                 </View>
               </Card.Content>
             </Card>
-            <Card style={styles.smallSummaryCard}>
+            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
                 <MaterialCommunityIcons
                   name="account-group-outline"
@@ -317,7 +341,7 @@ export default function DashboardScreen() {
                 </View>
               </Card.Content>
             </Card>
-            <Card style={styles.smallSummaryCard}>
+            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
                 <MaterialCommunityIcons name="fire" size={22} color="#ef4444" />
                 <View>
@@ -328,7 +352,7 @@ export default function DashboardScreen() {
                 </View>
               </Card.Content>
             </Card>
-            <Card style={styles.smallSummaryCard}>
+            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
                 <MaterialCommunityIcons
                   name="chart-bar"
@@ -349,7 +373,9 @@ export default function DashboardScreen() {
             mode="contained"
             icon="clipboard-edit-outline"
             onPress={() => router.push("/registros")}
-            style={styles.button}
+            buttonColor="#0f172a"
+            style={styles.supervisorMainButton}
+            contentStyle={styles.supervisorMainButtonContent}
           >
             Revisar registros de Operarios
           </Button>
@@ -365,15 +391,20 @@ export default function DashboardScreen() {
     >
       {userRole === "terreno" ? (
         <View style={styles.fixedHeader}>
-          <BrandHeader subtitle="Inicio · BECK" />
-
-          <Text variant="titleLarge" style={styles.title}>
-            Hola, {userName.split(" ")[0] || "equipo"}
-          </Text>
-          <Text style={styles.subtitle}>
-            Resumen de tus registros en terreno y el avance validado por
-            ingeniería.
-          </Text>
+          <View style={styles.terrenoWelcome}>
+            <View style={styles.terrenoWelcomeIcon}>
+              <MaterialCommunityIcons name="hard-hat" size={25} color="#0f172a" />
+            </View>
+            <View style={styles.terrenoWelcomeInfo}>
+              <Text style={styles.terrenoWelcomeEyebrow}>Resumen de actividad</Text>
+              <Text style={styles.terrenoWelcomeTitle}>
+                Hola, {userName.split(" ")[0] || "equipo"}
+              </Text>
+              <Text style={styles.terrenoWelcomeSubtitle}>
+                Revisa tus registros y su avance de validación.
+              </Text>
+            </View>
+          </View>
         </View>
       ) : null}
 
@@ -415,98 +446,151 @@ export default function DashboardScreen() {
           </Card>
         ) : null}
 
+        {userRole === "terreno" ? (
+          <>
+            <View style={styles.terrenoQuickActions}>
+              <Button
+                mode="contained"
+                icon="office-building-outline"
+                buttonColor="#0f172a"
+                onPress={() => router.push("/mis-obras")}
+                style={styles.terrenoQuickButton}
+                contentStyle={styles.terrenoQuickButtonContent}
+              >
+                Ir a Obras
+              </Button>
+              <Button
+                mode="outlined"
+                icon="clipboard-text-outline"
+                textColor="#0f172a"
+                onPress={() => router.push("/registros")}
+                style={[styles.terrenoQuickButton, styles.terrenoQuickButtonOutlined]}
+                contentStyle={styles.terrenoQuickButtonContent}
+              >
+                Ver registros
+              </Button>
+            </View>
+            <Text style={styles.terrenoSectionLabel}>Mis indicadores</Text>
+          </>
+        ) : null}
+
         <View style={styles.kpiGrid}>
-          <Card style={styles.kpiCard}>
-            <Card.Content>
+          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiYellow]}>
+            <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
+              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconYellow]}>
               <MaterialCommunityIcons
                 name="shield-check-outline"
-                size={24}
-                color="#f97316"
+                size={21}
+                color="#0f172a"
               />
-              <Text style={styles.kpiValue}>{metrics.sellos}</Text>
-              <Text style={styles.kpiLabel}>Sellos realizados</Text>
+              </View>
+              <Text style={styles.kpiValue}>{metrics.registrosRealizados}</Text>
+              <Text style={styles.kpiLabel}>Registros realizados</Text>
             </Card.Content>
           </Card>
 
-          <Card style={styles.kpiCard}>
-            <Card.Content>
+          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiBlue]}>
+            <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
+              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconBlue]}>
               <MaterialCommunityIcons
                 name="timer-sand"
-                size={24}
+                size={21}
                 color="#3b82f6"
               />
+              </View>
               <Text style={styles.kpiValue}>{metrics.enRevision}</Text>
               <Text style={styles.kpiLabel}>En revisión</Text>
             </Card.Content>
           </Card>
 
-          <Card style={styles.kpiCard}>
-            <Card.Content>
+          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiGreen]}>
+            <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
+              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconGreen]}>
               <MaterialCommunityIcons
                 name="check-decagram-outline"
-                size={24}
+                size={21}
                 color="#16a34a"
               />
+              </View>
               <Text style={styles.kpiValue}>{metrics.validados}</Text>
               <Text style={styles.kpiLabel}>Validados</Text>
             </Card.Content>
           </Card>
 
-          <Card style={styles.kpiCard}>
-            <Card.Content>
+          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiRed]}>
+            <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
+              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconRed]}>
               <MaterialCommunityIcons
                 name="close-octagon-outline"
-                size={24}
+                size={21}
                 color="#dc2626"
               />
+              </View>
               <Text style={styles.kpiValue}>{metrics.rechazados}</Text>
               <Text style={styles.kpiLabel}>Rechazados</Text>
             </Card.Content>
           </Card>
         </View>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={styles.cardTitle}>Pulso de avance</Text>
-                <Text style={styles.helperText}>
-                  {metrics.avance}% de tus registros ya fue validado.
-                </Text>
+        <Card style={[styles.card, userRole === "terreno" && styles.terrenoProgressCard]}>
+          <View style={userRole === "terreno" ? styles.terrenoProgressClip : undefined}>
+            {userRole === "terreno" ? <View style={styles.terrenoCardAccent} /> : null}
+            <Card.Content style={userRole === "terreno" ? styles.terrenoCardContent : undefined}>
+              <View style={styles.cardHeader}>
+                <View style={styles.terrenoCardHeading}>
+                  {userRole === "terreno" ? (
+                    <View style={styles.terrenoCardIcon}>
+                      <MaterialCommunityIcons name="chart-donut" size={19} color="#0f172a" />
+                    </View>
+                  ) : null}
+                  <View style={styles.terrenoCardHeadingText}>
+                    <Text style={styles.cardTitle}>Pulso de avance</Text>
+                    <Text style={styles.helperText}>
+                      {metrics.avance}% de tus registros ya fue validado.
+                    </Text>
+                  </View>
+                </View>
+                <Chip style={styles.orangeChip} textStyle={styles.chipText}>
+                  {metrics.total} registros
+                </Chip>
               </View>
-              <Chip style={styles.orangeChip} textStyle={styles.chipText}>
-                {metrics.total} registros
-              </Chip>
-            </View>
 
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.max(metrics.avance, 4)}%` },
-                ]}
-              />
-            </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.max(metrics.avance, 4)}%` },
+                  ]}
+                />
+              </View>
 
-            <View style={styles.statusRow}>
-              <Text style={styles.statusItem}>Pendientes: {metrics.pendientes}</Text>
-              <Text style={styles.statusItem}>Rechazados: {metrics.rechazados}</Text>
+              <View style={styles.statusRow}>
+                <Text style={styles.statusItem}>Pendientes: {metrics.pendientes}</Text>
+                <Text style={styles.statusItem}>Rechazados: {metrics.rechazados}</Text>
+              </View>
+            </Card.Content>
+          </View>
+        </Card>
+
+        <Card style={[styles.card, userRole === "terreno" && styles.terrenoFocusCard]}>
+          <Card.Content style={userRole === "terreno" ? styles.terrenoFocusContent : undefined}>
+            {userRole === "terreno" ? (
+              <View style={styles.terrenoFocusIcon}>
+                <MaterialCommunityIcons name="lightbulb-on-outline" size={21} color="#0f172a" />
+              </View>
+            ) : null}
+            <View style={styles.terrenoCardHeadingText}>
+              <Text style={styles.cardTitle}>Foco sugerido</Text>
+              <Text style={styles.focusText}>
+                Tu obra con más actividad es {metrics.obraPrincipal}. Prioriza
+                revisar los registros en revisión para acelerar validaciones.
+              </Text>
             </View>
           </Card.Content>
         </Card>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.cardTitle}>Foco sugerido</Text>
-            <Text style={styles.focusText}>
-              Tu obra con más actividad es {metrics.obraPrincipal}. Prioriza
-              revisar los registros en revisión para acelerar validaciones.
-            </Text>
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.card}>
-          <Card.Content>
+        <Card style={[styles.card, userRole === "terreno" && styles.terrenoRecentCard]}>
+          <Card.Content style={userRole === "terreno" ? styles.terrenoCardContent : undefined}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Últimos movimientos</Text>
               <Button mode="text" onPress={() => router.push("/historial")}>
@@ -567,6 +651,69 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 16,
   },
+  terrenoWelcome: {
+    alignItems: "center",
+    backgroundColor: "#0f172a",
+    borderColor: "#FDC10B",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 11,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  terrenoWelcomeIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 13,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  terrenoWelcomeInfo: {
+    flex: 1,
+  },
+  terrenoWelcomeEyebrow: {
+    color: "#FDC10B",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  terrenoWelcomeTitle: {
+    color: "#ffffff",
+    fontSize: 19,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  terrenoWelcomeSubtitle: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  terrenoQuickActions: {
+    flexDirection: "row",
+    gap: 9,
+    marginBottom: 14,
+  },
+  terrenoQuickButton: {
+    borderRadius: 13,
+    flex: 1,
+  },
+  terrenoQuickButtonOutlined: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+  },
+  terrenoQuickButtonContent: {
+    minHeight: 44,
+  },
+  terrenoSectionLabel: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 9,
+  },
   title: {
     color: "#0f172a",
     marginBottom: 4,
@@ -589,6 +736,52 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
+  terrenoKpiContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  terrenoKpiYellow: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+    borderTopWidth: 4,
+  },
+  terrenoKpiBlue: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#93c5fd",
+    borderTopColor: "#3b82f6",
+    borderTopWidth: 4,
+  },
+  terrenoKpiGreen: {
+    backgroundColor: "#f0fdf4",
+    borderColor: "#86efac",
+    borderTopColor: "#16a34a",
+    borderTopWidth: 4,
+  },
+  terrenoKpiRed: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fca5a5",
+    borderTopColor: "#dc2626",
+    borderTopWidth: 4,
+  },
+  terrenoKpiIcon: {
+    alignItems: "center",
+    borderRadius: 9,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  terrenoKpiIconYellow: {
+    backgroundColor: "#FDC10B",
+  },
+  terrenoKpiIconBlue: {
+    backgroundColor: "#dbeafe",
+  },
+  terrenoKpiIconGreen: {
+    backgroundColor: "#dcfce7",
+  },
+  terrenoKpiIconRed: {
+    backgroundColor: "#fee2e2",
+  },
   kpiValue: {
     color: "#0f172a",
     fontSize: 26,
@@ -606,6 +799,66 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
+  },
+  terrenoProgressCard: {
+    backgroundColor: "#fffdf7",
+    borderColor: "#FDC10B",
+  },
+  terrenoProgressClip: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  terrenoCardAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  terrenoCardContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  terrenoCardHeading: {
+    alignItems: "center",
+    flexDirection: "row",
+    flex: 1,
+    gap: 9,
+  },
+  terrenoCardHeadingText: {
+    flex: 1,
+  },
+  terrenoCardIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 10,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  terrenoFocusCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#FDC10B",
+  },
+  terrenoFocusContent: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  terrenoFocusIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 10,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  terrenoRecentCard: {
+    backgroundColor: "#ffffff",
+    borderColor: "#FDC10B",
   },
   errorCard: {
     backgroundColor: "#fff7ed",
@@ -713,14 +966,109 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 18,
   },
+  supervisorWelcome: {
+    alignItems: "center",
+    backgroundColor: "#0f172a",
+    borderColor: "#FDC10B",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 11,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  supervisorWelcomeIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 13,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  supervisorWelcomeEyebrow: {
+    color: "#FDC10B",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  supervisorWelcomeTitle: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  supervisorWelcomeSubtitle: {
+    color: "#cbd5e1",
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  supervisorTipoTabs: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 10,
+    padding: 4,
+  },
+  supervisorTipoButton: {
+    borderRadius: 10,
+    flex: 1,
+  },
+  supervisorSectionLabel: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 9,
+  },
   summaryGrid: {
-    gap: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
     marginBottom: 12,
   },
   summaryCard: {
     backgroundColor: "#ffffff",
     borderRadius: 14,
     borderTopWidth: 4,
+  },
+  supervisorSummaryHalf: {
+    width: "48%",
+  },
+  supervisorSummaryFull: {
+    width: "100%",
+  },
+  supervisorSummaryContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  supervisorWeightedContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 11,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  supervisorMetricIcon: {
+    alignItems: "center",
+    borderRadius: 10,
+    height: 34,
+    justifyContent: "center",
+    marginBottom: 8,
+    width: 34,
+  },
+  supervisorMetricYellow: {
+    backgroundColor: "#FDC10B",
+  },
+  supervisorMetricBlue: {
+    backgroundColor: "#dbeafe",
+  },
+  supervisorMetricGreen: {
+    backgroundColor: "#dcfce7",
+    marginBottom: 0,
   },
   summaryWarm: {
     borderColor: "#facc15",
@@ -743,9 +1091,9 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     color: "#0f172a",
-    fontSize: 32,
+    fontSize: 27,
     fontWeight: "900",
-    marginTop: 10,
+    marginTop: 6,
   },
   greenValue: {
     color: "#16a34a",
@@ -763,6 +1111,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
+  supervisorSmallCard: {
+    backgroundColor: "#fffdf7",
+    borderColor: "#fde68a",
+    borderRadius: 13,
+  },
   smallSummaryContent: {
     alignItems: "center",
     flexDirection: "row",
@@ -772,5 +1125,12 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 18,
     fontWeight: "900",
+  },
+  supervisorMainButton: {
+    borderRadius: 14,
+    marginTop: 3,
+  },
+  supervisorMainButtonContent: {
+    minHeight: 48,
   },
 });

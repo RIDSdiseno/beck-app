@@ -12,7 +12,6 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -21,6 +20,7 @@ import {
 import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
+import { ExpandableImage } from "@/components/ExpandableImage";
 
 const MAX_FOTOS_POR_PARAMETRO = 5;
 
@@ -272,7 +272,7 @@ export default function ControlInspeccionDetalleScreen() {
             {(p.fotos_correccion_parametro?.length || 0) > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
                 {p.fotos_correccion_parametro!.map((f) => (
-                  <Image key={f.id} source={{ uri: f.url }} style={styles.fotoThumb} />
+                  <ExpandableImage key={f.id} uri={f.url} style={styles.fotoThumb} />
                 ))}
               </ScrollView>
             )}

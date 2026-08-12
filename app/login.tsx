@@ -14,11 +14,13 @@ import {
 } from "@/services/auth/session";
 import * as AuthSession from "expo-auth-session";
 import { router } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -56,6 +58,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [error, setError] = useState("");
+  const [empresa, setEmpresa] = useState<"beck" | "firemat">("beck");
+  const isFiremat = empresa === "firemat";
   const redirectUri = useMemo(() => getMicrosoftRedirectUri(), []);
   const [request, , promptAsync] = AuthSession.useAuthRequest(
     getMicrosoftAuthRequestConfig(redirectUri),
@@ -131,7 +135,7 @@ export default function LoginScreen() {
 
       setIsEmailLoading(true);
 
-      const data = await loginWithEmailPassword(email, password);
+      const data = await loginWithEmailPassword(email, password, empresa);
       clearMisObrasCache();
       clearMisRegistrosCache();
       await saveSession(data.token, data.user);
@@ -146,6 +150,10 @@ export default function LoginScreen() {
   const isLoading = isMicrosoftLoading || isEmailLoading;
   const hasEmailValue = Boolean(email.trim());
   const hasEmailError = hasEmailValue && !isValidEmail(email);
+  const isEmailLoginDisabled =
+    isLoading || !email.trim() || hasEmailError || !password;
+  const isMicrosoftLoginDisabled =
+    !MICROSOFT_LOGIN_ENABLED || !request || isLoading;
   const isAndroid = Platform.OS === "android";
   const isShortAndroid = isAndroid && screenHeight < 740;
   const keyboardBehavior = isInputFocused
@@ -161,7 +169,7 @@ export default function LoginScreen() {
     : insets.bottom + 28;
 
   return (
-    <View style={styles.background}>
+    <View style={[styles.background, isFiremat && styles.firematBackground]}>
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
@@ -195,9 +203,14 @@ export default function LoginScreen() {
                 ]}
               >
                 <Image
-                  source={require("../assets/images/beck-splash-logo.png")}
+                  source={
+                    isFiremat
+                      ? require("../assets/images/Firemat_logo.png")
+                      : require("../assets/images/beck-splash-logo.png")
+                  }
                   style={[
                     styles.logo,
+                    isFiremat && styles.firematLogo,
                     isAndroid && styles.androidLogo,
                     isShortAndroid && styles.shortAndroidLogo,
                   ]}
@@ -210,7 +223,9 @@ export default function LoginScreen() {
                 elevation={3}
               >
                 <Card.Content>
-                  <Text style={styles.eyebrow}>CRM BECK</Text>
+                  <Text style={[styles.eyebrow, isFiremat && styles.firematEyebrow]}>
+                    {isFiremat ? "FIREMAT" : "CRM BECK"}
+                  </Text>
 
                   <Text
                     variant="headlineMedium"
@@ -225,7 +240,7 @@ export default function LoginScreen() {
                       isAndroid && styles.androidSubtitle,
                     ]}
                   >
-                    Accede con las credenciales asignadas desde el CRM Beck
+                    Accede con las credenciales asignadas desde el CRM {isFiremat ? "Firemat" : "Beck"}
                   </Text>
 
                   <TextInput
@@ -280,13 +295,14 @@ export default function LoginScreen() {
                     icon="email-outline"
                     onPress={onEmailLogin}
                     loading={isEmailLoading}
-                    disabled={
-                      isLoading ||
-                      !email.trim() ||
-                      hasEmailError ||
-                      !password
-                    }
-                    style={styles.button}
+                    disabled={isEmailLoginDisabled}
+                    style={[
+                      styles.button,
+                      isFiremat && styles.firematButton,
+                      isFiremat && isEmailLoginDisabled && styles.firematButtonDisabled,
+                    ]}
+                    buttonColor={isFiremat ? "#f20d13" : "#f97316"}
+                    textColor="#ffffff"
                     contentStyle={[
                       styles.buttonContent,
                       isAndroid && styles.androidButtonContent,
@@ -312,10 +328,14 @@ export default function LoginScreen() {
                     icon="microsoft-windows"
                     onPress={onMicrosoftLogin}
                     loading={isMicrosoftLoading}
-                    disabled={
-                      !MICROSOFT_LOGIN_ENABLED || !request || isLoading
-                    }
-                    style={styles.microsoftButton}
+                    disabled={isMicrosoftLoginDisabled}
+                    style={[
+                      styles.microsoftButton,
+                      isFiremat && styles.firematButton,
+                      isFiremat && isMicrosoftLoginDisabled && styles.firematButtonDisabled,
+                    ]}
+                    buttonColor={isFiremat ? "#f20d13" : "#334155"}
+                    textColor="#ffffff"
                     contentStyle={[
                       styles.buttonContent,
                       isAndroid && styles.androidButtonContent,
@@ -331,6 +351,29 @@ export default function LoginScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isFiremat ? "Volver al acceso Beck" : "Ir al acceso Firemat"}
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.companySwitch,
+            {
+              top: Math.max(insets.top, 12),
+              backgroundColor: isFiremat ? "#FDC10B" : "#111827",
+            },
+            pressed && styles.companySwitchPressed,
+          ]}
+          onPress={() => {
+            setEmpresa(isFiremat ? "beck" : "firemat");
+            setError("");
+          }}
+        >
+          {isFiremat ? (
+            <Text style={styles.beckSwitchLetter}>B</Text>
+          ) : (
+            <MaterialCommunityIcons name="fire" size={28} color="#ef4444" />
+          )}
+        </Pressable>
       </SafeAreaView>
     </View>
   );
@@ -340,6 +383,30 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     backgroundColor: "#FDC10B",
+  },
+  firematBackground: {
+    backgroundColor: "#090909",
+  },
+  companySwitch: {
+    position: "absolute",
+    right: 14,
+    zIndex: 100,
+    elevation: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  companySwitchPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
+  },
+  beckSwitchLetter: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 28,
   },
   safeArea: {
     flex: 1,
@@ -376,6 +443,9 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: "100%",
   },
+  firematLogo: {
+    transform: [{ translateX: 12 }],
+  },
   androidLogo: {
     height: 235,
     maxWidth: 480,
@@ -401,6 +471,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: "#1a1a1a",
     marginBottom: 8,
+  },
+  firematEyebrow: {
+    color: "#dc2626",
   },
   title: {
     textAlign: "center",
@@ -470,6 +543,12 @@ const styles = StyleSheet.create({
   microsoftButton: {
     backgroundColor: "#334155",
     borderRadius: 14,
+  },
+  firematButton: {
+    backgroundColor: "#f20d13",
+  },
+  firematButtonDisabled: {
+    opacity: 0.55,
   },
   errorText: {
     marginTop: 14,

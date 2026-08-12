@@ -13,6 +13,7 @@ import {
   Chip,
   Text,
 } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -135,12 +136,6 @@ export default function MisObrasScreen() {
   const renderHeader = () => (
     <>
       <BrandHeader subtitle="Obras disponibles · BECK" />
-      <Text variant="titleLarge" style={styles.title}>
-        Obras disponibles
-      </Text>
-      <Text style={styles.subtitle}>
-        Selecciona una obra activa o pausada para trabajar hoy.
-      </Text>
       <TextInput
         label="Buscar por nombre o código"
         value={search}
@@ -291,43 +286,66 @@ export default function MisObrasScreen() {
         refreshControl={refreshControl}
         renderItem={({ item }) => (
           <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.topRow}>
-                <Text style={styles.cardTitle}>{item.nombre}</Text>
+            <View style={styles.cardClip}>
+              <View style={styles.cardAccent} />
+              <Card.Content style={styles.cardContent}>
+                <View style={styles.topRow}>
+                  <View style={styles.obraIcon}>
+                    <MaterialCommunityIcons
+                      name="office-building-outline"
+                      size={25}
+                      color="#0f172a"
+                    />
+                  </View>
 
-                <Chip
-                  style={[
-                    styles.chip,
-                    { backgroundColor: getEstadoBg(item.estado) },
-                  ]}
-                  textStyle={styles.chipText}
+                  <View style={styles.cardHeading}>
+                    <Text style={styles.cardTitle}>{item.nombre}</Text>
+                    <Text style={styles.codeBadge}>
+                      {item.codigo || "Sin código"}
+                    </Text>
+                  </View>
+
+                  <Chip
+                    style={[
+                      styles.chip,
+                      { backgroundColor: getEstadoBg(item.estado) },
+                    ]}
+                    textStyle={styles.chipText}
+                  >
+                    {getEstadoLabel(item.estado)}
+                  </Chip>
+                </View>
+
+                <View style={styles.descriptionBox}>
+                  <MaterialCommunityIcons
+                    name="text-box-outline"
+                    size={18}
+                    color="#64748b"
+                  />
+                  <View style={styles.descriptionContent}>
+                    <Text style={styles.cardLabel}>Descripción</Text>
+                    <Text style={styles.cardValue} numberOfLines={2}>
+                      {item.descripcion || "Sin descripción"}
+                    </Text>
+                  </View>
+                </View>
+
+                <Button
+                  mode="contained"
+                  icon="arrow-right"
+                  onPress={() => onSelectObra(item)}
+                  loading={selectingId === item.id}
+                  disabled={selectingId === item.id}
+                  style={styles.selectButton}
+                  contentStyle={styles.selectButtonContent}
+                  labelStyle={styles.selectButtonLabel}
                 >
-                  {getEstadoLabel(item.estado)}
-                </Chip>
-              </View>
-
-              <Text style={styles.cardLabel}>Código</Text>
-              <Text style={styles.cardValue}>{item.codigo}</Text>
-
-              <Text style={styles.cardLabel}>Descripción</Text>
-              <Text style={styles.cardValue}>
-                {item.descripcion || "Sin descripción"}
-              </Text>
-
-              <Button
-                mode="contained"
-                onPress={() => onSelectObra(item)}
-                loading={selectingId === item.id}
-                disabled={selectingId === item.id}
-                style={styles.selectButton}
-                contentStyle={styles.selectButtonContent}
-                labelStyle={styles.selectButtonLabel}
-              >
-                {selectingId === item.id
-                  ? "Seleccionando..."
-                  : "Selecciona esta obra"}
-              </Button>
-            </Card.Content>
+                  {selectingId === item.id
+                    ? "Seleccionando..."
+                    : "Selecciona esta obra"}
+                </Button>
+              </Card.Content>
+            </View>
           </Card>
         )}
       />
@@ -344,11 +362,6 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     marginBottom: 4,
   },
-  subtitle: {
-    color: "#0f172a",
-    marginBottom: 14,
-    fontWeight: "500",
-  },
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 0,
@@ -363,53 +376,105 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   card: {
-    marginBottom: 14,
+    marginBottom: 12,
     borderRadius: 18,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fffaf0",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#FDC10B",
+  },
+  cardClip: {
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  cardAccent: {
+    backgroundColor: "#f97316",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
+  cardContent: {
+    paddingHorizontal: 15,
+    paddingVertical: 14,
   },
   topRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "center",
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 13,
+  },
+  obraIcon: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 13,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  cardHeading: {
+    flex: 1,
+    alignItems: "flex-start",
   },
   cardTitle: {
-    flex: 1,
     color: "#0f172a",
-    fontSize: 17,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 5,
+  },
+  codeBadge: {
+    backgroundColor: "#0f172a",
+    borderRadius: 999,
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 3,
   },
   chip: {
-    borderRadius: 14,
+    borderRadius: 999,
+    flexShrink: 0,
   },
   chipText: {
     color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  descriptionBox: {
+    alignItems: "flex-start",
+    backgroundColor: "#ffffff",
+    borderColor: "#fde68a",
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  descriptionContent: {
+    flex: 1,
   },
   cardLabel: {
-    marginTop: 4,
     color: "#64748b",
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
     textTransform: "uppercase",
   },
   cardValue: {
-    marginTop: 2,
+    marginTop: 3,
     color: "#334155",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
   selectButton: {
-    marginTop: 16,
-    backgroundColor: "#f97316",
-    borderRadius: 14,
+    marginTop: 12,
+    backgroundColor: "#0f172a",
+    borderRadius: 12,
   },
   selectButtonContent: {
-    minHeight: 46,
+    flexDirection: "row-reverse",
+    minHeight: 44,
   },
   selectButtonLabel: {
     fontSize: 14,

@@ -29,7 +29,13 @@ function makeJwt(payload: object): string {
   return `${header}.${body}.firma-falsa`;
 }
 
-const USER = { id: "u1", nombre: "Test", email: "test@beck.cl", rol: "terreno" };
+const USER = {
+  id: "u1",
+  nombre: "Test",
+  email: "test@becksoluciones.cl",
+  rol: "terreno",
+  empresa: "beck" as const,
+};
 
 // ── Tests: isJwtExpired (comportamiento observable via getSession) ─────────────
 
