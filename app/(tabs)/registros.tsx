@@ -27,6 +27,7 @@ import {
   isCorreccionEditable,
   shouldShowRejectionContext,
 } from "@/utils/registroEstado";
+import { HOLGURA_OPTIONS } from "@/utils/holgura";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -154,14 +155,6 @@ const ITEMIZADO_BECK_OPTIONS = [
   "Ducto de clima Rectangular SIN Aislación",
   "Ducto de clima Rectangular CON Aislación",
   "Bandeja eléctrica o escalerilla",
-];
-
-const HOLGURA_OPTIONS = [
-  { value: "1", label: "H <= 2" },
-  { value: "1.2", label: "2<H <4" },
-  { value: "1.4", label: "4<H <6" },
-  { value: "1.8", label: "6<H <10" },
-  { value: "0", label: "No aplica" },
 ];
 
 const CIELO_MODULAR_OPTIONS = [
