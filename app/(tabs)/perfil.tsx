@@ -64,6 +64,19 @@ function getInitials(name?: string) {
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "B";
 }
 
+function preferirCopiasCorreccion(registros: RegistroHistorialApi[]) {
+  const originalesConCopia = new Set(
+    registros
+      .map((registro) => registro.registro_origen_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  return registros.filter(
+    (registro) =>
+      !(registro.estado === "rechazado" && originalesConCopia.has(registro.id)),
+  );
+}
+
 
 function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
   if (!shouldShowRejectionContext(registro)) return null;
@@ -178,11 +191,17 @@ export default function PerfilScreen() {
     setUser(session.user);
 
     if (session.user?.rol === "jefeobra" || session.user?.rol === "terreno") {
-      const data = await getMisRegistros(forceRefresh);
+      const data = await getMisRegistros(
+        forceRefresh,
+        session.user.rol === "jefeobra" ? { scope: "historial" } : undefined,
+      );
+      const registrosSinDuplicar = preferirCopiasCorreccion(data);
       setRegistros(
         session.user?.rol === "jefeobra"
-          ? data.filter((registro) => registro.estado !== "pendiente")
-          : data,
+          ? registrosSinDuplicar.filter(
+              (registro) => registro.estado !== "pendiente",
+            )
+          : registrosSinDuplicar,
       );
     }
 

@@ -127,8 +127,16 @@ export default function DashboardScreen() {
     const validados = registros.filter(
       (registro) => registro.estado === "validado",
     ).length;
+    const correccionesRecibidas = registros.filter(
+      (registro) =>
+        registro.estado === "pendiente" &&
+        registro.es_correccion === true &&
+        registro.devuelto_a_tecnico === true,
+    ).length;
     const pendientes = registros.filter(
-      (registro) => registro.estado === "pendiente",
+      (registro) =>
+        registro.estado === "pendiente" &&
+        !(registro.es_correccion && registro.devuelto_a_tecnico),
     ).length;
     const total = registros.length;
     const avance = total ? Math.round((validados / total) * 100) : 0;
@@ -147,6 +155,7 @@ export default function DashboardScreen() {
       enRevision,
       validados,
       pendientes,
+      correccionesRecibidas,
       total,
       avance,
       obraPrincipal,
@@ -251,7 +260,6 @@ export default function DashboardScreen() {
             </Card>
           ) : null}
 
-          <Text style={styles.supervisorSectionLabel}>Alertas y seguimiento</Text>
           <View style={styles.summaryGrid}>
             <Card style={[styles.summaryCard, styles.summaryWarm, styles.supervisorSummaryHalf]}>
               <Card.Content style={styles.supervisorSummaryContent}>
@@ -260,7 +268,6 @@ export default function DashboardScreen() {
                 </View>
                 <Text style={styles.summaryLabel}>Pendientes de mi revisión</Text>
                 <Text style={styles.summaryValue}>{jefeObraMetrics.pendientesRevision}</Text>
-                <Text style={styles.helperText}>Esperan revisión del supervisor</Text>
               </Card.Content>
             </Card>
 
@@ -273,7 +280,6 @@ export default function DashboardScreen() {
                 <Text style={[styles.summaryValue, styles.redValue]}>
                   {jefeObraMetrics.rechazadosIngenieria}
                 </Text>
-                <Text style={styles.helperText}>Pendientes de corrección del operario</Text>
               </Card.Content>
             </Card>
 
@@ -285,11 +291,6 @@ export default function DashboardScreen() {
                 <Text style={styles.summaryLabel}>En revisión por Ingeniería</Text>
                 <Text style={styles.summaryValue}>
                   {jefeObraMetrics.enRevisionIngenieria ?? "—"}
-                </Text>
-                <Text style={styles.helperText}>
-                  {jefeObraMetrics.seguimientoPersonalDisponible
-                    ? "Enviados con tus credenciales"
-                    : "Disponible al actualizar la base de datos"}
                 </Text>
               </Card.Content>
             </Card>
@@ -303,11 +304,6 @@ export default function DashboardScreen() {
                 <Text style={[styles.summaryValue, styles.greenValue]}>
                   {jefeObraMetrics.validadosIngenieria ?? "—"}
                 </Text>
-                <Text style={styles.helperText}>
-                  {jefeObraMetrics.seguimientoPersonalDisponible
-                    ? "Enviados por ti y posteriormente aprobados"
-                    : "Disponible al actualizar la base de datos"}
-                </Text>
               </Card.Content>
             </Card>
           </View>
@@ -316,9 +312,13 @@ export default function DashboardScreen() {
           <View style={styles.smallSummaryGrid}>
             <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
-                <MaterialCommunityIcons name="send-check-outline" size={22} color="#ea580c" />
+                <View style={styles.supervisorActivityIcon}>
+                  <MaterialCommunityIcons name="send-check-outline" size={22} color="#ea580c" />
+                </View>
                 <View style={styles.supervisorActivityText}>
-                  <Text style={styles.helperText}>Enviados por mí</Text>
+                  <Text style={[styles.helperText, styles.supervisorActivityLabel]}>
+                    Enviados por mí
+                  </Text>
                   <Text style={styles.smallSummaryValue}>
                     {jefeObraMetrics.enviadosMes ?? "—"}
                   </Text>
@@ -327,13 +327,17 @@ export default function DashboardScreen() {
             </Card>
             <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
-                <MaterialCommunityIcons
-                  name="file-refresh-outline"
-                  size={22}
-                  color="#ea580c"
-                />
+                <View style={styles.supervisorActivityIcon}>
+                  <MaterialCommunityIcons
+                    name="file-refresh-outline"
+                    size={22}
+                    color="#ea580c"
+                  />
+                </View>
                 <View style={styles.supervisorActivityText}>
-                  <Text style={styles.helperText}>Correcciones reenviadas</Text>
+                  <Text style={[styles.helperText, styles.supervisorActivityLabel]}>
+                    Correcciones reenviadas
+                  </Text>
                   <Text style={styles.smallSummaryValue}>
                     {jefeObraMetrics.correccionesReenviadasMes ?? "—"}
                   </Text>
@@ -443,7 +447,6 @@ export default function DashboardScreen() {
                 Ver registros
               </Button>
             </View>
-            <Text style={styles.terrenoSectionLabel}>Mis indicadores</Text>
           </>
         ) : null}
 
@@ -452,15 +455,15 @@ export default function DashboardScreen() {
             style={[
               styles.kpiCard,
               userRole === "terreno" && styles.terrenoKpiCard,
-              userRole === "terreno" && styles.terrenoKpiYellow,
+              userRole === "terreno" && styles.terrenoKpiPurple,
             ]}
           >
             <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
-              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconYellow]}>
+              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconPurple]}>
                 <MaterialCommunityIcons
                   name="clipboard-check-outline"
                   size={21}
-                  color="#0f172a"
+                  color="#7c3aed"
                 />
               </View>
               <Text style={styles.kpiValue}>{metrics.registrosRealizados}</Text>
@@ -469,13 +472,13 @@ export default function DashboardScreen() {
           </Card>
 
           {userRole === "terreno" ? (
-            <Card style={[styles.kpiCard, styles.terrenoKpiCard, styles.terrenoKpiOrange]}>
+            <Card style={[styles.kpiCard, styles.terrenoKpiCard, styles.terrenoKpiYellow]}>
               <Card.Content style={styles.terrenoKpiContent}>
-                <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconOrange]}>
+                <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconYellow]}>
                   <MaterialCommunityIcons
                     name="account-clock-outline"
                     size={21}
-                    color="#ea580c"
+                    color="#0f172a"
                   />
                 </View>
                 <Text style={styles.kpiValue}>{metrics.pendientes}</Text>
@@ -523,6 +526,33 @@ export default function DashboardScreen() {
               <Text style={styles.kpiLabel}>Validados por ingeniería</Text>
             </Card.Content>
           </Card>
+
+          {userRole === "terreno" ? (
+            <Card
+              style={[
+                styles.kpiCard,
+                styles.terrenoKpiCard,
+                styles.terrenoKpiFull,
+                styles.terrenoKpiOrange,
+              ]}
+            >
+              <Card.Content style={styles.terrenoKpiFullContent}>
+                <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconOrange]}>
+                  <MaterialCommunityIcons
+                    name="file-document-refresh-outline"
+                    size={21}
+                    color="#ea580c"
+                  />
+                </View>
+                <View style={styles.terrenoKpiFullText}>
+                  <Text style={[styles.kpiValue, styles.terrenoKpiFullValue]}>
+                    {metrics.correccionesRecibidas}
+                  </Text>
+                  <Text style={styles.kpiLabel}>Correcciones recibidas</Text>
+                </View>
+              </Card.Content>
+            </Card>
+          ) : null}
 
         </View>
 
@@ -706,12 +736,6 @@ const styles = StyleSheet.create({
   terrenoQuickButtonContent: {
     minHeight: 44,
   },
-  terrenoSectionLabel: {
-    color: "#0f172a",
-    fontSize: 14,
-    fontWeight: "900",
-    marginBottom: 9,
-  },
   title: {
     color: "#0f172a",
     marginBottom: 4,
@@ -741,6 +765,23 @@ const styles = StyleSheet.create({
   terrenoKpiCard: {
     minHeight: 126,
   },
+  terrenoKpiFull: {
+    minHeight: 88,
+    width: "100%",
+  },
+  terrenoKpiFullContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  terrenoKpiFullText: {
+    flex: 1,
+  },
+  terrenoKpiFullValue: {
+    marginTop: 0,
+  },
   terrenoKpiYellow: {
     backgroundColor: "#fffaf0",
     borderColor: "#fde68a",
@@ -757,6 +798,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff7ed",
     borderColor: "#fdba74",
     borderTopColor: "#ea580c",
+    borderTopWidth: 4,
+  },
+  terrenoKpiPurple: {
+    backgroundColor: "#faf5ff",
+    borderColor: "#d8b4fe",
+    borderTopColor: "#7c3aed",
     borderTopWidth: 4,
   },
   terrenoKpiGreen: {
@@ -780,6 +827,9 @@ const styles = StyleSheet.create({
   },
   terrenoKpiIconOrange: {
     backgroundColor: "#ffedd5",
+  },
+  terrenoKpiIconPurple: {
+    backgroundColor: "#ede9fe",
   },
   terrenoKpiIconGreen: {
     backgroundColor: "#dcfce7",
@@ -1041,7 +1091,7 @@ const styles = StyleSheet.create({
     width: "48%",
   },
   supervisorSummaryContent: {
-    minHeight: 154,
+    minHeight: 124,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
@@ -1119,13 +1169,25 @@ const styles = StyleSheet.create({
     borderRadius: 13,
   },
   smallSummaryContent: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 10,
-    minHeight: 76,
+    minHeight: 86,
+  },
+  supervisorActivityIcon: {
+    alignItems: "center",
+    backgroundColor: "#ffedd5",
+    borderRadius: 9,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
   },
   supervisorActivityText: {
     flex: 1,
+  },
+  supervisorActivityLabel: {
+    lineHeight: 16,
+    minHeight: 32,
   },
   smallSummaryValue: {
     color: "#0f172a",

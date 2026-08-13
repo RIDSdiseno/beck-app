@@ -54,10 +54,13 @@ export function isCorreccionEditable(registro: RegistroHistorialApi) {
   return (
     registro.estado === "pendiente" &&
     Boolean(registro.es_correccion) &&
-    Boolean(registro.devuelto_a_tecnico || registro.registro_origen_id)
+    Boolean(registro.devuelto_a_tecnico)
   );
 }
 
 export function shouldShowRejectionContext(registro: RegistroHistorialApi) {
-  return registro.estado === "rechazado" || isCorreccionEditable(registro);
+  return (
+    registro.estado === "rechazado" ||
+    Boolean(registro.es_correccion || registro.registro_origen_id)
+  );
 }

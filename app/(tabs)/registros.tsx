@@ -545,15 +545,25 @@ export default function RegistrosScreen({
     const term = jefeRegistroSearch.trim().toLowerCase();
     const registrosSinDuplicar = preferirCopiasCorreccion(jefeRegistrosPorObra);
     const visibles = registrosSinDuplicar.filter((registro) => {
-      const isCorreccion = isCorreccionEditable(registro);
+      const isCorreccion = Boolean(
+        registro.es_correccion || registro.registro_origen_id,
+      );
+      const correccionEnManosDelOperario =
+        isCorreccion &&
+        registro.estado === "pendiente" &&
+        registro.devuelto_a_tecnico === true;
+      if (correccionEnManosDelOperario) return false;
+
+      const estadoVisual =
+        isCorreccion && !registro.corregido_at
+          ? "rechazado"
+          : registro.estado;
       const esEstadoVisible =
         registro.estado === "pendiente" ||
-        registro.estado === "rechazado" ||
-        isCorreccion;
+        registro.estado === "rechazado";
       const pasaFiltro =
         jefeEstadoFiltro === "todos" ||
-        registro.estado === jefeEstadoFiltro ||
-        (jefeEstadoFiltro === "rechazado" && isCorreccion);
+        estadoVisual === jefeEstadoFiltro;
 
       return esEstadoVisible && pasaFiltro;
     });
@@ -2278,7 +2288,8 @@ export default function RegistrosScreen({
                     <View
                       style={[
                         styles.jefeRegistroCardAccent,
-                        registro.estado === "rechazado" &&
+                        (registro.estado === "rechazado" ||
+                          (registro.es_correccion && !registro.corregido_at)) &&
                           styles.jefeRegistroCardAccentRejected,
                       ]}
                     />
@@ -2315,31 +2326,36 @@ export default function RegistrosScreen({
                           style={[
                             styles.statusPill,
                             styles.jefeStatusPill,
-                            registro.estado === "rechazado" &&
+                            (registro.estado === "rechazado" ||
+                              (registro.es_correccion && !registro.corregido_at)) &&
                               styles.statusRechazado,
                           ]}
                         >
-                          {getRegistroEstadoLabel(registro.estado)}
+                          {registro.es_correccion && !registro.corregido_at
+                            ? "corrección"
+                            : getRegistroEstadoLabel(registro.estado)}
                         </Text>
                       </View>
 
                       <RegistroContextBox registro={registro} />
 
                       <View style={[styles.actionRow, styles.jefeActionRow]}>
-                        <Button
-                          mode={registro.estado === "pendiente" ? "contained" : "outlined"}
-                          buttonColor={registro.estado === "pendiente" ? "#f97316" : undefined}
-                          textColor={registro.estado === "pendiente" ? "#ffffff" : "#0f172a"}
-                          onPress={() => fillFormFromRegistro(registro)}
-                          style={[styles.inlineButton, styles.jefeInlineButton]}
-                          contentStyle={styles.jefeButtonContent}
-                          labelStyle={styles.jefeButtonLabel}
-                        >
-                          {registro.estado === "pendiente"
-                            ? "Editar y enviar"
-                            : "Editar"}
-                        </Button>
-                        {registro.estado === "rechazado" ? (
+                        {registro.estado === "pendiente" ? (
+                          <Button
+                            mode="contained"
+                            buttonColor="#f97316"
+                            textColor="#ffffff"
+                            onPress={() => fillFormFromRegistro(registro)}
+                            style={[styles.inlineButton, styles.jefeInlineButton]}
+                            contentStyle={styles.jefeButtonContent}
+                            labelStyle={styles.jefeButtonLabel}
+                          >
+                            Editar y enviar
+                          </Button>
+                        ) : null}
+                        {registro.estado === "pendiente" &&
+                        registro.es_correccion &&
+                        !registro.devuelto_a_tecnico ? (
                           <Button
                             mode="contained"
                             buttonColor="#0f172a"
@@ -2675,36 +2691,68 @@ export default function RegistrosScreen({
             </Card.Content>
           </Card>
         ) : editingRegistro && userRole === "terreno" ? (
-          <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.cardHeaderRow}>
-                <View>
-                  <Text style={styles.formTitle}>Corregir registro rechazado</Text>
-                  <Text style={styles.emptyText}>
-                    Al reenviarlo quedará pendiente para Supervisor.
+          <Card style={[styles.card, styles.terrenoFormCard]}>
+            <View style={styles.terrenoFormClip}>
+            <View style={styles.terrenoFormAccent} />
+            <Card.Content style={styles.terrenoFormContent}>
+              <View style={styles.terrenoFormHeader}>
+                <View style={styles.terrenoFormHeaderIcon}>
+                  <MaterialCommunityIcons
+                    name="file-document-edit-outline"
+                    size={25}
+                    color="#0f172a"
+                  />
+                </View>
+                <View style={styles.terrenoSectionHeading}>
+                  <Text style={styles.terrenoFormTitle}>Corregir registro</Text>
+                  <Text style={styles.terrenoFormSubtitle}>
+                    Revisa el rechazo y actualiza los datos solicitados.
                   </Text>
                 </View>
-                <Button mode="text" onPress={() => setEditingRegistro(null)}>
+                <Button
+                  mode="text"
+                  compact
+                  textColor="#c2410c"
+                  onPress={() => setEditingRegistro(null)}
+                >
                   Cancelar
                 </Button>
               </View>
 
+              <RegistroContextBox registro={editingRegistro} />
+
               {campoConfiguradoVisible("tipoRegistro") ? (
                 <>
-                  <Text style={styles.fieldLabel}>Tipo de registro</Text>
+                  <View style={styles.terrenoSectionHeader}>
+                    <View style={styles.terrenoSectionIcon}>
+                      <MaterialCommunityIcons name="fire" size={18} color="#0f172a" />
+                    </View>
+                    <Text style={styles.terrenoSectionTitle}>Tipo de registro</Text>
+                  </View>
                   <SegmentedButtons
                     value={tipoRegistro}
                     onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
                     style={styles.segmented}
                     buttons={[
-                      { value: "sello_cortafuego", label: "Sello" },
-                      { value: "junta_lineal_espuma", label: "Junta" },
+                      { value: "sello_cortafuego", label: "Sello Cortafuego" },
+                      { value: "junta_lineal_espuma", label: "Junta Lineal Espuma" },
                     ]}
                   />
                 </>
               ) : null}
 
               {!isJuntaLineal ? renderItemizadoTerreno() : null}
+
+              <View style={styles.terrenoSectionHeader}>
+                <View style={styles.terrenoSectionIcon}>
+                  <MaterialCommunityIcons
+                    name="map-marker-outline"
+                    size={18}
+                    color="#0f172a"
+                  />
+                </View>
+                <Text style={styles.terrenoSectionTitle}>Ubicación y ejecución</Text>
+              </View>
 
               {campoConfiguradoVisible("fechaEjecucionSello") ? (
                 <Pressable onPress={() => setCalendarVisible(true)}>
@@ -2793,11 +2841,9 @@ export default function RegistrosScreen({
                       style={[styles.input, styles.observacionesInput]}
                     />
                   ) : null}
-                  {renderFotos()}
                 </>
               ) : (
                 <>
-                  {renderFotos()}
                   {campoConfiguradoVisible("recinto") ? (
                     <TextInput
                       label="Recinto"
@@ -2881,6 +2927,12 @@ export default function RegistrosScreen({
                 </>
               )}
 
+              {renderFotos({
+                terrainCreate: true,
+                existingFotos: getRegistroFotos(editingRegistro),
+                replacementMode: true,
+              })}
+
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               {success ? <Text style={styles.successText}>{success}</Text> : null}
 
@@ -2889,13 +2941,15 @@ export default function RegistrosScreen({
                 onPress={submitTecnicoReenvio}
                 loading={saving}
                 disabled={saving}
-                style={styles.button}
+                style={[styles.button, styles.terrenoSubmitButton]}
                 contentStyle={styles.buttonContent}
                 labelStyle={styles.buttonLabel}
+                icon="send-outline"
               >
                 {saving ? "Reenviando..." : "Reenviar al Supervisor"}
               </Button>
             </Card.Content>
+            </View>
           </Card>
         ) : isFormMode && !obra ? (
           <Card style={styles.card}>

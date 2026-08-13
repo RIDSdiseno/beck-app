@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { LogBox } from "react-native";
 import { MD3LightTheme, Provider as PaperProvider } from "react-native-paper";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { HistorialProvider } from "@/context/HistorialContext";
@@ -43,27 +44,29 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <PaperProvider theme={paperTheme}>
-          <HistorialProvider>
-            <RegistrosProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="login" />
-                <Stack.Screen name="auth" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="(firemat)" />
-                <Stack.Screen
-                  name="modal"
-                  options={{ presentation: "modal" }}
-                />
-              </Stack>
-              <StatusBar style="auto" />
-            </RegistrosProvider>
-          </HistorialProvider>
-        </PaperProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+          <PaperProvider theme={paperTheme}>
+            <HistorialProvider>
+              <RegistrosProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="login" />
+                  <Stack.Screen name="auth" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="(firemat)" />
+                  <Stack.Screen
+                    name="modal"
+                    options={{ presentation: "modal" }}
+                  />
+                </Stack>
+                <StatusBar style="auto" />
+              </RegistrosProvider>
+            </HistorialProvider>
+          </PaperProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
