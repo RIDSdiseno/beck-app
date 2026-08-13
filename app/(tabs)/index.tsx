@@ -1,6 +1,8 @@
 import {
   getMisRegistros,
+  getResumenSupervisor,
   RegistroHistorialApi,
+  ResumenSupervisorApi,
 } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -43,6 +45,16 @@ function getRegistroKind(registro: RegistroHistorialApi) {
     : "Sello";
 }
 
+const EMPTY_SUPERVISOR_SUMMARY: ResumenSupervisorApi = {
+  pendientesRevision: 0,
+  rechazadosIngenieria: 0,
+  enRevisionIngenieria: 0,
+  validadosIngenieria: 0,
+  enviadosMes: 0,
+  correccionesReenviadasMes: 0,
+  seguimientoPersonalDisponible: false,
+};
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -54,17 +66,34 @@ export default function DashboardScreen() {
     "sello_cortafuego" | "junta_lineal_espuma"
   >("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [supervisorSummary, setSupervisorSummary] = useState<{
+    sello_cortafuego: ResumenSupervisorApi;
+    junta_lineal_espuma: ResumenSupervisorApi;
+  }>({
+    sello_cortafuego: EMPTY_SUPERVISOR_SUMMARY,
+    junta_lineal_espuma: EMPTY_SUPERVISOR_SUMMARY,
+  });
 
   const loadDashboard = useCallback(async (forceRefresh = false) => {
     try {
       setError("");
-      const [session, data] = await Promise.all([
-        getSession(),
-        getMisRegistros(forceRefresh),
-      ]);
+      const session = await getSession();
       setUserName(session.user?.nombre || "Usuario Beck");
       setUserRole(session.user?.rol || "");
-      setRegistros(data);
+
+      if (session.user?.rol === "jefeobra") {
+        const [sellos, juntas] = await Promise.all([
+          getResumenSupervisor("sello_cortafuego"),
+          getResumenSupervisor("junta_lineal_espuma"),
+        ]);
+        setSupervisorSummary({
+          sello_cortafuego: sellos,
+          junta_lineal_espuma: juntas,
+        });
+        setRegistros([]);
+      } else {
+        setRegistros(await getMisRegistros(forceRefresh));
+      }
     } catch (err: any) {
       setError(err?.message || "No se pudo cargar el inicio");
     }
@@ -101,9 +130,6 @@ export default function DashboardScreen() {
     const pendientes = registros.filter(
       (registro) => registro.estado === "pendiente",
     ).length;
-    const rechazados = registros.filter(
-      (registro) => registro.estado === "rechazado",
-    ).length;
     const total = registros.length;
     const avance = total ? Math.round((validados / total) * 100) : 0;
 
@@ -121,7 +147,6 @@ export default function DashboardScreen() {
       enRevision,
       validados,
       pendientes,
-      rechazados,
       total,
       avance,
       obraPrincipal,
@@ -129,39 +154,7 @@ export default function DashboardScreen() {
   }, [registros]);
 
   const recientes = useMemo(() => registros.slice(0, 4), [registros]);
-  const jefeObraMetrics = useMemo(() => {
-    const visibles = registros.filter((registro) =>
-      activeTipo === "junta_lineal_espuma"
-        ? registro.tipo_registro === "junta_lineal_espuma"
-        : registro.tipo_registro !== "junta_lineal_espuma",
-    );
-    const pisos = new Set(visibles.map((registro) => registro.piso).filter(Boolean));
-    const selladores = new Set(
-      visibles.map((registro) => registro.nombre_sellador).filter(Boolean),
-    );
-    const unidades = visibles.reduce((total, registro) => {
-      if (activeTipo === "junta_lineal_espuma") {
-        return total + Number(registro.metros_lineales || 0);
-      }
-      return total + Number(registro.cantidad_sellos || 0);
-    }, 0);
-    const holguras = visibles
-      .map((registro) => Number(registro.holgura || 0))
-      .filter((value) => Number.isFinite(value));
-    const promedioHolgura = holguras.length
-      ? holguras.reduce((total, value) => total + value, 0) / holguras.length
-      : 0;
-
-    return {
-      registrosVista: visibles.length,
-      unidades,
-      ponderados: unidades,
-      pisos: pisos.size,
-      selladores: selladores.size,
-      promedioFactor: 1,
-      promedioHolgura,
-    };
-  }, [activeTipo, registros]);
+  const jefeObraMetrics = supervisorSummary[activeTipo];
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -187,8 +180,6 @@ export default function DashboardScreen() {
   }
 
   if (userRole === "jefeobra") {
-    const isJunta = activeTipo === "junta_lineal_espuma";
-
     return (
       <SafeAreaView
         style={[styles.container, { paddingTop: insets.top + 2 }]}
@@ -260,94 +251,76 @@ export default function DashboardScreen() {
             </Card>
           ) : null}
 
-          <Text style={styles.supervisorSectionLabel}>Resumen general</Text>
+          <Text style={styles.supervisorSectionLabel}>Alertas y seguimiento</Text>
           <View style={styles.summaryGrid}>
             <Card style={[styles.summaryCard, styles.summaryWarm, styles.supervisorSummaryHalf]}>
               <Card.Content style={styles.supervisorSummaryContent}>
                 <View style={[styles.supervisorMetricIcon, styles.supervisorMetricYellow]}>
-                  <MaterialCommunityIcons name="clipboard-text-outline" size={20} color="#0f172a" />
+                  <MaterialCommunityIcons name="clipboard-clock-outline" size={20} color="#0f172a" />
                 </View>
-                <Text style={styles.summaryLabel}>Registros en vista</Text>
-                <Text style={styles.summaryValue}>
-                  {jefeObraMetrics.registrosVista}
+                <Text style={styles.summaryLabel}>Pendientes de mi revisión</Text>
+                <Text style={styles.summaryValue}>{jefeObraMetrics.pendientesRevision}</Text>
+                <Text style={styles.helperText}>Esperan revisión del supervisor</Text>
+              </Card.Content>
+            </Card>
+
+            <Card style={[styles.summaryCard, styles.summaryRed, styles.supervisorSummaryHalf]}>
+              <Card.Content style={styles.supervisorSummaryContent}>
+                <View style={[styles.supervisorMetricIcon, styles.supervisorMetricRed]}>
+                  <MaterialCommunityIcons name="alert-octagon-outline" size={20} color="#dc2626" />
+                </View>
+                <Text style={styles.summaryLabel}>Rechazados por Ingeniería</Text>
+                <Text style={[styles.summaryValue, styles.redValue]}>
+                  {jefeObraMetrics.rechazadosIngenieria}
                 </Text>
-                <Text style={styles.helperText}>Filtrados por tipo</Text>
+                <Text style={styles.helperText}>Pendientes de corrección del operario</Text>
               </Card.Content>
             </Card>
 
             <Card style={[styles.summaryCard, styles.summaryBlue, styles.supervisorSummaryHalf]}>
               <Card.Content style={styles.supervisorSummaryContent}>
                 <View style={[styles.supervisorMetricIcon, styles.supervisorMetricBlue]}>
-                  <MaterialCommunityIcons name={isJunta ? "ruler" : "fire"} size={20} color="#2563eb" />
+                  <MaterialCommunityIcons name="send-clock-outline" size={20} color="#2563eb" />
                 </View>
-                <Text style={styles.summaryLabel}>
-                  {isJunta ? "Metros lineales registrados" : "Sellos registrados"}
-                </Text>
+                <Text style={styles.summaryLabel}>En revisión por Ingeniería</Text>
                 <Text style={styles.summaryValue}>
-                  {isJunta
-                    ? jefeObraMetrics.unidades.toFixed(2)
-                    : Math.round(jefeObraMetrics.unidades)}
+                  {jefeObraMetrics.enRevisionIngenieria ?? "—"}
                 </Text>
                 <Text style={styles.helperText}>
-                  {isJunta ? "Metros lineales totales" : "Conteo directo de unidades"}
+                  {jefeObraMetrics.seguimientoPersonalDisponible
+                    ? "Enviados con tus credenciales"
+                    : "Disponible al actualizar la base de datos"}
                 </Text>
               </Card.Content>
             </Card>
 
-            <Card style={[styles.summaryCard, styles.summaryGreen, styles.supervisorSummaryFull]}>
-              <Card.Content style={styles.supervisorWeightedContent}>
+            <Card style={[styles.summaryCard, styles.summaryGreen, styles.supervisorSummaryHalf]}>
+              <Card.Content style={styles.supervisorSummaryContent}>
                 <View style={[styles.supervisorMetricIcon, styles.supervisorMetricGreen]}>
-                  <MaterialCommunityIcons name="chart-line" size={21} color="#16a34a" />
+                  <MaterialCommunityIcons name="check-decagram-outline" size={21} color="#16a34a" />
                 </View>
-                <View style={styles.terrenoCardHeadingText}>
-                <Text style={styles.summaryLabel}>
-                  {isJunta ? "Metros ponderados" : "Sellos ponderados"}
-                </Text>
+                <Text style={styles.summaryLabel}>Validados por Ingeniería</Text>
                 <Text style={[styles.summaryValue, styles.greenValue]}>
-                  {isJunta
-                    ? jefeObraMetrics.ponderados.toFixed(2)
-                    : jefeObraMetrics.ponderados.toFixed(1)}
+                  {jefeObraMetrics.validadosIngenieria ?? "—"}
                 </Text>
                 <Text style={styles.helperText}>
-                  Equivalente por factor de holgura y tipo de cielo
+                  {jefeObraMetrics.seguimientoPersonalDisponible
+                    ? "Enviados por ti y posteriormente aprobados"
+                    : "Disponible al actualizar la base de datos"}
                 </Text>
-                </View>
               </Card.Content>
             </Card>
           </View>
 
+          <Text style={styles.supervisorSectionLabel}>Mi actividad este mes</Text>
           <View style={styles.smallSummaryGrid}>
             <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
-                <MaterialCommunityIcons name="stairs" size={22} color="#ea580c" />
-                <View>
-                  <Text style={styles.helperText}>Pisos con registros</Text>
-                  <Text style={styles.smallSummaryValue}>{jefeObraMetrics.pisos}</Text>
-                </View>
-              </Card.Content>
-            </Card>
-            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
-              <Card.Content style={styles.smallSummaryContent}>
-                <MaterialCommunityIcons
-                  name="account-group-outline"
-                  size={22}
-                  color="#3b82f6"
-                />
-                <View>
-                  <Text style={styles.helperText}>Selladores distintos</Text>
+                <MaterialCommunityIcons name="send-check-outline" size={22} color="#ea580c" />
+                <View style={styles.supervisorActivityText}>
+                  <Text style={styles.helperText}>Enviados por mí</Text>
                   <Text style={styles.smallSummaryValue}>
-                    {jefeObraMetrics.selladores}
-                  </Text>
-                </View>
-              </Card.Content>
-            </Card>
-            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
-              <Card.Content style={styles.smallSummaryContent}>
-                <MaterialCommunityIcons name="fire" size={22} color="#ef4444" />
-                <View>
-                  <Text style={styles.helperText}>Promedio factor F</Text>
-                  <Text style={styles.smallSummaryValue}>
-                    {jefeObraMetrics.promedioFactor.toFixed(2)}
+                    {jefeObraMetrics.enviadosMes ?? "—"}
                   </Text>
                 </View>
               </Card.Content>
@@ -355,14 +328,14 @@ export default function DashboardScreen() {
             <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}>
               <Card.Content style={styles.smallSummaryContent}>
                 <MaterialCommunityIcons
-                  name="chart-bar"
+                  name="file-refresh-outline"
                   size={22}
-                  color="#f97316"
+                  color="#ea580c"
                 />
-                <View>
-                  <Text style={styles.helperText}>Holgura promedio (cm)</Text>
+                <View style={styles.supervisorActivityText}>
+                  <Text style={styles.helperText}>Correcciones reenviadas</Text>
                   <Text style={styles.smallSummaryValue}>
-                    {jefeObraMetrics.promedioHolgura.toFixed(1)}
+                    {jefeObraMetrics.correccionesReenviadasMes ?? "—"}
                   </Text>
                 </View>
               </Card.Content>
@@ -475,61 +448,82 @@ export default function DashboardScreen() {
         ) : null}
 
         <View style={styles.kpiGrid}>
-          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiYellow]}>
+          <Card
+            style={[
+              styles.kpiCard,
+              userRole === "terreno" && styles.terrenoKpiCard,
+              userRole === "terreno" && styles.terrenoKpiYellow,
+            ]}
+          >
             <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
               <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconYellow]}>
-              <MaterialCommunityIcons
-                name="shield-check-outline"
-                size={21}
-                color="#0f172a"
-              />
+                <MaterialCommunityIcons
+                  name="clipboard-check-outline"
+                  size={21}
+                  color="#0f172a"
+                />
               </View>
               <Text style={styles.kpiValue}>{metrics.registrosRealizados}</Text>
               <Text style={styles.kpiLabel}>Registros realizados</Text>
             </Card.Content>
           </Card>
 
-          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiBlue]}>
+          {userRole === "terreno" ? (
+            <Card style={[styles.kpiCard, styles.terrenoKpiCard, styles.terrenoKpiOrange]}>
+              <Card.Content style={styles.terrenoKpiContent}>
+                <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconOrange]}>
+                  <MaterialCommunityIcons
+                    name="account-clock-outline"
+                    size={21}
+                    color="#ea580c"
+                  />
+                </View>
+                <Text style={styles.kpiValue}>{metrics.pendientes}</Text>
+                <Text style={styles.kpiLabel}>Pendientes de revisión por supervisor</Text>
+              </Card.Content>
+            </Card>
+          ) : null}
+
+          <Card
+            style={[
+              styles.kpiCard,
+              userRole === "terreno" && styles.terrenoKpiCard,
+              userRole === "terreno" && styles.terrenoKpiBlue,
+            ]}
+          >
             <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
               <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconBlue]}>
-              <MaterialCommunityIcons
-                name="timer-sand"
-                size={21}
-                color="#3b82f6"
-              />
+                <MaterialCommunityIcons
+                  name="timer-sand"
+                  size={21}
+                  color="#3b82f6"
+                />
               </View>
               <Text style={styles.kpiValue}>{metrics.enRevision}</Text>
-              <Text style={styles.kpiLabel}>En revisión</Text>
+              <Text style={styles.kpiLabel}>En revisión por ingeniería</Text>
             </Card.Content>
           </Card>
 
-          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiGreen]}>
+          <Card
+            style={[
+              styles.kpiCard,
+              userRole === "terreno" && styles.terrenoKpiCard,
+              userRole === "terreno" && styles.terrenoKpiGreen,
+            ]}
+          >
             <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
               <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconGreen]}>
-              <MaterialCommunityIcons
-                name="check-decagram-outline"
-                size={21}
-                color="#16a34a"
-              />
+                <MaterialCommunityIcons
+                  name="check-decagram-outline"
+                  size={21}
+                  color="#16a34a"
+                />
               </View>
               <Text style={styles.kpiValue}>{metrics.validados}</Text>
-              <Text style={styles.kpiLabel}>Validados</Text>
+              <Text style={styles.kpiLabel}>Validados por ingeniería</Text>
             </Card.Content>
           </Card>
 
-          <Card style={[styles.kpiCard, userRole === "terreno" && styles.terrenoKpiRed]}>
-            <Card.Content style={userRole === "terreno" ? styles.terrenoKpiContent : undefined}>
-              <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconRed]}>
-              <MaterialCommunityIcons
-                name="close-octagon-outline"
-                size={21}
-                color="#dc2626"
-              />
-              </View>
-              <Text style={styles.kpiValue}>{metrics.rechazados}</Text>
-              <Text style={styles.kpiLabel}>Rechazados</Text>
-            </Card.Content>
-          </Card>
         </View>
 
         <Card style={[styles.card, userRole === "terreno" && styles.terrenoProgressCard]}>
@@ -566,7 +560,6 @@ export default function DashboardScreen() {
 
               <View style={styles.statusRow}>
                 <Text style={styles.statusItem}>Pendientes: {metrics.pendientes}</Text>
-                <Text style={styles.statusItem}>Rechazados: {metrics.rechazados}</Text>
               </View>
             </Card.Content>
           </View>
@@ -583,7 +576,8 @@ export default function DashboardScreen() {
               <Text style={styles.cardTitle}>Foco sugerido</Text>
               <Text style={styles.focusText}>
                 Tu obra con más actividad es {metrics.obraPrincipal}. Prioriza
-                revisar los registros en revisión para acelerar validaciones.
+                informar a tu supervisor de tus registros realizados, para acelerar
+                el proceso de revisión y para que estos sean validados por ingeniería.
               </Text>
             </View>
           </Card.Content>
@@ -617,7 +611,11 @@ export default function DashboardScreen() {
                       {getRegistroKind(registro)} · {registro.obras?.nombre || "Sin obra"}
                     </Text>
                     <Text style={styles.helperText}>
-                      {formatDate(registro.fecha)} · {registro.estado.replace("_", " ")}
+                      {formatDate(registro.fecha)}
+                      {registro.tipo_registro !== "junta_lineal_espuma"
+                        ? ` · Sello N° ${registro.numero_sello || "Sin número"}`
+                        : ""}
+                      {` · ${registro.estado.replace("_", " ")}`}
                     </Text>
                   </View>
                 </View>
@@ -740,9 +738,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
+  terrenoKpiCard: {
+    minHeight: 126,
+  },
   terrenoKpiYellow: {
     backgroundColor: "#fffaf0",
-    borderColor: "#FDC10B",
+    borderColor: "#fde68a",
+    borderTopColor: "#FDC10B",
     borderTopWidth: 4,
   },
   terrenoKpiBlue: {
@@ -751,16 +753,16 @@ const styles = StyleSheet.create({
     borderTopColor: "#3b82f6",
     borderTopWidth: 4,
   },
+  terrenoKpiOrange: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fdba74",
+    borderTopColor: "#ea580c",
+    borderTopWidth: 4,
+  },
   terrenoKpiGreen: {
     backgroundColor: "#f0fdf4",
     borderColor: "#86efac",
     borderTopColor: "#16a34a",
-    borderTopWidth: 4,
-  },
-  terrenoKpiRed: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#fca5a5",
-    borderTopColor: "#dc2626",
     borderTopWidth: 4,
   },
   terrenoKpiIcon: {
@@ -776,11 +778,11 @@ const styles = StyleSheet.create({
   terrenoKpiIconBlue: {
     backgroundColor: "#dbeafe",
   },
+  terrenoKpiIconOrange: {
+    backgroundColor: "#ffedd5",
+  },
   terrenoKpiIconGreen: {
     backgroundColor: "#dcfce7",
-  },
-  terrenoKpiIconRed: {
-    backgroundColor: "#fee2e2",
   },
   kpiValue: {
     color: "#0f172a",
@@ -1038,18 +1040,9 @@ const styles = StyleSheet.create({
   supervisorSummaryHalf: {
     width: "48%",
   },
-  supervisorSummaryFull: {
-    width: "100%",
-  },
   supervisorSummaryContent: {
+    minHeight: 154,
     paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  supervisorWeightedContent: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 11,
-    paddingHorizontal: 13,
     paddingVertical: 11,
   },
   supervisorMetricIcon: {
@@ -1068,7 +1061,9 @@ const styles = StyleSheet.create({
   },
   supervisorMetricGreen: {
     backgroundColor: "#dcfce7",
-    marginBottom: 0,
+  },
+  supervisorMetricRed: {
+    backgroundColor: "#fee2e2",
   },
   summaryWarm: {
     borderColor: "#facc15",
@@ -1081,6 +1076,10 @@ const styles = StyleSheet.create({
   summaryGreen: {
     borderColor: "#22c55e",
     backgroundColor: "#ecfdf5",
+  },
+  summaryRed: {
+    borderColor: "#ef4444",
+    backgroundColor: "#fef2f2",
   },
   summaryLabel: {
     color: "#64748b",
@@ -1097,6 +1096,9 @@ const styles = StyleSheet.create({
   },
   greenValue: {
     color: "#16a34a",
+  },
+  redValue: {
+    color: "#dc2626",
   },
   smallSummaryGrid: {
     flexDirection: "row",
@@ -1120,6 +1122,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
+    minHeight: 76,
+  },
+  supervisorActivityText: {
+    flex: 1,
   },
   smallSummaryValue: {
     color: "#0f172a",

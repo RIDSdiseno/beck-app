@@ -119,6 +119,16 @@ export type RegistroHistorialApi = {
   }[];
 };
 
+export type ResumenSupervisorApi = {
+  pendientesRevision: number;
+  rechazadosIngenieria: number;
+  enRevisionIngenieria: number | null;
+  validadosIngenieria: number | null;
+  enviadosMes: number | null;
+  correccionesReenviadasMes: number | null;
+  seguimientoPersonalDisponible: boolean;
+};
+
 const registrosCache = new Map<string, RegistroHistorialApi[]>();
 
 type GetMisRegistrosParams = {
@@ -235,6 +245,35 @@ export async function getMisRegistros(
   );
   registrosCache.set(cacheKey, data);
   return data;
+}
+
+export async function getResumenSupervisor(
+  tipoRegistro: "sello_cortafuego" | "junta_lineal_espuma",
+): Promise<ResumenSupervisorApi> {
+  const session = await getSession();
+
+  if (!session.token) {
+    throw new Error("No hay sesión activa");
+  }
+
+  const query = new URLSearchParams({ tipoRegistro });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/registros/resumen-supervisor?${query.toString()}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  const result = await readJsonResponse(response);
+
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo obtener el resumen del supervisor");
+  }
+
+  return result.data as ResumenSupervisorApi;
 }
 
 export async function uploadRegistroFotos(
