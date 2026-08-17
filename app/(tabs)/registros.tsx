@@ -28,6 +28,10 @@ import {
   shouldShowRejectionContext,
 } from "@/utils/registroEstado";
 import { HOLGURA_OPTIONS } from "@/utils/holgura";
+import {
+  ACCESIBILIDAD_OPTIONS,
+  getAislacionOption,
+} from "@/utils/factoresRegistro";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -155,13 +159,6 @@ const ITEMIZADO_BECK_OPTIONS = [
   "Ducto de clima Rectangular SIN Aislación",
   "Ducto de clima Rectangular CON Aislación",
   "Bandeja eléctrica o escalerilla",
-];
-
-const CIELO_MODULAR_OPTIONS = [
-  { value: "1", label: "Normal" },
-  { value: "2", label: "Cielo Americano o estructurado" },
-  { value: "3", label: "Cielo duro y gateras" },
-  { value: "0", label: "No aplica" },
 ];
 
 const APLICA_OPTIONS = [
@@ -1012,9 +1009,9 @@ export default function RegistrosScreen({
     setNumeroSello(registro.numero_sello === "N/A" ? "" : registro.numero_sello || "");
     setCantidadSellos(String(registro.cantidad_sellos || ""));
     setNombreSellador(registro.nombre_sellador || "");
-    setHolgura(String(registro.holgura || ""));
+    setHolgura(String(registro.holgura ?? ""));
     setAccesibilidad(String(registro.cielo_modular ?? registro.accesibilidad ?? ""));
-    setAislacion(String(registro.aislacion || ""));
+    setAislacion(getAislacionOption(registro));
     setReparacionTabique(String(registro.reparacion_tabique || ""));
     setItemizadoSacyr(registro.itemizado_mandante || registro.itemizado_sacyr || "");
     setMetrosLineales(String(registro.metros_lineales || ""));
@@ -2094,7 +2091,7 @@ export default function RegistrosScreen({
                         "Accesibilidad",
                         accesibilidad,
                         setAccesibilidad,
-                        CIELO_MODULAR_OPTIONS,
+                        ACCESIBILIDAD_OPTIONS,
                       )
                     ) : null}
                     {campoConfiguradoVisible("cantidadSellosConFactores") ? (
@@ -2887,7 +2884,7 @@ export default function RegistrosScreen({
                       "Accesibilidad",
                       accesibilidad,
                       setAccesibilidad,
-                      CIELO_MODULAR_OPTIONS,
+                      ACCESIBILIDAD_OPTIONS,
                     )
                   ) : null}
                   {campoConfiguradoVisible("aislacion") ? (
@@ -3235,7 +3232,7 @@ export default function RegistrosScreen({
                         "Accesibilidad",
                         accesibilidad,
                         setAccesibilidad,
-                        CIELO_MODULAR_OPTIONS,
+                        ACCESIBILIDAD_OPTIONS,
                       )
                     ) : null}
 

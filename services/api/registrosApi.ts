@@ -59,6 +59,7 @@ export type RegistroHistorialApi = {
   cielo_modular?: number | null;
   cantidad_sellos_con_factores?: string | number | null;
   aislacion?: string | number | null;
+  aislacion_aplica?: boolean | null;
   cantidad_sellos_aislacion?: string | number | null;
   reparacion_tabique?: string | number | null;
   cantidad_final?: string | number | null;
