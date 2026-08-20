@@ -13,6 +13,7 @@ import {
 import {
   getHistorialRegistroDetalle,
   getHistorialRegistrosPage,
+  EstadoRegistroApi,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
 import { getSession, STORAGE_KEYS } from "@/services/auth/session";
@@ -58,6 +59,7 @@ export default function HistorialScreen() {
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [obraFilter, setObraFilter] = useState("todas");
+  const [estadoFilter, setEstadoFilter] = useState<EstadoRegistroApi | "todos">("todos");
   const [obraOptions, setObraOptions] = useState<ObraOption[]>([]);
   const [selectedRegistro, setSelectedRegistro] = useState<HistoryItem | null>(null);
   const [hiddenValidatedIds, setHiddenValidatedIds] = useState<Set<string>>(new Set());
@@ -91,6 +93,7 @@ export default function HistorialScreen() {
         search,
         fecha: dateFilter,
         obraId: obraFilter,
+        estado: estadoFilter,
       };
       const page = role === "cliente"
         ? await getClienteHistorialPage(params)
@@ -114,13 +117,13 @@ export default function HistorialScreen() {
         setRefreshing(false);
       }
     }
-  }, [dateFilter, nextCursor, obraFilter, ready, role, search]);
+  }, [dateFilter, estadoFilter, nextCursor, obraFilter, ready, role, search]);
 
   useEffect(() => {
     if (!ready) return;
     const timer = setTimeout(() => { void loadPage(true); }, 350);
     return () => clearTimeout(timer);
-  }, [ready, search, dateFilter, obraFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, search, dateFilter, obraFilter, estadoFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleItems = useMemo(
     () => items.filter((item) => item.estado !== "validado" || !hiddenValidatedIds.has(item.id)),
@@ -173,6 +176,23 @@ export default function HistorialScreen() {
           options={obraOptions} onChange={setObraFilter} compact containerStyle={styles.filter}
         />
       </View>
+      {role === "administrador" ? (
+        <BeckOptionFilter
+          label="Filtrar por estado"
+          value={estadoFilter}
+          allValue="todos"
+          allLabel="Todos los estados"
+          icon="list-status"
+          options={[
+            { value: "pendiente", label: "Pendiente" },
+            { value: "en_revision", label: "En revisión" },
+            { value: "rechazado", label: "Rechazado" },
+            { value: "validado", label: "Validado" },
+          ]}
+          onChange={(value) => setEstadoFilter(value as EstadoRegistroApi | "todos")}
+          compact
+        />
+      ) : null}
       <Text style={styles.total}>{total} {total === 1 ? "registro" : "registros"}</Text>
     </View>
   );

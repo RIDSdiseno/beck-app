@@ -103,13 +103,18 @@ export default function TabLayout() {
                 }}
               />
               <Tabs.Screen
-                name="cliente"
+                name="mis-obras"
                 options={{
-                  title: "Mis Obras",
-                  href: userRole === "cliente" || userRole === "administrador" ? undefined : null,
+                  title: userRole === "administrador" ? "Operario" : "Obras",
+                  href:
+                    userRole === "jefeobra" ||
+                    userRole === "ingenieria" ||
+                    userRole === "cliente"
+                      ? null
+                      : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
-                      name="domain"
+                      name={userRole === "administrador" ? "hard-hat" : "office-building"}
                       color={color}
                       size={size}
                     />
@@ -117,13 +122,30 @@ export default function TabLayout() {
                 }}
               />
               <Tabs.Screen
-                name="mis-obras"
+                name="registros"
                 options={{
-                  title: "Obras",
-                  href: userRole === "jefeobra" || userRole === "ingenieria" || userRole === "cliente" ? null : undefined,
+                  title: userRole === "administrador" ? "Supervisor" : "Registro",
+                  href:
+                    userRole === "ingenieria" || userRole === "cliente"
+                      ? null
+                      : undefined,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
-                      name="office-building"
+                      name="clipboard-text-outline"
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="control-inspeccion"
+                options={{
+                  title: "Correcciones",
+                  href: userRole === "jefeobra" ? undefined : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name="clipboard-alert-outline"
                       color={color}
                       size={size}
                     />
@@ -133,8 +155,11 @@ export default function TabLayout() {
               <Tabs.Screen
                 name="ingenieria"
                 options={{
-                  title: "Revisión",
-                  href: userRole === "ingenieria" ? undefined : null,
+                  title: userRole === "administrador" ? "Ingeniero" : "Revisión",
+                  href:
+                    userRole === "ingenieria" || userRole === "administrador"
+                      ? undefined
+                      : null,
                   tabBarIcon: ({ color, size }) => (
                     <MaterialCommunityIcons
                       name="clipboard-check-outline"
@@ -144,66 +169,16 @@ export default function TabLayout() {
                   ),
                 }}
               />
-              {userRole === "jefeobra" ? (
-                <Tabs.Screen
-                  name="registros"
-                  options={{
-                    title: "Registro",
-                    tabBarIcon: ({ color, size }) => (
-                      <MaterialCommunityIcons
-                        name="clipboard-text-outline"
-                        color={color}
-                        size={size}
-                      />
-                    ),
-                  }}
-                />
-              ) : (
-                <Tabs.Screen
-                  name="control-inspeccion"
-                  options={{
-                    title: "Correcciones",
-                    href: userRole === "administrador" ? undefined : null,
-                    tabBarIcon: ({ color, size }) => (
-                      <MaterialCommunityIcons
-                        name="clipboard-alert-outline"
-                        color={color}
-                        size={size}
-                      />
-                    ),
-                  }}
-                />
-              )}
-              {userRole === "jefeobra" ? (
-                <Tabs.Screen
-                  name="control-inspeccion"
-                  options={{
-                    title: "Correcciones",
-                    tabBarIcon: ({ color, size }) => (
-                      <MaterialCommunityIcons
-                        name="clipboard-alert-outline"
-                        color={color}
-                        size={size}
-                      />
-                    ),
-                  }}
-                />
-              ) : (
-                <Tabs.Screen
-                  name="registros"
-                  options={{
-                    title: "Registro",
-                    href: userRole === "ingenieria" || userRole === "cliente" ? null : undefined,
-                    tabBarIcon: ({ color, size }) => (
-                      <MaterialCommunityIcons
-                        name="clipboard-text-outline"
-                        color={color}
-                        size={size}
-                      />
-                    ),
-                  }}
-                />
-              )}
+              <Tabs.Screen
+                name="cliente"
+                options={{
+                  title: "Mis Obras",
+                  href: userRole === "cliente" ? undefined : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons name="domain" color={color} size={size} />
+                  ),
+                }}
+              />
               <Tabs.Screen
                 name="cotizaciones"
                 options={{
@@ -237,7 +212,7 @@ export default function TabLayout() {
                 options={{
                   title: "Historial",
                   href:
-                    userRole === "terreno" || userRole === "jefeobra" || userRole === "ingenieria" || userRole === "cliente"
+                    userRole === "terreno" || userRole === "jefeobra" || userRole === "ingenieria" || userRole === "cliente" || userRole === "administrador"
                       ? null
                       : undefined,
                   tabBarIcon: ({ color, size }) => (
@@ -248,6 +223,10 @@ export default function TabLayout() {
                     />
                   ),
                 }}
+              />
+              <Tabs.Screen
+                name="actividad-admin"
+                options={{ title: "Mi actividad", href: null }}
               />
               <Tabs.Screen
                 name="perfil"

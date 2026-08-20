@@ -398,17 +398,21 @@ type RegistrosScreenProps = {
   mode?: "list" | "form";
   initialObra?: ObraSeleccionada | null;
   onChangeObra?: () => void;
+  operationalRole?: "terreno" | "jefeobra";
 };
 
 export default function RegistrosScreen({
   mode = "list",
   initialObra = null,
   onChangeObra,
+  operationalRole,
 }: RegistrosScreenProps = {}) {
   const insets = useSafeAreaInsets();
   const [obra, setObra] = useState<ObraSeleccionada | null>(initialObra);
   const [currentUserName, setCurrentUserName] = useState("");
-  const [userRole, setUserRole] = useState("");
+  const [sessionRole, setSessionRole] = useState("");
+  const isAdminSession = sessionRole === "administrador";
+  const userRole = isAdminSession ? operationalRole ?? "jefeobra" : sessionRole;
   const [saving, setSaving] = useState(false);
   const [refreshingTecnicoRegistros, setRefreshingTecnicoRegistros] =
     useState(false);
@@ -691,14 +695,17 @@ export default function RegistrosScreen({
       setRefreshingTecnicoRegistros(true);
       setError("");
       clearSuccessMessage();
-      const registros = await getMisRegistros(true, { scope: "registro" });
+      const registros = await getMisRegistros(true, {
+        scope: "registro",
+        vista: isAdminSession ? "operario" : undefined,
+      });
       setTecnicoRegistros(registros);
     } catch (err: any) {
       setError(err?.message || "No se pudieron obtener los registros");
     } finally {
       setRefreshingTecnicoRegistros(false);
     }
-  }, [clearSuccessMessage]);
+  }, [clearSuccessMessage, isAdminSession]);
 
   const refreshJefeObraData = useCallback(async () => {
     try {
@@ -707,7 +714,9 @@ export default function RegistrosScreen({
       clearSuccessMessage();
       const [obrasDisponibles, registros] = await Promise.all([
         getMisObras(true),
-        getMisRegistros(true),
+        getMisRegistros(true, {
+          vista: isAdminSession ? "supervisor" : undefined,
+        }),
       ]);
       setJefeObras(obrasDisponibles);
       setJefeRegistros(registros);
@@ -716,7 +725,7 @@ export default function RegistrosScreen({
     } finally {
       setRefreshingJefeRegistros(false);
     }
-  }, [clearSuccessMessage]);
+  }, [clearSuccessMessage, isAdminSession]);
 
   const refreshConfiguracionFormulario = useCallback(async () => {
     const obraId =
@@ -812,16 +821,21 @@ export default function RegistrosScreen({
         const role = session.user?.rol || "";
 
         setCurrentUserName(userName);
-        setUserRole(role);
+        setSessionRole(role);
         setNombreSellador(userName);
 
-        if (role === "jefeobra") {
+        const effectiveRole =
+          role === "administrador" ? operationalRole ?? "jefeobra" : role;
+
+        if (effectiveRole === "jefeobra") {
           const shouldBlockScreen = !hasLoadedJefeRegistrosRef.current;
           if (shouldBlockScreen) setLoadingJefeRegistros(true);
           try {
             const [obrasDisponibles, registros] = await Promise.all([
               getMisObras(),
-              getMisRegistros(),
+              getMisRegistros(false, {
+                vista: role === "administrador" ? "supervisor" : undefined,
+              }),
             ]);
 
             setJefeObras(obrasDisponibles);
@@ -834,8 +848,11 @@ export default function RegistrosScreen({
           return;
         }
 
-        if (role === "terreno") {
-          const registros = await getMisRegistros(false, { scope: "registro" });
+        if (effectiveRole === "terreno") {
+          const registros = await getMisRegistros(false, {
+            scope: "registro",
+            vista: role === "administrador" ? "operario" : undefined,
+          });
           setTecnicoRegistros(registros);
         }
 
@@ -870,7 +887,7 @@ export default function RegistrosScreen({
       };
 
       loadInitialData();
-    }, [clearSuccessMessage, initialObra]),
+    }, [clearSuccessMessage, initialObra, operationalRole]),
   );
 
   const resetForm = () => {
@@ -1278,13 +1295,20 @@ export default function RegistrosScreen({
 
       await uploadRegistroFotos(registro.id, fotos);
 
-      const registros = await getMisRegistros(true, { scope: "registro" });
+      const registros = await getMisRegistros(true, {
+        scope: "registro",
+        vista: isAdminSession ? "operario" : undefined,
+      });
       setTecnicoRegistros(registros);
       showSuccessMessage("Registro y fotos enviados correctamente.");
       await clearSelectedObra();
       setObra(null);
       resetForm();
-      router.replace("/registros");
+      if (isAdminSession && onChangeObra) {
+        onChangeObra();
+      } else {
+        router.replace("/registros");
+      }
     } catch (err: any) {
       if (__DEV__) console.warn("CREATE/UPLOAD REGISTRO ERROR =>", err);
       if (registroCreadoId) {
@@ -1385,7 +1409,9 @@ export default function RegistrosScreen({
           : undefined,
       });
 
-      const registros = await getMisRegistros(true);
+      const registros = await getMisRegistros(true, {
+        vista: isAdminSession ? "supervisor" : undefined,
+      });
       setJefeRegistros(registros);
       setEditingRegistro(null);
       resetForm();
@@ -1477,7 +1503,10 @@ export default function RegistrosScreen({
           : undefined,
       });
 
-      const registros = await getMisRegistros(true, { scope: "registro" });
+      const registros = await getMisRegistros(true, {
+        scope: "registro",
+        vista: isAdminSession ? "operario" : undefined,
+      });
       setTecnicoRegistros(registros);
       setEditingRegistro(null);
       resetForm();
@@ -1496,7 +1525,9 @@ export default function RegistrosScreen({
       setSuccess("");
 
       await enviarRegistroATecnico(registro.id);
-      const registros = await getMisRegistros(true);
+      const registros = await getMisRegistros(true, {
+        vista: isAdminSession ? "supervisor" : undefined,
+      });
       setJefeRegistros(registros);
       showSuccessMessage("Registro enviado al Operario para corrección.");
     } catch (err: any) {
@@ -1821,7 +1852,21 @@ export default function RegistrosScreen({
       >
         {isJefeObraObrasList ? (
           <View style={styles.fixedHeader}>
-            <BrandHeader subtitle="Registros de Operarios · Supervisor" />
+            <View style={styles.fixedTopRow}>
+              <View style={styles.fixedBrand}>
+                <BrandHeader subtitle={isAdminSession ? "Supervisor · Administración" : "Registros de Operarios · Supervisor"} />
+              </View>
+              {isAdminSession ? (
+                <Button
+                  mode="text"
+                  compact
+                  icon="clipboard-alert-outline"
+                  onPress={() => router.push("/control-inspeccion")}
+                >
+                  Correcciones
+                </Button>
+              ) : null}
+            </View>
 
             <BeckSearchInput
               placeholder="Buscar obra por nombre o código"
@@ -1835,7 +1880,7 @@ export default function RegistrosScreen({
           <View style={styles.fixedHeader}>
             <View style={styles.fixedTopRow}>
               <View style={styles.fixedBrand}>
-                <BrandHeader subtitle="Registros de Operarios · Supervisor" />
+                <BrandHeader subtitle={isAdminSession ? "Supervisor · Administración" : "Registros de Operarios · Supervisor"} />
               </View>
               <Button
                 mode="text"
@@ -1893,7 +1938,7 @@ export default function RegistrosScreen({
           }
         >
           {!isJefeObraObrasList && !isJefeObraRegistrosList ? (
-            <BrandHeader subtitle="Registros de Operarios · Supervisor" />
+            <BrandHeader subtitle={isAdminSession ? "Supervisor · Administración" : "Registros de Operarios · Supervisor"} />
           ) : null}
 
           {loadingJefeRegistros ? (
@@ -2513,7 +2558,16 @@ export default function RegistrosScreen({
     >
       {isTerrenoRegistroList ? (
         <View style={styles.fixedHeader}>
-          <BrandHeader subtitle="Registro de operario · BECK" />
+          <View style={styles.fixedTopRow}>
+            <View style={styles.fixedBrand}>
+              <BrandHeader subtitle={isAdminSession ? "Operario · Administración" : "Registro de operario · BECK"} />
+            </View>
+            {isAdminSession && onChangeObra ? (
+              <Button mode="text" compact onPress={onChangeObra}>
+                Volver
+              </Button>
+            ) : null}
+          </View>
           <BeckSearchInput
             placeholder="Buscar por obra, piso o N° de sello"
             value={tecnicoRegistroSearch}

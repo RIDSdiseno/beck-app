@@ -178,7 +178,8 @@ export default function PerfilScreen() {
     user?.rol === "terreno" ||
     user?.rol === "jefeobra" ||
     user?.rol === "ingenieria" ||
-    user?.rol === "cliente";
+    user?.rol === "cliente" ||
+    user?.rol === "administrador";
   const filteredHistorialCliente = useMemo(
     () =>
       historialCliente.filter(
@@ -445,8 +446,9 @@ export default function PerfilScreen() {
   const isTerrenoProfile = user?.rol === "terreno";
   const isSupervisorProfile = user?.rol === "jefeobra";
   const isEngineeringProfile = user?.rol === "ingenieria";
+  const isAdminProfile = user?.rol === "administrador";
   const isBeckFieldProfile =
-    isTerrenoProfile || isSupervisorProfile || isEngineeringProfile;
+    isTerrenoProfile || isSupervisorProfile || isEngineeringProfile || isAdminProfile;
 
   return (
     <SafeAreaView
@@ -463,7 +465,9 @@ export default function PerfilScreen() {
                   ? "Perfil · Supervisor"
                   : isEngineeringProfile
                     ? "Perfil · Ingeniería"
-                  : "Perfil · BECK"
+                    : isAdminProfile
+                      ? "Perfil · Administración"
+                    : "Perfil · BECK"
             }
           />
           {!isBeckFieldProfile ? (
@@ -557,6 +561,14 @@ export default function PerfilScreen() {
             onPress={handleHistoryPress}
             beckStyle={isBeckFieldProfile}
           />
+          {isAdminProfile ? (
+            <ProfileAction
+              icon="shield-account-outline"
+              label="Mi actividad administrativa"
+              onPress={() => router.push("/(tabs)/actividad-admin" as any)}
+              beckStyle
+            />
+          ) : null}
         </View>
 
       </ScrollView>

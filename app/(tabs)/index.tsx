@@ -27,6 +27,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { AdminResumen, getAdminResumen } from "@/services/api/adminApi";
 
 function formatDate(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -56,6 +57,16 @@ const EMPTY_SUPERVISOR_SUMMARY: ResumenSupervisorApi = {
   seguimientoPersonalDisponible: false,
 };
 
+const EMPTY_ADMIN_SUMMARY: AdminResumen = {
+  total: 0,
+  pendientesSupervisor: 0,
+  enRevision: 0,
+  rechazados: 0,
+  validados: 0,
+  correcciones: 0,
+  accionesAdministrador: 0,
+};
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
@@ -68,6 +79,7 @@ export default function DashboardScreen() {
     "sello_cortafuego" | "junta_lineal_espuma"
   >("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [adminSummary, setAdminSummary] = useState(EMPTY_ADMIN_SUMMARY);
   const [supervisorSummary, setSupervisorSummary] = useState<{
     sello_cortafuego: ResumenSupervisorApi;
     junta_lineal_espuma: ResumenSupervisorApi;
@@ -83,7 +95,10 @@ export default function DashboardScreen() {
       setUserName(session.user?.nombre || "Usuario Beck");
       setUserRole(session.user?.rol || "");
 
-      if (session.user?.rol === "jefeobra") {
+      if (session.user?.rol === "administrador") {
+        setAdminSummary(await getAdminResumen());
+        setRegistros([]);
+      } else if (session.user?.rol === "jefeobra") {
         const [sellos, juntas] = await Promise.all([
           getResumenSupervisor("sello_cortafuego", forceRefresh),
           getResumenSupervisor("junta_lineal_espuma", forceRefresh),
@@ -192,6 +207,58 @@ export default function DashboardScreen() {
 
   if (userRole === "cliente") {
     return <Redirect href="/(tabs)/cliente" />;
+  }
+
+  if (userRole === "administrador") {
+    const adminMetrics = [
+      { label: "Pendientes de Supervisor", value: adminSummary.pendientesSupervisor, icon: "clipboard-clock-outline" as const, style: styles.summaryWarm },
+      { label: "En revisión por Ingeniería", value: adminSummary.enRevision, icon: "send-clock-outline" as const, style: styles.summaryBlue },
+      { label: "Rechazados", value: adminSummary.rechazados, icon: "alert-octagon-outline" as const, style: styles.summaryRed },
+      { label: "Validados", value: adminSummary.validados, icon: "check-decagram-outline" as const, style: styles.summaryGreen },
+    ];
+    return (
+      <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+        <View style={styles.fixedHeader}>
+          <View style={styles.supervisorWelcome}>
+            <View style={styles.supervisorWelcomeIcon}>
+              <MaterialCommunityIcons name="shield-account-outline" size={25} color="#0f172a" />
+            </View>
+            <View style={styles.terrenoWelcomeInfo}>
+              <Text style={styles.supervisorWelcomeEyebrow}>Panel administrativo</Text>
+              <Text style={styles.supervisorWelcomeTitle}>Hola, {userName.split(" ")[0] || "Administrador"}</Text>
+              <Text style={styles.supervisorWelcomeSubtitle}>Opera y supervisa el flujo completo de registros BECK.</Text>
+            </View>
+          </View>
+        </View>
+        <ScrollView
+          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {error ? <Card style={styles.errorCard}><Card.Content><Text style={styles.errorText}>{error}</Text><Button onPress={() => loadDashboard(true)}>Reintentar</Button></Card.Content></Card> : null}
+          <View style={styles.summaryGrid}>
+            {adminMetrics.map((metric) => (
+              <Card key={metric.label} style={[styles.summaryCard, metric.style, styles.supervisorSummaryHalf]}>
+                <Card.Content style={styles.supervisorSummaryContent}>
+                  <View style={styles.supervisorMetricIcon}><MaterialCommunityIcons name={metric.icon} size={20} color="#0f172a" /></View>
+                  <Text style={styles.summaryLabel}>{metric.label}</Text>
+                  <Text style={styles.summaryValue}>{metric.value}</Text>
+                </Card.Content>
+              </Card>
+            ))}
+          </View>
+          <View style={styles.smallSummaryGrid}>
+            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}><Card.Content style={styles.smallSummaryContent}><MaterialCommunityIcons name="file-refresh-outline" size={23} color="#ea580c" /><View style={styles.supervisorActivityText}><Text style={styles.helperText}>Correcciones activas</Text><Text style={styles.smallSummaryValue}>{adminSummary.correcciones}</Text></View></Card.Content></Card>
+            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}><Card.Content style={styles.smallSummaryContent}><MaterialCommunityIcons name="history" size={23} color="#ea580c" /><View style={styles.supervisorActivityText}><Text style={styles.helperText}>Mis acciones</Text><Text style={styles.smallSummaryValue}>{adminSummary.accionesAdministrador}</Text></View></Card.Content></Card>
+          </View>
+          <Text style={styles.supervisorSectionLabel}>Accesos operativos</Text>
+          <View style={styles.terrenoQuickActions}>
+            <Button mode="contained" icon="hard-hat" buttonColor="#0f172a" onPress={() => router.push("/mis-obras")} style={styles.terrenoQuickButton}>Operario</Button>
+            <Button mode="outlined" icon="clipboard-text-outline" textColor="#0f172a" onPress={() => router.push("/registros")} style={[styles.terrenoQuickButton, styles.terrenoQuickButtonOutlined]}>Supervisor</Button>
+          </View>
+          <Button mode="contained" icon="clipboard-check-outline" buttonColor="#f97316" onPress={() => router.push("/ingenieria")} style={styles.supervisorMainButton}>Revisión de Ingeniería</Button>
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   if (userRole === "jefeobra") {

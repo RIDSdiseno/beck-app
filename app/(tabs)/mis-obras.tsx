@@ -3,7 +3,7 @@ import {
   isObraDisponible,
   ObraApi,
 } from "@/services/api/obrasApi";
-import { saveSelectedObra } from "@/services/auth/session";
+import { getSession, saveSelectedObra } from "@/services/auth/session";
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
@@ -76,6 +76,8 @@ export default function MisObrasScreen() {
   const [showRegistro, setShowRegistro] = useState(false);
   const [selectedObra, setSelectedObra] = useState<ObraApi | null>(null);
   const [selectingId, setSelectingId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminView, setAdminView] = useState<"obras" | "registros">("obras");
 
   const filteredObras = React.useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -119,7 +121,8 @@ export default function MisObrasScreen() {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await loadObras();
+      const [session] = await Promise.all([getSession(), loadObras()]);
+      setIsAdmin(session.user?.rol === "administrador");
       setLoading(false);
     };
 
@@ -161,7 +164,29 @@ export default function MisObrasScreen() {
 
   const renderHeader = () => (
     <>
-      <BrandHeader subtitle="Obras disponibles · BECK" />
+      <BrandHeader subtitle={isAdmin ? "Operario · Administración" : "Obras disponibles · BECK"} />
+      {isAdmin ? (
+        <View style={styles.adminSwitcher}>
+          <Button
+            mode={adminView === "obras" ? "contained" : "outlined"}
+            icon="office-building-outline"
+            onPress={() => setAdminView("obras")}
+            style={styles.adminSwitcherButton}
+            labelStyle={styles.adminSwitcherLabel}
+          >
+            Nueva carga
+          </Button>
+          <Button
+            mode={adminView === "registros" ? "contained" : "outlined"}
+            icon="clipboard-clock-outline"
+            onPress={() => setAdminView("registros")}
+            style={styles.adminSwitcherButton}
+            labelStyle={styles.adminSwitcherLabel}
+          >
+            Pendientes
+          </Button>
+        </View>
+      ) : null}
       <BeckSearchInput
         placeholder="Buscar por nombre o código"
         value={search}
@@ -198,10 +223,20 @@ export default function MisObrasScreen() {
       <RegistrosScreen
         mode="form"
         initialObra={selectedObra}
+        operationalRole={isAdmin ? "terreno" : undefined}
         onChangeObra={() => {
           setSelectedObra(null);
           setShowRegistro(false);
         }}
+      />
+    );
+  }
+
+  if (isAdmin && adminView === "registros") {
+    return (
+      <RegistrosScreen
+        operationalRole="terreno"
+        onChangeObra={() => setAdminView("obras")}
       />
     );
   }
@@ -360,6 +395,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f7fb",
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  adminSwitcher: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  adminSwitcherButton: {
+    borderColor: "#0f172a",
+    borderRadius: 13,
+    flex: 1,
+  },
+  adminSwitcherLabel: {
+    fontSize: 12,
+    fontWeight: "800",
   },
   emptyListContent: {
     flexGrow: 1,

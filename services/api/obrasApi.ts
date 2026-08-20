@@ -171,7 +171,7 @@ export async function getConfiguracionRegistro(
   }
 
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/obras/${obraId}/configuracion-registro`,
+    `${API_BASE_URL}/api/obras/${obraId}/configuracion-registro?vista=${encodeURIComponent(rol)}`,
     {
       method: "GET",
       headers: {

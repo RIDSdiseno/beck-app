@@ -143,6 +143,7 @@ type GetMisRegistrosParams = {
   obraId?: string;
   estado?: EstadoRegistroApi;
   scope?: "registro" | "historial";
+  vista?: "operario" | "supervisor";
 };
 
 export type HistorialRegistrosPage = {
@@ -158,6 +159,7 @@ export type HistorialRegistrosParams = {
   search?: string;
   fecha?: string;
   obraId?: string;
+  estado?: EstadoRegistroApi | "todos";
 };
 
 function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
@@ -166,6 +168,7 @@ function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
     obraId: params?.obraId ?? "",
     estado: params?.estado ?? "",
     scope: params?.scope ?? "",
+    vista: params?.vista ?? "",
   });
 }
 
@@ -247,6 +250,7 @@ export async function getMisRegistros(
   if (params?.obraId) query.set("obraId", params.obraId);
   if (params?.estado) query.set("estado", params.estado);
   if (params?.scope) query.set("scope", params.scope);
+  if (params?.vista) query.set("vista", params.vista);
   const queryString = query.toString();
 
   const response = await authenticatedFetch(`${API_BASE_URL}/api/registros/mis-registros${queryString ? `?${queryString}` : ""}`, {
@@ -282,6 +286,7 @@ export async function getHistorialRegistrosPage(
   if (params.search?.trim()) query.set("search", params.search.trim());
   if (params.fecha) query.set("fecha", params.fecha);
   if (params.obraId && params.obraId !== "todas") query.set("obraId", params.obraId);
+  if (params.estado && params.estado !== "todos") query.set("estado", params.estado);
   const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/historial?${query.toString()}`,
     { method: "GET", headers: { Authorization: `Bearer ${session.token}` } },
