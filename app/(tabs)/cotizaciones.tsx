@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { TextInput } from "@/components/AppTextInput";
+import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { BrandHeader } from "../../components/BrandHeader";
 
 type EstadoCotizacion = "borrador" | "enviada" | "aceptada" | "rechazada";
@@ -161,13 +161,10 @@ export default function CotizacionesScreen() {
           movil.
         </Text>
 
-        <TextInput
-          mode="outlined"
+        <BeckSearchInput
           placeholder="Buscar cotizacion, cliente u origen..."
           value={search}
           onChangeText={setSearch}
-          left={<TextInput.Icon icon="magnify" />}
-          style={styles.input}
         />
 
         <ScrollView

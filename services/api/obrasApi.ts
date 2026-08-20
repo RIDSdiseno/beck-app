@@ -14,6 +14,7 @@ export type CampoConfiguracionRegistro =
   | "tipoRegistro"
   | "codigoBeck"
   | "itemizadoBeck"
+  | "dimensiones"
   | "itemizadoMandante"
   | "fechaEjecucionSello"
   | "diaSemana"
@@ -58,6 +59,7 @@ const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
   tipoRegistro: "tipoRegistro",
   codigoBeck: "codigoBeck",
   itemizadoBeck: "itemizadoBeck",
+  dimensiones: "dimensiones",
   itemizadoMandante: "itemizadoMandante",
   fechaEjecucionSello: "fechaEjecucionSello",
   diaSemana: "diaSemana",

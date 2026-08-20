@@ -179,6 +179,7 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
 const DEFAULT_CAMPOS_CLIENTE: Partial<Record<CampoConfiguracionRegistro, boolean>> = {
   codigoBeck: true,
   itemizadoBeck: true,
+  dimensiones: true,
   itemizadoMandante: true,
   diaSemana: true,
   folio: true,
@@ -449,6 +450,7 @@ export default function ClienteRegistroScreen() {
             <FieldRow label="Sellos aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />
             <FieldRow label="Reparación tabique" value={campoVisible("reparacionTabique") ? registro.reparacionTabique : null} />
             <FieldRow label="Itemizado BECK"     value={campoVisible("itemizadoBeck") ? registro.itemizadoBeck : null} />
+            <FieldRow label="Dimensiones" value={campoVisible("dimensiones") ? registro.dimensiones : null} />
             <FieldRow label="Itemizado mandante" value={campoVisible("itemizadoMandante") ? registro.itemizadoMandante : null} />
           </View>
 

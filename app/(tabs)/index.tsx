@@ -5,6 +5,7 @@ import {
   ResumenSupervisorApi,
 } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Redirect, router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -641,7 +642,7 @@ export default function DashboardScreen() {
                       {getRegistroKind(registro)} · {registro.obras?.nombre || "Sin obra"}
                     </Text>
                     <Text style={styles.helperText}>
-                      {formatDate(registro.fecha)}
+                      {formatDate(registro.fecha)} · {formatTime24WithPeriod(registro.created_at)}
                       {registro.tipo_registro !== "junta_lineal_espuma"
                         ? ` · Sello N° ${registro.numero_sello || "Sin número"}`
                         : ""}

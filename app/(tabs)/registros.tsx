@@ -28,6 +28,7 @@ import {
   shouldShowRejectionContext,
 } from "@/utils/registroEstado";
 import { HOLGURA_OPTIONS } from "@/utils/holgura";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 import {
   ACCESIBILIDAD_OPTIONS,
   getAislacionOption,
@@ -51,7 +52,6 @@ import {
   ActivityIndicator,
   Button,
   Card,
-  Chip,
   Checkbox,
   SegmentedButtons,
   Text,
@@ -61,11 +61,24 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
+import { BeckSearchInput } from "@/components/BeckSearchInput";
+import { BeckFilterPanel } from "@/components/BeckFilterPanel";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import { SelectSheet } from "@/components/SelectSheet";
 import { BrandHeader } from "../../components/BrandHeader";
 
 type TipoRegistro = "sello_cortafuego" | "junta_lineal_espuma";
+type RegistroEstadoFiltro = "todos" | "pendiente" | "rechazado";
+
+const REGISTRO_ESTADO_FILTERS: {
+  value: RegistroEstadoFiltro;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}[] = [
+  { value: "todos", label: "Todos", icon: "view-grid-outline" },
+  { value: "pendiente", label: "Pendientes", icon: "clock-outline" },
+  { value: "rechazado", label: "Rechazados", icon: "alert-circle-outline" },
+];
 
 type ObraSeleccionada = {
   id: string;
@@ -121,6 +134,7 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   tipoRegistro: true,
   codigoBeck: false,
   itemizadoBeck: true,
+  dimensiones: true,
   itemizadoMandante: false,
   fechaEjecucionSello: true,
   diaSemana: true,
@@ -205,13 +219,13 @@ function formatDisplayDate(value?: string | null) {
 
   if (Number.isNaN(date.getTime())) return "";
 
-  return date.toLocaleString("es-CL", {
+  const formattedDate = date.toLocaleDateString("es-CL", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
+
+  return `${formattedDate} ${formatTime24WithPeriod(value)}`;
 }
 
 function formatExecutionDate(value?: string | null) {
@@ -374,10 +388,10 @@ function buildCalendarDays(viewDate: Date) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const mondayFirstOffset = (firstDay.getDay() + 6) % 7;
 
-  return [
-    ...Array.from({ length: mondayFirstOffset }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
-  ];
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = index - mondayFirstOffset + 1;
+    return day > 0 && day <= daysInMonth ? day : null;
+  });
 }
 
 type RegistrosScreenProps = {
@@ -411,13 +425,11 @@ export default function RegistrosScreen({
   const [jefeObras, setJefeObras] = useState<ObraApi[]>([]);
   const [jefeObraSearch, setJefeObraSearch] = useState("");
   const [jefeRegistroSearch, setJefeRegistroSearch] = useState("");
-  const [jefeEstadoFiltro, setJefeEstadoFiltro] = useState<
-    "todos" | "pendiente" | "rechazado"
-  >("todos");
+  const [jefeEstadoFiltro, setJefeEstadoFiltro] =
+    useState<RegistroEstadoFiltro>("todos");
   const [tecnicoRegistroSearch, setTecnicoRegistroSearch] = useState("");
-  const [tecnicoEstadoFiltro, setTecnicoEstadoFiltro] = useState<
-    "todos" | "pendiente" | "rechazado"
-  >("todos");
+  const [tecnicoEstadoFiltro, setTecnicoEstadoFiltro] =
+    useState<RegistroEstadoFiltro>("todos");
   const [selectedJefeObraId, setSelectedJefeObraId] = useState<string | null>(null);
   const [tecnicoRegistros, setTecnicoRegistros] = useState<RegistroHistorialApi[]>([]);
   const [selectedTecnicoRegistro, setSelectedTecnicoRegistro] =
@@ -431,6 +443,7 @@ export default function RegistrosScreen({
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [itemizadoBeck, setItemizadoBeck] = useState("");
+  const [dimensiones, setDimensiones] = useState("");
   const [itemizadoCodigoBeck, setItemizadoCodigoBeck] = useState("");
   const [itemizadoSelectorVisible, setItemizadoSelectorVisible] = useState(false);
   const [itemizadoSearch, setItemizadoSearch] = useState("");
@@ -567,6 +580,48 @@ export default function RegistrosScreen({
     );
   }, [jefeEstadoFiltro, jefeRegistroSearch, jefeRegistrosPorObra]);
 
+  const jefeFilterCounts = useMemo(() => {
+    const term = jefeRegistroSearch.trim().toLowerCase();
+    const registrosSinDuplicar = preferirCopiasCorreccion(jefeRegistrosPorObra);
+    const matchingSearch = registrosSinDuplicar.filter((registro) => {
+      const isCorreccion = Boolean(
+        registro.es_correccion || registro.registro_origen_id,
+      );
+      const correccionEnManosDelOperario =
+        isCorreccion &&
+        registro.estado === "pendiente" &&
+        registro.devuelto_a_tecnico === true;
+      if (correccionEnManosDelOperario) return false;
+
+      const esEstadoVisible =
+        registro.estado === "pendiente" || registro.estado === "rechazado";
+      if (!esEstadoVisible) return false;
+
+      return (
+        !term ||
+        `${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.numero_sello || ""} ${registro.tipo_registro}`
+          .toLowerCase()
+          .includes(term)
+      );
+    });
+
+    const estadoVisual = (registro: RegistroHistorialApi) =>
+      (registro.es_correccion || registro.registro_origen_id) &&
+      !registro.corregido_at
+        ? "rechazado"
+        : registro.estado;
+
+    return {
+      todos: matchingSearch.length,
+      pendiente: matchingSearch.filter(
+        (registro) => estadoVisual(registro) === "pendiente",
+      ).length,
+      rechazado: matchingSearch.filter(
+        (registro) => estadoVisual(registro) === "rechazado",
+      ).length,
+    };
+  }, [jefeRegistroSearch, jefeRegistrosPorObra]);
+
   const tecnicoRegistrosSinDuplicar = useMemo(
     () => preferirCopiasCorreccion(tecnicoRegistros),
     [tecnicoRegistros],
@@ -606,6 +661,29 @@ export default function RegistrosScreen({
     tecnicoRechazados,
     tecnicoRegistroSearch,
   ]);
+
+  const tecnicoFilterCounts = useMemo(() => {
+    const term = tecnicoRegistroSearch.trim().toLowerCase();
+    const visibles = [...tecnicoRechazados, ...tecnicoPendientes];
+    const matchingSearch = term
+      ? visibles.filter((registro) =>
+          `${registro.obras?.nombre || ""} ${registro.obras?.codigo || ""} ${registro.piso || ""} ${registro.numero_sello || ""}`
+            .toLowerCase()
+            .includes(term),
+        )
+      : visibles;
+
+    return {
+      todos: matchingSearch.length,
+      pendiente: matchingSearch.filter(
+        (registro) => registro.estado === "pendiente",
+      ).length,
+      rechazado: matchingSearch.filter(
+        (registro) =>
+          registro.estado === "rechazado" || isCorreccionEditable(registro),
+      ).length,
+    };
+  }, [tecnicoPendientes, tecnicoRechazados, tecnicoRegistroSearch]);
 
   const refreshTecnicoRegistros = useCallback(async () => {
     try {
@@ -797,6 +875,7 @@ export default function RegistrosScreen({
     setFecha(formatDate(new Date()));
     setCalendarMonth(new Date());
     setItemizadoBeck("");
+    setDimensiones("");
     setItemizadoCodigoBeck("");
     setItemizadoSelectorVisible(false);
     setItemizadoSearch("");
@@ -999,6 +1078,7 @@ export default function RegistrosScreen({
     setFecha(String(registro.fecha || "").slice(0, 10));
     setCalendarMonth(new Date(registro.fecha || new Date()));
     setItemizadoBeck(registro.itemizado_beck || registro.descripcion_material || "");
+    setDimensiones(registro.dimensiones || "");
     setItemizadoCodigoBeck(registro.codigo_beck || "");
     setOtroItemizado(false);
     setRecinto(registro.recinto || "");
@@ -1012,7 +1092,7 @@ export default function RegistrosScreen({
     setHolgura(String(registro.holgura ?? ""));
     setAccesibilidad(String(registro.cielo_modular ?? registro.accesibilidad ?? ""));
     setAislacion(getAislacionOption(registro));
-    setReparacionTabique(String(registro.reparacion_tabique || ""));
+    setReparacionTabique(String(registro.reparacion_tabique ?? ""));
     setItemizadoSacyr(registro.itemizado_mandante || registro.itemizado_sacyr || "");
     setMetrosLineales(String(registro.metros_lineales || ""));
     setObservaciones(registro.observaciones || "");
@@ -1046,6 +1126,7 @@ export default function RegistrosScreen({
     } else {
       if (
         (campoConfiguradoVisible("itemizadoBeck") && !itemizadoBeck.trim()) ||
+        (campoConfiguradoVisible("dimensiones") && !dimensiones.trim()) ||
         (campoConfiguradoVisible("numeroSello") && !numeroSello.trim()) ||
         (campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
         (campoConfiguradoVisible("holgura") && !holgura.trim()) ||
@@ -1056,6 +1137,10 @@ export default function RegistrosScreen({
       ) {
         return "Debes completar todos los campos obligatorios.";
       }
+    }
+
+    if (dimensiones.trim().length > 100) {
+      return "Dimensiones no puede superar los 100 caracteres.";
     }
 
     if (!fotos.length) {
@@ -1083,6 +1168,9 @@ export default function RegistrosScreen({
       }
     } else if (
       (campoConfiguradoVisible("itemizadoBeck") && !itemizadoBeck.trim()) ||
+      (userRole === "terreno" &&
+        campoConfiguradoVisible("dimensiones") &&
+        !dimensiones.trim()) ||
       (campoConfiguradoVisible("numeroSello") && !numeroSello.trim()) ||
       (campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
       (campoConfiguradoVisible("holgura") && !holgura.trim()) ||
@@ -1092,6 +1180,10 @@ export default function RegistrosScreen({
         !reparacionTabique.trim())
     ) {
       return "Debes completar todos los campos obligatorios.";
+    }
+
+    if (dimensiones.trim().length > 100) {
+      return "Dimensiones no puede superar los 100 caracteres.";
     }
 
     return "";
@@ -1133,6 +1225,10 @@ export default function RegistrosScreen({
           isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
             ? undefined
             : itemizadoBeck,
+        dimensiones:
+          !isJuntaLineal && campoConfiguradoVisible("dimensiones")
+            ? dimensiones.trim()
+            : undefined,
         numeroSello:
           isJuntaLineal || !campoConfiguradoVisible("numeroSello")
             ? "No aplica"
@@ -1331,6 +1427,10 @@ export default function RegistrosScreen({
           isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
             ? undefined
             : itemizadoBeck,
+        dimensiones:
+          !isJuntaLineal && campoConfiguradoVisible("dimensiones")
+            ? dimensiones.trim()
+            : undefined,
         numeroSello:
           isJuntaLineal || !campoConfiguradoVisible("numeroSello")
             ? "No aplica"
@@ -1430,6 +1530,15 @@ export default function RegistrosScreen({
       placeholder="Seleccionar opción"
       options={options}
       onChange={(next) => onSelect(next ?? "")}
+      icon={
+        label.startsWith("Holgura")
+          ? "arrow-expand-vertical"
+          : label === "Accesibilidad"
+            ? "ladder"
+            : label === "Aislación"
+              ? "shield-home-outline"
+              : "wall"
+      }
     />
   );
 
@@ -1447,7 +1556,20 @@ export default function RegistrosScreen({
           label: itemizado,
         }))}
         onChange={(next) => selectItemizadoBeck(next ?? "")}
+        icon="format-list-bulleted"
       />
+
+      {campoConfiguradoVisible("dimensiones") ? (
+        <TextInput
+          label="Dimensiones"
+          value={dimensiones}
+          onChangeText={setDimensiones}
+          mode="outlined"
+          placeholder="Ej: 60 mm"
+          maxLength={100}
+          style={styles.input}
+        />
+      ) : null}
 
       <Checkbox.Item
         label="Otras: escribir"
@@ -1486,10 +1608,11 @@ export default function RegistrosScreen({
       onRequestClose={() => setItemizadoSelectorVisible(false)}
     >
       <Pressable
-        style={styles.modalBackdrop}
+        style={[styles.modalBackdrop, styles.itemizadoModalBackdrop]}
         onPress={() => setItemizadoSelectorVisible(false)}
       >
         <Pressable style={styles.itemizadoModal}>
+          <View style={styles.itemizadoSheetHandle} />
           <View style={styles.modalHeaderRow}>
             <View style={styles.recordInfo}>
               <Text style={styles.modalTitle}>Seleccionar Itemizado Básico</Text>
@@ -1502,13 +1625,11 @@ export default function RegistrosScreen({
             </Button>
           </View>
 
-          <TextInput
-            label="Buscar por itemizado, código o tipo"
+          <BeckSearchInput
+            placeholder="Buscar por itemizado, código o tipo"
             value={itemizadoSearch}
             onChangeText={setItemizadoSearch}
-            mode="outlined"
-            style={styles.input}
-            left={<TextInput.Icon icon="magnify" />}
+            onSubmitEditing={() => void loadItemizadoOpciones()}
           />
           <TextInput
             label="Elemento atravesado"
@@ -1699,13 +1820,10 @@ export default function RegistrosScreen({
           <View style={styles.fixedHeader}>
             <BrandHeader subtitle="Registros de Operarios · Supervisor" />
 
-            <TextInput
-              label="Buscar obra por nombre o código"
+            <BeckSearchInput
+              placeholder="Buscar obra por nombre o código"
               value={jefeObraSearch}
               onChangeText={setJefeObraSearch}
-              mode="outlined"
-              style={styles.input}
-              left={<TextInput.Icon icon="magnify" />}
             />
 
             <Text style={styles.sectionTitle}>Obras disponibles</Text>
@@ -1729,68 +1847,23 @@ export default function RegistrosScreen({
               </Button>
             </View>
             <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
-            <Text style={styles.recordMeta}>
-              Código: {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
-              {selectedJefeObra.estado || "Sin estado"}
-            </Text>
 
-            <TextInput
-              label="Buscar por operario, sello, piso o eje"
+            <BeckSearchInput
+              placeholder="Buscar por operario, sello, piso o eje"
               value={jefeRegistroSearch}
               onChangeText={setJefeRegistroSearch}
-              mode="outlined"
-              style={styles.input}
-              left={<TextInput.Icon icon="magnify" />}
             />
 
-            <View style={styles.filterRow}>
-              <Chip
-                selected={jefeEstadoFiltro === "todos"}
-                onPress={() => setJefeEstadoFiltro("todos")}
-                style={[
-                  styles.filterChip,
-                  jefeEstadoFiltro === "todos" && styles.filterChipSelected,
-                ]}
-                textStyle={[
-                  styles.filterChipText,
-                  jefeEstadoFiltro === "todos" && styles.filterChipTextSelected,
-                ]}
-              >
-                Todos
-              </Chip>
-              <Chip
-                selected={jefeEstadoFiltro === "pendiente"}
-                onPress={() => setJefeEstadoFiltro("pendiente")}
-                style={[
-                  styles.filterChip,
-                  jefeEstadoFiltro === "pendiente" && styles.filterChipSelected,
-                ]}
-                textStyle={[
-                  styles.filterChipText,
-                  jefeEstadoFiltro === "pendiente" &&
-                    styles.filterChipTextSelected,
-                ]}
-              >
-                Pendientes
-              </Chip>
-              <Chip
-                selected={jefeEstadoFiltro === "rechazado"}
-                onPress={() => setJefeEstadoFiltro("rechazado")}
-                style={[
-                  styles.filterChip,
-                  jefeEstadoFiltro === "rechazado" && styles.filterChipSelected,
-                ]}
-                textStyle={[
-                  styles.filterChipText,
-                  jefeEstadoFiltro === "rechazado" &&
-                    styles.filterChipTextSelected,
-                ]}
-              >
-                Rechazados
-              </Chip>
-            </View>
-
-            <Text style={styles.sectionTitle}>Registros de la obra</Text>
+            <BeckFilterPanel
+              title="Filtrar registros"
+              resultCount={filteredJefeRegistros.length}
+              options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
+                ...filter,
+                count: jefeFilterCounts[filter.value],
+              }))}
+              value={jefeEstadoFiltro}
+              onChange={setJefeEstadoFiltro}
+            />
           </View>
         ) : null}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -1910,17 +1983,40 @@ export default function RegistrosScreen({
                 ) : null}
 
                 {!isJuntaLineal && campoConfiguradoVisible("itemizadoBeck") ? (
-                  <>
-                    <Text style={styles.fieldLabel}>Itemizado Beck</Text>
-                    <Button
-                      mode="outlined"
-                      onPress={openItemizadoSelector}
-                      style={styles.dropdownButton}
-                      contentStyle={styles.dropdownContent}
-                    >
-                      {itemizadoBeck || "Seleccionar itemizado"}
-                    </Button>
-                  </>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Itemizado Básico"
+                    onPress={openItemizadoSelector}
+                    style={({ pressed }) => [
+                      styles.catalogSelectButton,
+                      pressed && styles.catalogSelectButtonPressed,
+                    ]}
+                  >
+                    <View style={styles.catalogSelectIcon}>
+                      <MaterialCommunityIcons
+                        name="format-list-bulleted"
+                        size={18}
+                        color="#c2410c"
+                      />
+                    </View>
+                    <View style={styles.catalogSelectTextGroup}>
+                      <Text style={styles.catalogSelectLabel}>Itemizado Básico</Text>
+                      <Text style={styles.catalogSelectValue} numberOfLines={1}>
+                        {itemizadoBeck || "Seleccionar itemizado"}
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-down" size={21} color="#64748b" />
+                  </Pressable>
+                ) : null}
+
+                {!isJuntaLineal && campoConfiguradoVisible("dimensiones") ? (
+                  <TextInput
+                    label="Dimensiones"
+                    value={dimensiones || "Sin información"}
+                    mode="outlined"
+                    editable={false}
+                    style={styles.input}
+                  />
                 ) : null}
 
                 {!isJuntaLineal && campoConfiguradoVisible("codigoBeck") ? (
@@ -2192,10 +2288,6 @@ export default function RegistrosScreen({
                   <View style={styles.cardHeaderRow}>
                     <View style={styles.recordInfo}>
                       <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
-                      <Text style={styles.recordMeta}>
-                        {selectedJefeObra.codigo || "Sin codigo"} ·{" "}
-                        {selectedJefeObra.estado || "Sin estado"}
-                      </Text>
                     </View>
                     <Button
                       mode="text"
@@ -2209,66 +2301,22 @@ export default function RegistrosScreen({
                     </Button>
                   </View>
 
-                  <TextInput
-                    label="Buscar por operario, sello, piso o eje"
+                  <BeckSearchInput
+                    placeholder="Buscar por operario, sello, piso o eje"
                     value={jefeRegistroSearch}
                     onChangeText={setJefeRegistroSearch}
-                    mode="outlined"
-                    style={styles.input}
-                    left={<TextInput.Icon icon="magnify" />}
                   />
 
-                  <View style={styles.filterRow}>
-                    <Chip
-                      selected={jefeEstadoFiltro === "todos"}
-                      onPress={() => setJefeEstadoFiltro("todos")}
-                      style={[
-                        styles.filterChip,
-                        jefeEstadoFiltro === "todos" && styles.filterChipSelected,
-                      ]}
-                      textStyle={[
-                        styles.filterChipText,
-                        jefeEstadoFiltro === "todos" &&
-                          styles.filterChipTextSelected,
-                      ]}
-                    >
-                      Todos
-                    </Chip>
-                    <Chip
-                      selected={jefeEstadoFiltro === "pendiente"}
-                      onPress={() => setJefeEstadoFiltro("pendiente")}
-                      style={[
-                        styles.filterChip,
-                        jefeEstadoFiltro === "pendiente" &&
-                          styles.filterChipSelected,
-                      ]}
-                      textStyle={[
-                        styles.filterChipText,
-                        jefeEstadoFiltro === "pendiente" &&
-                          styles.filterChipTextSelected,
-                      ]}
-                    >
-                      Pendientes
-                    </Chip>
-                    <Chip
-                      selected={jefeEstadoFiltro === "rechazado"}
-                      onPress={() => setJefeEstadoFiltro("rechazado")}
-                      style={[
-                        styles.filterChip,
-                        jefeEstadoFiltro === "rechazado" &&
-                          styles.filterChipSelected,
-                      ]}
-                      textStyle={[
-                        styles.filterChipText,
-                        jefeEstadoFiltro === "rechazado" &&
-                          styles.filterChipTextSelected,
-                      ]}
-                    >
-                      Rechazados
-                    </Chip>
-                  </View>
-
-                  <Text style={styles.sectionTitle}>Registros de la obra</Text>
+                  <BeckFilterPanel
+                    title="Filtrar registros"
+                    resultCount={filteredJefeRegistros.length}
+                    options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
+                      ...filter,
+                      count: jefeFilterCounts[filter.value],
+                    }))}
+                    value={jefeEstadoFiltro}
+                    onChange={setJefeEstadoFiltro}
+                  />
                 </>
               ) : null}
               {filteredJefeRegistros.length ? (
@@ -2306,7 +2354,7 @@ export default function RegistrosScreen({
                             Piso {registro.piso} · Eje {registro.eje_alfabetico}-{registro.eje_numerico}
                           </Text>
                           <Text style={[styles.recordMeta, styles.jefeRecordMeta]}>
-                            Fecha: {formatExecutionDate(registro.fecha)} · Sello: {registro.numero_sello || "Sin número"}
+                            Fecha: {formatExecutionDate(registro.fecha)} · Hora: {formatTime24WithPeriod(registro.created_at)} · Sello: {registro.numero_sello || "Sin número"}
                           </Text>
                           <Text style={[styles.recordMeta, styles.jefeRecordMeta]}>
                             Operario: {registro.usuarios?.nombre || registro.nombre_sellador}
@@ -2379,13 +2427,10 @@ export default function RegistrosScreen({
             <>
               {!isJefeObraObrasList ? (
                 <>
-                  <TextInput
-                    label="Buscar obra por nombre o código"
+                  <BeckSearchInput
+                    placeholder="Buscar obra por nombre o código"
                     value={jefeObraSearch}
                     onChangeText={setJefeObraSearch}
-                    mode="outlined"
-                    style={styles.input}
-                    left={<TextInput.Icon icon="magnify" />}
                   />
 
                   <Text style={styles.sectionTitle}>Obras disponibles</Text>
@@ -2466,60 +2511,21 @@ export default function RegistrosScreen({
       {isTerrenoRegistroList ? (
         <View style={styles.fixedHeader}>
           <BrandHeader subtitle="Registro de operario · BECK" />
-          <TextInput
-            label="Buscar por obra, piso o N° de sello"
+          <BeckSearchInput
+            placeholder="Buscar por obra, piso o N° de sello"
             value={tecnicoRegistroSearch}
             onChangeText={setTecnicoRegistroSearch}
-            mode="outlined"
-            style={styles.input}
-            left={<TextInput.Icon icon="magnify" />}
           />
-          <View style={styles.filterRow}>
-            <Chip
-              selected={tecnicoEstadoFiltro === "todos"}
-              onPress={() => setTecnicoEstadoFiltro("todos")}
-              style={[
-                styles.filterChip,
-                tecnicoEstadoFiltro === "todos" && styles.filterChipSelected,
-              ]}
-              textStyle={[
-                styles.filterChipText,
-                tecnicoEstadoFiltro === "todos" && styles.filterChipTextSelected,
-              ]}
-            >
-              Todos
-            </Chip>
-            <Chip
-              selected={tecnicoEstadoFiltro === "pendiente"}
-              onPress={() => setTecnicoEstadoFiltro("pendiente")}
-              style={[
-                styles.filterChip,
-                tecnicoEstadoFiltro === "pendiente" && styles.filterChipSelected,
-              ]}
-              textStyle={[
-                styles.filterChipText,
-                tecnicoEstadoFiltro === "pendiente" &&
-                  styles.filterChipTextSelected,
-              ]}
-            >
-              Pendientes
-            </Chip>
-            <Chip
-              selected={tecnicoEstadoFiltro === "rechazado"}
-              onPress={() => setTecnicoEstadoFiltro("rechazado")}
-              style={[
-                styles.filterChip,
-                tecnicoEstadoFiltro === "rechazado" && styles.filterChipSelected,
-              ]}
-              textStyle={[
-                styles.filterChipText,
-                tecnicoEstadoFiltro === "rechazado" &&
-                  styles.filterChipTextSelected,
-              ]}
-            >
-              Rechazados
-            </Chip>
-          </View>
+          <BeckFilterPanel
+            title="Filtrar registros"
+            resultCount={filteredTecnicoRegistros.length}
+            options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
+              ...filter,
+              count: tecnicoFilterCounts[filter.value],
+            }))}
+            value={tecnicoEstadoFiltro}
+            onChange={setTecnicoEstadoFiltro}
+          />
         </View>
       ) : null}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -2623,7 +2629,7 @@ export default function RegistrosScreen({
                           color="#c2410c"
                         />
                         <Text style={styles.terrenoPendingDetailValue}>
-                          {formatExecutionDate(registro.fecha)}
+                          {formatExecutionDate(registro.fecha)} · {formatTime24WithPeriod(registro.created_at)}
                           {registro.tipo_registro !== "junta_lineal_espuma"
                             ? ` · Sello ${registro.numero_sello || "Sin número"}`
                             : ""}
@@ -3379,6 +3385,9 @@ export default function RegistrosScreen({
                     <RegistroDetailField label="Día" value={selectedTecnicoRegistro.dia_semana} />
                     <RegistroDetailField label="Responsable" value={selectedTecnicoRegistro.usuarios?.nombre || selectedTecnicoRegistro.nombre_sellador} />
                     <RegistroDetailField label="Itemizado Beck" value={selectedTecnicoRegistro.itemizado_beck || selectedTecnicoRegistro.descripcion_material} />
+                    {campoConfiguradoVisible("dimensiones") ? (
+                      <RegistroDetailField label="Dimensiones" value={selectedTecnicoRegistro.dimensiones} />
+                    ) : null}
                     <RegistroDetailField label="Código Beck" value={selectedTecnicoRegistro.codigo_beck} />
                     <RegistroDetailField label="Itemizado mandante" value={selectedTecnicoRegistro.itemizado_mandante || selectedTecnicoRegistro.itemizado_sacyr} />
                     <RegistroDetailField label="Recinto" value={selectedTecnicoRegistro.recinto} />
@@ -3460,18 +3469,28 @@ export default function RegistrosScreen({
           style={styles.modalBackdrop}
           onPress={() => setCalendarVisible(false)}
         >
-          <Pressable style={styles.calendarModal}>
+          <Pressable style={styles.calendarModal} onPress={() => {}}>
             <View style={styles.calendarHeader}>
-              <Button mode="text" onPress={() => changeCalendarMonth(-1)}>
-                Anterior
-              </Button>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Mes anterior"
+                onPress={() => changeCalendarMonth(-1)}
+                style={styles.calendarMonthButton}
+              >
+                <MaterialCommunityIcons name="chevron-left" size={24} color="#0f172a" />
+              </Pressable>
               <Text style={styles.calendarTitle}>
                 {MONTH_NAMES[calendarMonth.getMonth()]}{" "}
                 {calendarMonth.getFullYear()}
               </Text>
-              <Button mode="text" onPress={() => changeCalendarMonth(1)}>
-                Siguiente
-              </Button>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Mes siguiente"
+                onPress={() => changeCalendarMonth(1)}
+                style={styles.calendarMonthButton}
+              >
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#0f172a" />
+              </Pressable>
             </View>
 
             <View style={styles.weekRow}>
@@ -3918,14 +3937,45 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
-  dropdownButton: {
-    alignSelf: "stretch",
-    borderRadius: 12,
-    marginBottom: 6,
+  catalogSelectButton: {
+    alignItems: "center",
+    backgroundColor: "#fffdf8",
+    borderColor: "#fbbf24",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    marginBottom: 12,
+    minHeight: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
-  dropdownContent: {
-    minHeight: 48,
-    justifyContent: "flex-start",
+  catalogSelectButtonPressed: {
+    opacity: 0.75,
+  },
+  catalogSelectIcon: {
+    alignItems: "center",
+    backgroundColor: "#ffedd5",
+    borderRadius: 9,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  catalogSelectTextGroup: {
+    flex: 1,
+    minWidth: 0,
+  },
+  catalogSelectLabel: {
+    color: "#64748b",
+    fontSize: 9,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  catalogSelectValue: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 1,
   },
   checkboxItem: {
     paddingHorizontal: 0,
@@ -4020,6 +4070,91 @@ const styles = StyleSheet.create({
   },
   filterChipTextSelected: {
     color: "#ffffff",
+  },
+  tecnicoFilterPanel: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#fbbf24",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 10,
+  },
+  tecnicoFilterHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 9,
+  },
+  tecnicoFilterTitleGroup: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+  },
+  tecnicoFilterIconBox: {
+    alignItems: "center",
+    backgroundColor: "#ffedd5",
+    borderRadius: 8,
+    height: 29,
+    justifyContent: "center",
+    width: 29,
+  },
+  tecnicoFilterTitle: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  tecnicoFilterResultCount: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  tecnicoFilterRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  tecnicoFilterOption: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#fed7aa",
+    borderRadius: 11,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    gap: 4,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 5,
+  },
+  tecnicoFilterOptionSelected: {
+    backgroundColor: "#0f172a",
+    borderColor: "#0f172a",
+  },
+  tecnicoFilterOptionPressed: {
+    opacity: 0.75,
+  },
+  tecnicoFilterOptionText: {
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  tecnicoFilterOptionTextSelected: {
+    color: "#ffffff",
+  },
+  tecnicoFilterBadge: {
+    backgroundColor: "#f1f5f9",
+    borderRadius: 999,
+    color: "#475569",
+    fontSize: 9,
+    fontWeight: "900",
+    minWidth: 19,
+    overflow: "hidden",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    textAlign: "center",
+  },
+  tecnicoFilterBadgeSelected: {
+    backgroundColor: "#FDC10B",
+    color: "#0f172a",
   },
   loadingBox: {
     alignItems: "center",
@@ -4560,15 +4695,37 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   calendarModal: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 14,
+    alignSelf: "center",
+    backgroundColor: "#fffaf0",
+    borderColor: "#fbbf24",
+    borderRadius: 20,
+    borderWidth: 1,
+    maxWidth: 370,
+    padding: 15,
+    width: "100%",
   },
   itemizadoModal: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
+    backgroundColor: "#fffaf0",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: "88%",
-    padding: 14,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    width: "100%",
+  },
+  itemizadoModalBackdrop: {
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+    padding: 0,
+  },
+  itemizadoSheetHandle: {
+    alignSelf: "center",
+    backgroundColor: "#cbd5e1",
+    borderRadius: 2,
+    height: 4,
+    marginBottom: 14,
+    width: 42,
   },
   modalHeaderRow: {
     alignItems: "flex-start",
@@ -4594,11 +4751,12 @@ const styles = StyleSheet.create({
   },
   itemizadoOption: {
     backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 14,
+    borderColor: "#fed7aa",
+    borderRadius: 13,
     borderWidth: 1,
-    marginBottom: 10,
-    padding: 12,
+    marginBottom: 8,
+    minHeight: 52,
+    padding: 11,
   },
   confirmModal: {
     backgroundColor: "#ffffff",
@@ -4626,47 +4784,56 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+  },
+  calendarMonthButton: {
+    alignItems: "center",
+    backgroundColor: "#FDC10B",
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   calendarTitle: {
     color: "#0f172a",
     flex: 1,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "900",
     textAlign: "center",
     textTransform: "capitalize",
   },
   weekRow: {
     flexDirection: "row",
-    marginBottom: 6,
+    marginTop: 15,
   },
   weekDay: {
     color: "#64748b",
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "900",
     textAlign: "center",
+    width: "14.2857%",
   },
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    marginTop: 6,
   },
   calendarDay: {
     alignItems: "center",
-    aspectRatio: 1,
+    height: 40,
     justifyContent: "center",
-    width: `${100 / 7}%`,
+    width: "14.2857%",
   },
   calendarDaySelected: {
-    backgroundColor: "#f97316",
-    borderRadius: 999,
+    backgroundColor: "#0f172a",
+    borderRadius: 20,
   },
   calendarDayText: {
-    color: "#0f172a",
-    fontSize: 15,
-    fontWeight: "600",
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "700",
   },
   calendarDayTextSelected: {
-    color: "#ffffff",
+    color: "#FDC10B",
+    fontWeight: "900",
   },
 });

@@ -5,6 +5,7 @@ import {
   uploadCorreccionParametroFotos,
 } from "@/services/api/jefeobraApi";
 import { formatShortDate } from "@/utils/registroEstado";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -210,7 +211,9 @@ export default function ControlInspeccionDetalleScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.infoCard}>
           <Text style={styles.obraNombre}>{registro?.obras?.nombre || "Sin obra"}</Text>
-          <Text style={styles.infoMeta}>{registro?.obras?.codigo || "—"} · {formatShortDate(control.fecha)}</Text>
+          <Text style={styles.infoMeta}>
+            {registro?.obras?.codigo || "—"} · {formatShortDate(control.fecha)} · {formatTime24WithPeriod(control.created_at)}
+          </Text>
           {registro?.codigo_beck ? <Text style={styles.infoMeta}>Código BECK: {registro.codigo_beck}</Text> : null}
           <Text style={styles.ensayo}>{control.ensayo}</Text>
           {control.observacion ? <Text style={styles.infoMeta}>Observación general: {control.observacion}</Text> : null}

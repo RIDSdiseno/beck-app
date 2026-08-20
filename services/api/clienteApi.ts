@@ -44,6 +44,7 @@ export type RegistroCliente = {
   sellador: string;
   nombreSellador: string;
   itemizadoBeck: string | null;
+  dimensiones: string | null;
   itemizadoMandante: string | null;
   holgura: number | null;
   factorPorHolguras: number | null;

@@ -1,5 +1,6 @@
 import { ControlCorreccion, getControlesPendientesCorreccion } from "@/services/api/jefeobraApi";
 import { formatShortDate } from "@/utils/registroEstado";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -138,7 +139,9 @@ function ControlCard({ control }: { control: ControlCorreccion }) {
           <View style={styles.detailsRow}>
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Fecha</Text>
-              <Text style={styles.detailValue}>{formatShortDate(control.fecha)}</Text>
+              <Text style={styles.detailValue}>
+                {formatShortDate(control.fecha)} · {formatTime24WithPeriod(control.created_at)}
+              </Text>
             </View>
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Piso</Text>

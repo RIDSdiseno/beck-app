@@ -24,6 +24,7 @@ import {
   ItemizadoOpcionApi,
 } from "@/services/api/itemizadoOpcionesApi";
 import { estadoColor, getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -43,10 +44,12 @@ import {
 import {
   ActivityIndicator,
   Button,
+  SegmentedButtons,
   Text,
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
+import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { ExpandableImage } from "@/components/ExpandableImage";
 
 type FotoLocal = { uri: string; name: string; type: string };
@@ -553,6 +556,7 @@ export default function IngenieriaDetalleScreen() {
         <SectionTitle title="REGISTRO" />
         {campoVisible("codigoBeck") ? <InfoRow label="Código BECK" value={registro.codigo_beck} /> : null}
         {campoVisible("itemizadoBeck") ? <InfoRow label="Itemizado BECK" value={registro.itemizado_beck} /> : null}
+        {campoVisible("dimensiones") ? <InfoRow label="Dimensiones" value={registro.dimensiones} /> : null}
         {campoVisible("itemizadoMandante") && registro.itemizado_mandante ? (
           <InfoRow label="Itemizado Mandante" value={registro.itemizado_mandante} />
         ) : null}
@@ -652,7 +656,10 @@ export default function IngenieriaDetalleScreen() {
                   <View style={styles.controlCard}>
                     <Text style={styles.controlTitle}>Control de inspección registrado</Text>
                     <InfoRow label="Ensayo" value={control.ensayo} />
-                    <InfoRow label="Fecha" value={control.fecha?.slice(0, 10)} />
+                    <InfoRow
+                      label="Fecha"
+                      value={`${control.fecha?.slice(0, 10) || "Sin fecha"} · ${formatTime24WithPeriod(control.created_at)}`}
+                    />
                     <InfoRow label="Conformidad" value={control.conformidad === "conforme" ? "Conforme" : control.conformidad === "no_conforme" ? "No conforme" : "Sin definir"} />
                     {control.observacion ? <InfoRow label="Observación" value={control.observacion} /> : null}
                     <Text style={styles.paramsTitle}>
@@ -787,13 +794,11 @@ export default function IngenieriaDetalleScreen() {
               Solo se muestran los itemizados habilitados para esta obra.
             </Text>
 
-            <TextInput
-              label="Buscar por itemizado, código o tipo"
+            <BeckSearchInput
+              placeholder="Buscar por itemizado, código o tipo"
               value={itemizadoSearch}
               onChangeText={setItemizadoSearch}
-              mode="outlined"
-              style={styles.modalInput}
-              left={<TextInput.Icon icon="magnify" />}
+              onSubmitEditing={() => void loadItemizadoOpciones()}
             />
             <Button
               mode="contained"
@@ -863,6 +868,15 @@ export default function IngenieriaDetalleScreen() {
             >
               {editFields.itemizadoBeck || "Seleccionar itemizado"}
             </Button>
+            {campoVisible("dimensiones") ? (
+              <TextInput
+                label="Dimensiones"
+                value={registro.dimensiones || "Sin información"}
+                mode="outlined"
+                style={styles.editInput}
+                editable={false}
+              />
+            ) : null}
             <TextInput label="Itemizado Mandante" value={editFields.itemizadoMandante} onChangeText={(v) => setEditFields((p) => ({ ...p, itemizadoMandante: v }))} mode="outlined" style={styles.editInput} />
             <TextInput label="Fecha ejecución" value={formatShortDate(registro.fecha)} mode="outlined" style={styles.editInput} editable={false} />
             {registro.dia_semana ? (
@@ -942,7 +956,21 @@ export default function IngenieriaDetalleScreen() {
             <TextInput label="Accesibilidad" value={editFields.accesibilidad} onChangeText={(v) => setEditFields((p) => ({ ...p, accesibilidad: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
             <TextInput label="Aislación" value={editFields.aislacion} onChangeText={(v) => setEditFields((p) => ({ ...p, aislacion: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
             <TextInput label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} mode="outlined" style={styles.editInput} editable={false} />
-            <TextInput label="Reparación de tabique" value={editFields.reparacionTabique} onChangeText={(v) => setEditFields((p) => ({ ...p, reparacionTabique: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <Text style={styles.binaryFieldLabel}>Reparación de tabique</Text>
+            <SegmentedButtons
+              value={editFields.reparacionTabique}
+              onValueChange={(value) =>
+                setEditFields((previous) => ({
+                  ...previous,
+                  reparacionTabique: value,
+                }))
+              }
+              buttons={[
+                { value: "1", label: "Aplica" },
+                { value: "0", label: "No aplica" },
+              ]}
+              style={styles.editInput}
+            />
             <TextInput label="Observaciones" value={editFields.observaciones} onChangeText={(v) => setEditFields((p) => ({ ...p, observaciones: v }))} mode="outlined" style={styles.editInput} multiline numberOfLines={3} />
             <TextInput label="Folio" value={editFields.folio} onChangeText={(v) => setEditFields((p) => ({ ...p, folio: v }))} mode="outlined" style={styles.editInput} />
             <TextInput label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} mode="outlined" style={styles.editInput} editable={false} />
@@ -1188,6 +1216,13 @@ const styles = StyleSheet.create({
   editTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
   editScroll: { padding: 16, gap: 8 },
   editInput: { marginBottom: 4 },
+  binaryFieldLabel: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 6,
+    marginTop: 4,
+  },
   editSaveBtn: { marginTop: 12, borderRadius: 14, backgroundColor: "#3b82f6" },
   itemizadoLabel: { color: "#475569", fontSize: 12, marginBottom: 4, marginTop: 4 },
   itemizadoSelectBtn: { marginBottom: 4, borderColor: "#94a3b8", justifyContent: "center" },

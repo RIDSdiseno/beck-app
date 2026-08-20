@@ -8,6 +8,7 @@ export type CreateRegistroPayload = {
   descripcionMaterial: string;
   codigoBeck?: string;
   itemizadoBeck?: string;
+  dimensiones?: string;
   recinto?: string;
   moduloEdificio?: string;
   modulo?: string;
@@ -41,6 +42,7 @@ export type RegistroHistorialApi = {
   dia_semana: string;
   descripcion_material: string;
   itemizado_beck?: string | null;
+  dimensiones?: string | null;
   itemizado_mandante?: string | null;
   codigo_beck?: string | null;
   recinto?: string | null;

@@ -2,11 +2,6 @@ import {
   getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
-import {
-  estadoColor,
-  formatShortDate as formatDate,
-  getEstadoLabel,
-} from "@/utils/registroEstado";
 import { STORAGE_KEYS } from "@/services/auth/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -14,8 +9,6 @@ import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
-  Card,
-  Chip,
   Text,
 } from "react-native-paper";
 import {
@@ -23,6 +16,12 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { RegistroHistoryDetailModal } from "../../components/RegistroHistoryDetailModal";
+import { RegistroHistoryCard } from "../../components/RegistroHistoryCard";
+import { RegistroHistorySearch } from "../../components/RegistroHistorySearch";
+import { BeckDateFilter } from "../../components/BeckDateFilter";
+import { BeckOptionFilter } from "../../components/BeckOptionFilter";
+import { matchesRegistroHistorySearch } from "../../utils/registroHistorySearch";
 
 async function getHiddenValidatedIds() {
   const raw = await AsyncStorage.getItem(STORAGE_KEYS.hiddenValidatedRegistros);
@@ -49,6 +48,11 @@ export default function HistorialScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [obraFilter, setObraFilter] = useState("todas");
+  const [selectedRegistro, setSelectedRegistro] =
+    useState<RegistroHistorialApi | null>(null);
   const [hiddenValidatedIds, setHiddenValidatedIds] = useState<Set<string>>(
     new Set(),
   );
@@ -82,10 +86,25 @@ export default function HistorialScreen() {
     () =>
       registros.filter(
         (registro) =>
-          registro.estado !== "validado" || !hiddenValidatedIds.has(registro.id),
+          (registro.estado !== "validado" || !hiddenValidatedIds.has(registro.id)) &&
+          matchesRegistroHistorySearch(registro, search) &&
+          (!dateFilter || registro.fecha.slice(0, 10) === dateFilter) &&
+          (obraFilter === "todas" || registro.obras?.id === obraFilter),
       ),
-    [hiddenValidatedIds, registros],
+    [dateFilter, hiddenValidatedIds, obraFilter, registros, search],
   );
+
+  const historyObras = useMemo(() => {
+    const unique = new Map<string, string>();
+    registros.forEach((registro) => {
+      if (registro.obras?.id && registro.obras?.nombre) {
+        unique.set(registro.obras.id, registro.obras.nombre);
+      }
+    });
+    return Array.from(unique, ([value, label]) => ({ value, label })).sort(
+      (a, b) => a.label.localeCompare(b.label, "es"),
+    );
+  }, [registros]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -101,16 +120,28 @@ export default function HistorialScreen() {
     await saveHiddenValidatedIds(next);
   };
 
-  const renderHeader = () => (
-    <View style={styles.headerWrapper}>
+  const renderFixedHeader = () => (
+    <View style={styles.fixedHeader}>
       <BrandHeader subtitle="Registros realizados · BECK" />
-      <Text variant="titleLarge" style={styles.title}>
-        Historial de registros
-      </Text>
-      <Text style={styles.subtitle}>
-        Revisa el estado de tus registros y actualiza la lista para ver cambios
-        recientes.
-      </Text>
+      <RegistroHistorySearch value={search} onChangeText={setSearch} />
+      <View style={styles.historyInlineFilters}>
+        <BeckDateFilter
+          value={dateFilter}
+          onChange={setDateFilter}
+          compact
+          containerStyle={styles.historyInlineFilter}
+        />
+        <BeckOptionFilter
+          label="Filtrar por obra"
+          value={obraFilter}
+          allValue="todas"
+          allLabel="Todas las obras"
+          options={historyObras}
+          onChange={setObraFilter}
+          compact
+          containerStyle={styles.historyInlineFilter}
+        />
+      </View>
     </View>
   );
 
@@ -143,12 +174,13 @@ export default function HistorialScreen() {
   }
 
   return (
+    <>
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
+      {renderFixedHeader()}
       <FlatList
-        ListHeaderComponent={renderHeader}
         data={visibleRegistros}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -159,78 +191,40 @@ export default function HistorialScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Sin registros</Text>
             <Text style={styles.itemMeta}>
-              Cuando realices registros en terreno aparecerán aquí.
+              {search || dateFilter || obraFilter !== "todas"
+                ? "No hay registros que coincidan con la búsqueda o los filtros seleccionados."
+                : "Cuando realices registros en terreno aparecerán aquí."}
             </Text>
           </View>
         }
         renderItem={({ item }) => {
-          const obraNombre = item.obras?.nombre || "Obra sin nombre";
-
           return (
-            <Card style={styles.card}>
-              <Card.Content>
-                <View style={styles.headerRow}>
-                  <View style={styles.titleGroup}>
-                    <Text style={styles.itemTitle}>{obraNombre}</Text>
-                    <Text style={styles.itemMeta}>
-                      {item.obras?.codigo || "Sin código"} ·{" "}
-                      {formatDate(item.fecha)}
-                    </Text>
-                  </View>
-
-                  <Chip
-                    compact
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor:
-                          estadoColor[item.estado] || estadoColor.pendiente,
-                      },
-                    ]}
-                    textStyle={styles.chipText}
-                  >
-                    {getEstadoLabel(item.estado)}
-                  </Chip>
-                </View>
-
-                <Text style={styles.itemDetail}>
-                  {item.descripcion_material}
-                </Text>
-
-                <View style={styles.detailGrid}>
-                  <Text style={styles.detailItem}>Módulo: {item.modulo}</Text>
-                  <Text style={styles.detailItem}>Piso: {item.piso}</Text>
-                  <Text style={styles.detailItem}>
-                    Eje: {item.eje_numerico}-{item.eje_alfabetico}
-                  </Text>
-                  <Text style={styles.detailItem}>
-                    Sellos: {item.cantidad_sellos}
-                  </Text>
-                </View>
-
-                {item.observaciones ? (
-                  <Text style={styles.observaciones}>
-                    Observaciones: {item.observaciones}
-                  </Text>
-                ) : null}
-
-                {item.estado === "validado" ? (
-                  <Button
-                    mode="outlined"
-                    icon="trash-can-outline"
-                    onPress={() => hideValidatedRegistro(item.id)}
-                    style={styles.removeButton}
-                    labelStyle={styles.removeButtonLabel}
-                  >
-                    Borrar del historial
-                  </Button>
-                ) : null}
-              </Card.Content>
-            </Card>
+            <View>
+              <RegistroHistoryCard
+                registro={item}
+                onPress={() => setSelectedRegistro(item)}
+              />
+              {item.estado === "validado" ? (
+                <Button
+                  mode="outlined"
+                  icon="trash-can-outline"
+                  onPress={() => hideValidatedRegistro(item.id)}
+                  style={styles.removeButton}
+                  labelStyle={styles.removeButtonLabel}
+                >
+                  Borrar del historial
+                </Button>
+              ) : null}
+            </View>
           );
         }}
       />
     </SafeAreaView>
+    <RegistroHistoryDetailModal
+      registro={selectedRegistro}
+      onClose={() => setSelectedRegistro(null)}
+    />
+    </>
   );
 }
 
@@ -242,10 +236,22 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 80,
+    paddingTop: 4,
   },
-  headerWrapper: {
-    paddingHorizontal: 0,
+  fixedHeader: {
+    backgroundColor: "#f5f7fb",
+    paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  historyInlineFilters: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  historyInlineFilter: {
+    flex: 1,
+    marginBottom: 0,
+    minWidth: 0,
   },
   title: {
     color: "#0f172a",
@@ -261,6 +267,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: "#ffffff",
     borderRadius: 14,
+  },
+  openHint: {
+    alignItems: "center",
+    borderTopColor: "#fed7aa",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 10,
+    paddingTop: 9,
+  },
+  openHintText: {
+    color: "#c2410c",
+    fontSize: 12,
+    fontWeight: "700",
   },
   headerRow: {
     flexDirection: "row",

@@ -10,23 +10,25 @@ import {
   RegistroCliente,
 } from "@/services/api/clienteApi";
 import { clearSession, getSession } from "@/services/auth/session";
-import {
-  estadoColor,
-  formatDateTime,
-  formatShortDate as formatDate,
-  getEstadoLabel,
-  shouldShowRejectionContext,
-} from "@/utils/registroEstado";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
-import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Avatar, Button, Card, Chip, Text } from "react-native-paper";
+import React, { useCallback, useMemo, useState } from "react";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Avatar, Button, Text } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { RegistroHistoryDetailModal } from "../../components/RegistroHistoryDetailModal";
+import { RegistroHistoryCard } from "../../components/RegistroHistoryCard";
+import { RegistroHistorySearch } from "../../components/RegistroHistorySearch";
+import {
+  matchesRegistroHistoryResponsible,
+  matchesRegistroHistorySearch,
+} from "../../utils/registroHistorySearch";
+import { BeckDateFilter } from "../../components/BeckDateFilter";
+import { BeckOptionFilter } from "../../components/BeckOptionFilter";
 
 type ProfileUser = {
   id: string;
@@ -78,62 +80,6 @@ function preferirCopiasCorreccion(registros: RegistroHistorialApi[]) {
 }
 
 
-function RegistroContextBox({ registro }: { registro: RegistroHistorialApi }) {
-  if (!shouldShowRejectionContext(registro)) return null;
-
-  const hasRechazo = Boolean(
-    registro.motivo_rechazo ||
-      registro.fecha_rechazo ||
-      registro.rechazado_por ||
-      registro.registro_origen?.motivo_rechazo,
-  );
-  const isCorreccion = Boolean(registro.es_correccion || registro.registro_origen_id);
-  const motivo =
-    registro.motivo_rechazo || registro.registro_origen?.motivo_rechazo;
-  const fecha =
-    formatDateTime(registro.fecha_rechazo) ||
-    formatDateTime(registro.registro_origen?.fecha_rechazo);
-
-  if (!hasRechazo && !isCorreccion) return null;
-
-  return (
-    <View style={styles.contextBox}>
-      <View style={styles.contextHeader}>
-        <MaterialCommunityIcons
-          name={hasRechazo ? "alert-circle-outline" : "file-refresh-outline"}
-          size={18}
-          color={hasRechazo ? "#dc2626" : "#2563eb"}
-        />
-        <Text
-          style={[
-            styles.contextTitle,
-            hasRechazo ? styles.contextTitleDanger : styles.contextTitleInfo,
-          ]}
-        >
-          {hasRechazo ? "Contexto de rechazo" : "Registro de corrección"}
-        </Text>
-      </View>
-      {isCorreccion ? (
-        <Text style={styles.contextText}>
-          Corrección enlazada al registro original
-          {registro.registro_origen?.numero_sello
-            ? ` N° ${registro.registro_origen.numero_sello}`
-            : ""}.
-        </Text>
-      ) : null}
-      {motivo ? (
-        <Text style={styles.contextText}>Motivo: {motivo}</Text>
-      ) : null}
-      {registro.rechazado_por?.nombre ? (
-        <Text style={styles.contextText}>
-          Rechazado por: {registro.rechazado_por.nombre}
-        </Text>
-      ) : null}
-      {fecha ? <Text style={styles.contextText}>Fecha: {fecha}</Text> : null}
-    </View>
-  );
-}
-
 type ProfileActionProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -182,8 +128,13 @@ export default function PerfilScreen() {
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
   const [historialCliente, setHistorialCliente] = useState<RegistroCliente[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyDate, setHistoryDate] = useState("");
+  const [historyObraId, setHistoryObraId] = useState("todas");
   const [refreshingHistory, setRefreshingHistory] = useState(false);
   const [selectedRegistro, setSelectedRegistro] = useState<RegistroCliente | null>(null);
+  const [selectedHistoryRegistro, setSelectedHistoryRegistro] =
+    useState<RegistroHistorialApi | null>(null);
   const [sharing, setSharing] = useState(false);
 
   const loadProfile = useCallback(async (forceRefresh = false) => {
@@ -249,6 +200,9 @@ export default function PerfilScreen() {
   };
 
   const handleHistoryPress = () => {
+    setHistorySearch("");
+    setHistoryDate("");
+    setHistoryObraId("todas");
     if (user?.rol === "terreno" || user?.rol === "jefeobra") {
       setShowHistory(true);
       return;
@@ -270,6 +224,49 @@ export default function PerfilScreen() {
     user?.rol === "jefeobra" ||
     user?.rol === "ingenieria" ||
     user?.rol === "cliente";
+  const filteredHistorialCliente = useMemo(
+    () =>
+      historialCliente.filter(
+        (registro) =>
+          matchesRegistroHistorySearch(registro, historySearch) &&
+          (!historyDate || registro.fecha.slice(0, 10) === historyDate) &&
+          (historyObraId === "todas" || registro.obraId === historyObraId),
+      ),
+    [historialCliente, historyDate, historyObraId, historySearch],
+  );
+  const filteredRegistros = useMemo(
+    () =>
+      registros.filter((registro) =>
+        (matchesRegistroHistorySearch(registro, historySearch) ||
+          (user?.rol === "jefeobra" &&
+            matchesRegistroHistoryResponsible(registro, historySearch))) &&
+        (!historyDate || registro.fecha.slice(0, 10) === historyDate) &&
+        (historyObraId === "todas" || registro.obras?.id === historyObraId),
+      ),
+    [historyDate, historyObraId, historySearch, registros, user?.rol],
+  );
+  const historyObras = useMemo(() => {
+    const unique = new Map<string, string>();
+    registros.forEach((registro) => {
+      if (registro.obras?.id && registro.obras?.nombre) {
+        unique.set(registro.obras.id, registro.obras.nombre);
+      }
+    });
+    return Array.from(unique, ([value, label]) => ({ value, label })).sort(
+      (a, b) => a.label.localeCompare(b.label, "es"),
+    );
+  }, [registros]);
+  const clientHistoryObras = useMemo(() => {
+    const unique = new Map<string, string>();
+    historialCliente.forEach((registro) => {
+      if (registro.obraId && registro.obraNombre) {
+        unique.set(registro.obraId, registro.obraNombre);
+      }
+    });
+    return Array.from(unique, ([value, label]) => ({ value, label })).sort(
+      (a, b) => a.label.localeCompare(b.label, "es"),
+    );
+  }, [historialCliente]);
 
   // ── Historial cliente ─────────────────────────────────────────────────────────
   if (showHistory && user?.rol === "cliente") {
@@ -284,12 +281,28 @@ export default function PerfilScreen() {
               <View style={styles.fixedBrand}><BrandHeader subtitle="Registros validados · BECK" /></View>
               <Button mode="text" onPress={() => setShowHistory(false)}>Volver</Button>
             </View>
-            <Text variant="titleLarge" style={styles.title}>Mis validaciones</Text>
-            <Text style={styles.subtitle}>
-              {historialCliente.length > 0
-                ? `${historialCliente.length} ${historialCliente.length === 1 ? "registro validado" : "registros validados"} con tu firma.`
-                : "Aún no has validado ningún registro."}
-            </Text>
+            <RegistroHistorySearch
+              value={historySearch}
+              onChangeText={setHistorySearch}
+            />
+            <View style={styles.historyInlineFilters}>
+              <BeckDateFilter
+                value={historyDate}
+                onChange={setHistoryDate}
+                compact
+                containerStyle={styles.historyInlineFilter}
+              />
+              <BeckOptionFilter
+                label="Filtrar por obra"
+                value={historyObraId}
+                allValue="todas"
+                allLabel="Todas las obras"
+                options={clientHistoryObras}
+                onChange={setHistoryObraId}
+                compact
+                containerStyle={styles.historyInlineFilter}
+              />
+            </View>
           </View>
           <ScrollView
             contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
@@ -297,144 +310,69 @@ export default function PerfilScreen() {
               <RefreshControl refreshing={refreshingHistory} onRefresh={async () => { setRefreshingHistory(true); await loadProfile(true); setRefreshingHistory(false); }} />
             }
           >
-            {historialCliente.length > 0 ? (
-              historialCliente.map((item) => {
-                const isJunta = item.tipoRegistro === "junta_lineal_espuma";
-                const hasPdf = item.pdfDisponible;
+            {filteredHistorialCliente.length > 0 ? (
+              filteredHistorialCliente.map((item) => {
                 return (
-                  <Pressable
+                  <RegistroHistoryCard
                     key={item.id}
+                    registro={item}
                     onPress={() => setSelectedRegistro(item)}
-                    style={({ pressed }) => pressed ? { opacity: 0.82 } : undefined}
-                  >
-                    <Card style={styles.historyFullCard}>
-                      <Card.Content>
-                        <View style={styles.historyCardHeader}>
-                          <View style={styles.historyTitleGroup}>
-                            <Text style={styles.historyItemTitle}>{item.obraNombre || "Obra sin nombre"}</Text>
-                            <Text style={styles.historyItemMeta}>
-                              {item.obraCodigo || "Sin código"} · {formatDateShort(item.fecha)}
-                            </Text>
-                          </View>
-                          <View style={styles.historyChipGroup}>
-                            <Chip
-                              compact
-                              style={[styles.historyChip, { backgroundColor: "#2563eb" }]}
-                              textStyle={styles.historyChipText}
-                            >
-                              Firmado
-                            </Chip>
-                            {hasPdf ? (
-                              <MaterialCommunityIcons name="file-pdf-box" size={22} color="#16a34a" />
-                            ) : null}
-                          </View>
-                        </View>
-                        <Text style={styles.historyItemDetail}>
-                          {item.descripcionMaterial || (isJunta ? "Junta Lineal Espuma" : "Sello Cortafuego")}
-                        </Text>
-                        <View style={styles.historyDetailGrid}>
-                          <Text style={styles.historyDetailItem}>Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
-                          <Text style={styles.historyDetailItem}>Módulo: {item.modulo}</Text>
-                          <Text style={styles.historyDetailItem}>Piso: {item.piso}</Text>
-                          <Text style={styles.historyDetailItem}>Código: {item.codigoBeck || "-"}</Text>
-                          {item.validadoClienteAt ? (
-                            <Text style={styles.historyDetailItem}>Firmado el: {formatDateShort(item.validadoClienteAt)}</Text>
-                          ) : null}
-                        </View>
-                        {hasPdf ? (
-                          <View style={styles.historyPdfHint}>
-                            <MaterialCommunityIcons name="share-variant" size={13} color="#16a34a" />
-                            <Text style={styles.historyPdfHintText}>Toca para ver y compartir el PDF</Text>
-                          </View>
-                        ) : null}
-                      </Card.Content>
-                    </Card>
-                  </Pressable>
+                    pdfDisponible={item.pdfDisponible}
+                  />
                 );
               })
             ) : (
               <View style={styles.historyEmptyState}>
                 <Text style={styles.historyEmptyTitle}>Sin validaciones</Text>
                 <Text style={styles.historyItemMeta}>
-                  Los registros que valides con tu firma aparecerán aquí.
+                  {historySearch || historyDate || historyObraId !== "todas"
+                    ? "No hay registros que coincidan con la búsqueda o los filtros seleccionados."
+                    : "Los registros que valides con tu firma aparecerán aquí."}
                 </Text>
               </View>
             )}
           </ScrollView>
         </SafeAreaView>
 
-        {/* Modal PDF */}
-        <Modal
-          visible={selectedRegistro !== null}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setSelectedRegistro(null)}
-        >
-          <SafeAreaView style={styles.pdfModalContainer} edges={["top", "bottom"]}>
-            <View style={styles.pdfModalHeader}>
-              <Text style={styles.pdfModalTitle}>PDF Firmado</Text>
-              <TouchableOpacity onPress={() => setSelectedRegistro(null)} style={styles.pdfModalClose}>
-                <MaterialCommunityIcons name="close" size={24} color="#0f172a" />
-              </TouchableOpacity>
-            </View>
-
-            {selectedRegistro ? (
-              <ScrollView contentContainerStyle={styles.pdfModalContent}>
-                <Text style={styles.pdfModalItemTitle}>
-                  {selectedRegistro.obraNombre || "Obra sin nombre"}
-                </Text>
-                <Text style={styles.pdfModalItemMeta}>
-                  {selectedRegistro.obraCodigo || "Sin código"} · {formatDateShort(selectedRegistro.fecha)}
-                </Text>
-                <Text style={styles.pdfModalItemMeta}>
-                  Código BECK: {selectedRegistro.codigoBeck || "-"}
-                </Text>
-
-                {selectedRegistro.pdfDisponible ? (
-                  <>
-                    <View style={styles.pdfPreviewBox}>
-                      <MaterialCommunityIcons name="file-pdf-box" size={64} color="#16a34a" />
-                      <Text style={styles.pdfPreviewTitle}>PDF firmado disponible</Text>
-                      {selectedRegistro.validadoClienteAt ? (
-                        <Text style={styles.pdfPreviewMeta}>
-                          Firmado el {formatDateShort(selectedRegistro.validadoClienteAt)}
-                        </Text>
-                      ) : null}
-                    </View>
-
-                    <Button
-                      mode="contained"
-                      icon={sharing ? undefined : "share-variant"}
-                      onPress={() =>
-                        handleSharePdf(
-                          selectedRegistro.id,
-                          selectedRegistro.codigoBeck,
-                        )
-                      }
-                      loading={sharing}
-                      disabled={sharing}
-                      style={styles.pdfShareBtn}
-                      contentStyle={styles.pdfShareBtnContent}
-                      labelStyle={styles.pdfShareBtnLabel}
-                    >
-                      {sharing ? "Descargando PDF..." : "Compartir PDF"}
-                    </Button>
-
-                    <Text style={styles.pdfShareHint}>
-                      Puedes enviarlo por WhatsApp, correo, iMessage u otras aplicaciones.
+        <RegistroHistoryDetailModal
+          registro={selectedRegistro}
+          onClose={() => setSelectedRegistro(null)}
+          footer={selectedRegistro ? (
+            selectedRegistro.pdfDisponible ? (
+              <>
+                <View style={styles.pdfPreviewBox}>
+                  <MaterialCommunityIcons name="file-pdf-box" size={52} color="#16a34a" />
+                  <Text style={styles.pdfPreviewTitle}>PDF firmado disponible</Text>
+                  {selectedRegistro.validadoClienteAt ? (
+                    <Text style={styles.pdfPreviewMeta}>
+                      Firmado el {formatDateShort(selectedRegistro.validadoClienteAt)}
                     </Text>
-                  </>
-                ) : (
-                  <View style={styles.pdfNoUrl}>
-                    <MaterialCommunityIcons name="file-pdf-box" size={48} color="#94a3b8" />
-                    <Text style={styles.pdfNoUrlText}>PDF no disponible para este registro.</Text>
-                    <Text style={styles.pdfNoUrlMeta}>Es posible que el PDF aún no se haya generado.</Text>
-                  </View>
-                )}
-              </ScrollView>
-            ) : null}
-          </SafeAreaView>
-        </Modal>
+                  ) : null}
+                </View>
+                <Button
+                  mode="contained"
+                  icon={sharing ? undefined : "share-variant"}
+                  onPress={() => handleSharePdf(selectedRegistro.id, selectedRegistro.codigoBeck)}
+                  loading={sharing}
+                  disabled={sharing}
+                  style={styles.pdfShareBtn}
+                  contentStyle={styles.pdfShareBtnContent}
+                  labelStyle={styles.pdfShareBtnLabel}
+                >
+                  {sharing ? "Descargando PDF..." : "Compartir PDF"}
+                </Button>
+                <Text style={styles.pdfShareHint}>
+                  Puedes enviarlo por WhatsApp, correo, iMessage u otras aplicaciones.
+                </Text>
+              </>
+            ) : (
+              <View style={styles.pdfNoUrl}>
+                <MaterialCommunityIcons name="file-pdf-box" size={42} color="#94a3b8" />
+                <Text style={styles.pdfNoUrlText}>PDF no disponible para este registro.</Text>
+              </View>
+            )
+          ) : undefined}
+        />
       </>
     );
   }
@@ -442,12 +380,8 @@ export default function PerfilScreen() {
   if (showHistory && (user?.rol === "jefeobra" || user?.rol === "terreno")) {
     const isFixedHistoryHeader =
       user?.rol === "terreno" || user?.rol === "jefeobra" || user?.rol === "cliente";
-    const historyTitle =
-      user?.rol === "jefeobra"
-        ? "Historial de registros actualizados"
-        : "Historial de registros";
-
     return (
+      <>
       <SafeAreaView
         style={[styles.container, { paddingTop: insets.top + 2 }]}
         edges={["top", "left", "right"]}
@@ -462,15 +396,33 @@ export default function PerfilScreen() {
                 Volver
               </Button>
             </View>
-            {user?.rol !== "terreno" && user?.rol !== "jefeobra" ? (
-              <Text variant="titleLarge" style={styles.title}>
-                {historyTitle}
-              </Text>
-            ) : null}
-            <Text style={styles.subtitle}>
-              Revisa el estado de los registros y actualiza la lista para ver
-              cambios recientes.
-            </Text>
+            <RegistroHistorySearch
+              value={historySearch}
+              onChangeText={setHistorySearch}
+              placeholder={
+                user?.rol === "jefeobra"
+                  ? "Buscar por responsable, N° de sello o piso"
+                  : undefined
+              }
+            />
+            <View style={styles.historyInlineFilters}>
+              <BeckDateFilter
+                value={historyDate}
+                onChange={setHistoryDate}
+                compact
+                containerStyle={styles.historyInlineFilter}
+              />
+              <BeckOptionFilter
+                label="Filtrar por obra"
+                value={historyObraId}
+                allValue="todas"
+                allLabel="Todas las obras"
+                options={historyObras}
+                onChange={setHistoryObraId}
+                compact
+                containerStyle={styles.historyInlineFilter}
+              />
+            </View>
           </View>
         ) : null}
         <ScrollView
@@ -489,15 +441,6 @@ export default function PerfilScreen() {
             <>
               <BrandHeader subtitle="Registros realizados · BECK" />
               <View style={styles.historyScreenHeader}>
-                <View style={styles.historyScreenTitleGroup}>
-                  <Text variant="titleLarge" style={styles.title}>
-                    Historial de registros actualizados
-                  </Text>
-                  <Text style={styles.subtitle}>
-                    Revisa el estado de los registros y actualiza la lista para ver
-                    cambios recientes.
-                  </Text>
-                </View>
                 <Button mode="text" onPress={() => setShowHistory(false)}>
                   Volver
                 </Button>
@@ -505,208 +448,42 @@ export default function PerfilScreen() {
             </>
           ) : null}
 
-          {registros.length ? (
-            registros.map((item) => {
-              const obraNombre = item.obras?.nombre || "Obra sin nombre";
-              const isJunta = item.tipo_registro === "junta_lineal_espuma";
-              const isTerrenoHistory = user?.rol === "terreno";
+          {!isFixedHistoryHeader ? (
+            <RegistroHistorySearch
+              value={historySearch}
+              onChangeText={setHistorySearch}
+            />
+          ) : null}
 
+          {filteredRegistros.length ? (
+            filteredRegistros.map((item) => {
               return (
-                <Card
+                <RegistroHistoryCard
                   key={item.id}
-                  style={[
-                    styles.historyFullCard,
-                    user?.rol === "jefeobra" && styles.jefeHistoryFullCard,
-                    isTerrenoHistory && styles.terrenoHistoryFullCard,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.historyCardClip,
-                      user?.rol === "jefeobra" && styles.jefeHistoryCardClip,
-                      isTerrenoHistory && styles.terrenoHistoryCardClip,
-                    ]}
-                  >
-                  {user?.rol === "jefeobra" || isTerrenoHistory ? (
-                    <View
-                      style={[
-                        styles.jefeHistoryAccent,
-                        item.estado === "rechazado" && styles.jefeHistoryAccentRejected,
-                        item.estado === "validado" && styles.jefeHistoryAccentValidated,
-                      ]}
-                    />
-                  ) : null}
-                  <Card.Content
-                    style={[
-                      user?.rol === "jefeobra" && styles.jefeHistoryContent,
-                      isTerrenoHistory && styles.terrenoHistoryContent,
-                    ]}
-                  >
-                    <View style={styles.historyCardHeader}>
-                      {user?.rol === "jefeobra" || isTerrenoHistory ? (
-                        <View
-                          style={[
-                            styles.jefeHistoryIcon,
-                            isTerrenoHistory && styles.terrenoHistoryIcon,
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            name={isJunta ? "ruler" : "fire"}
-                            size={21}
-                            color="#0f172a"
-                          />
-                        </View>
-                      ) : null}
-                      <View style={styles.historyTitleGroup}>
-                        <Text
-                          style={[
-                            styles.historyItemTitle,
-                            user?.rol === "jefeobra" && styles.jefeHistoryTitle,
-                            isTerrenoHistory && styles.terrenoHistoryTitle,
-                          ]}
-                        >
-                          {obraNombre}
-                        </Text>
-                        {user?.rol === "jefeobra" || isTerrenoHistory ? (
-                          <View style={styles.jefeHistoryBadges}>
-                            <Text style={styles.jefeHistoryCodeBadge}>
-                              {item.obras?.codigo || "Sin código"}
-                            </Text>
-                            <Text style={styles.jefeHistoryDateBadge}>
-                              {formatDate(item.fecha)}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text style={styles.historyItemMeta}>
-                            {item.obras?.codigo || "Sin código"} ·{" "}
-                            {formatDate(item.fecha)}
-                          </Text>
-                        )}
-                      </View>
-
-                      <Chip
-                        compact
-                        style={[
-                          styles.historyChip,
-                          {
-                            backgroundColor:
-                              estadoColor[item.estado] || estadoColor.pendiente,
-                          },
-                        ]}
-                        textStyle={styles.historyChipText}
-                      >
-                        {getEstadoLabel(item.estado)}
-                      </Chip>
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.historyItemDetail,
-                        isTerrenoHistory && styles.terrenoHistoryItemDetail,
-                      ]}
-                    >
-                      {item.descripcion_material}
-                    </Text>
-
-                    <View
-                      style={[
-                        styles.historyDetailGrid,
-                        user?.rol === "jefeobra" && styles.jefeHistoryDetailGrid,
-                        isTerrenoHistory && styles.terrenoHistoryDetailGrid,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.historyDetailItem,
-                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                        ]}
-                      >
-                        Tipo: {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.historyDetailItem,
-                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                        ]}
-                      >
-                        Módulo: {item.modulo}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.historyDetailItem,
-                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                        ]}
-                      >
-                        Piso: {item.piso}
-                      </Text>
-                      {user?.rol === "jefeobra" || isTerrenoHistory ? (
-                        <Text
-                          style={[
-                            styles.historyDetailItem,
-                            isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                          ]}
-                        >
-                          Nº sello: {item.numero_sello || "—"}
-                        </Text>
-                      ) : null}
-                      <Text
-                        style={[
-                          styles.historyDetailItem,
-                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                        ]}
-                      >
-                        Eje: {item.eje_numerico}-{item.eje_alfabetico}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.historyDetailItem,
-                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                        ]}
-                      >
-                        {isJunta
-                          ? `Metros lineales: ${item.metros_lineales || 0}`
-                          : `Sellos: ${item.cantidad_sellos}`}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.historyDetailItem,
-                          isTerrenoHistory && styles.terrenoHistoryDetailItem,
-                        ]}
-                      >
-                        Responsable:{" "}
-                        {item.usuarios?.nombre || item.nombre_sellador}
-                      </Text>
-                    </View>
-
-                    {item.observaciones ? (
-                      <Text
-                        style={[
-                          styles.historyObservaciones,
-                          isTerrenoHistory && styles.terrenoHistoryObservaciones,
-                        ]}
-                      >
-                        Observaciones: {item.observaciones}
-                      </Text>
-                    ) : null}
-
-                    <RegistroContextBox registro={item} />
-                  </Card.Content>
-                  </View>
-                </Card>
+                  registro={item}
+                  onPress={() => setSelectedHistoryRegistro(item)}
+                />
               );
             })
           ) : (
             <View style={styles.historyEmptyState}>
               <Text style={styles.historyEmptyTitle}>Sin registros</Text>
               <Text style={styles.historyItemMeta}>
-                {user?.rol === "jefeobra"
-                  ? "Cuando envíes registros a ingeniería aparecerán aquí."
-                  : "Cuando realices registros en terreno aparecerán aquí."}
+                {historySearch || historyDate || historyObraId !== "todas"
+                  ? "No hay registros que coincidan con la búsqueda o los filtros seleccionados."
+                  : user?.rol === "jefeobra"
+                    ? "Cuando envíes registros a ingeniería aparecerán aquí."
+                    : "Cuando realices registros en terreno aparecerán aquí."}
               </Text>
             </View>
           )}
         </ScrollView>
       </SafeAreaView>
+      <RegistroHistoryDetailModal
+        registro={selectedHistoryRegistro}
+        onClose={() => setSelectedHistoryRegistro(null)}
+      />
+      </>
     );
   }
 
@@ -1159,6 +936,16 @@ const styles = StyleSheet.create({
   },
   historyScreenTitleGroup: {
     flex: 1,
+  },
+  historyInlineFilters: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  historyInlineFilter: {
+    flex: 1,
+    marginBottom: 0,
+    minWidth: 0,
   },
   historyFullCard: {
     backgroundColor: "#ffffff",

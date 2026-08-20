@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   FlatList,
@@ -22,6 +22,7 @@ type SelectSheetProps = {
   onChange: (value: string | null) => void;
   includeAllOption?: { label: string };
   accentColor?: string;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
 };
 
 const BRAND = "#f97316";
@@ -34,6 +35,7 @@ export function SelectSheet({
   onChange,
   includeAllOption,
   accentColor = BRAND,
+  icon = "format-list-bulleted",
 }: SelectSheetProps) {
   const [open, setOpen] = useState(false);
 
@@ -53,16 +55,25 @@ export function SelectSheet({
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable
-        style={styles.pickerButton}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={({ pressed }) => [
+          styles.pickerButton,
+          pressed && styles.pickerButtonPressed,
+        ]}
         onPress={() => setOpen(true)}
-        android_ripple={{ color: "#e2e8f0" }}
       >
-        <Text style={styles.pickerButtonText} numberOfLines={1}>
-          {selectedLabel}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color="#98A2B3" />
+        <View style={styles.iconBox}>
+          <MaterialCommunityIcons name={icon} size={18} color="#c2410c" />
+        </View>
+        <View style={styles.textGroup}>
+          <Text style={styles.fieldLabel}>{label}</Text>
+          <Text style={styles.pickerButtonText} numberOfLines={1}>
+            {selectedLabel}
+          </Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-down" size={21} color="#64748b" />
       </Pressable>
 
       <Modal
@@ -73,29 +84,49 @@ export function SelectSheet({
       >
         <Pressable style={styles.modalOverlay} onPress={() => setOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={() => {}}>
+            <View style={styles.sheetHandle} />
             <Text style={styles.modalTitle}>{label}</Text>
             <FlatList
               data={data}
               keyExtractor={(item) => item.value ?? "__all__"}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => {
                 const active = item.value === value;
                 return (
                   <Pressable
-                    style={styles.modalOption}
+                    style={[
+                      styles.modalOption,
+                      active && styles.modalOptionSelected,
+                    ]}
                     onPress={() => handleSelect(item.value)}
-                    android_ripple={{ color: "#f1f5f9" }}
                   >
+                    <View
+                      style={[
+                        styles.optionIcon,
+                        active && styles.optionIconSelected,
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={item.value === null ? "view-grid-outline" : icon}
+                        size={18}
+                        color={active ? "#0f172a" : "#64748b"}
+                      />
+                    </View>
                     <Text
                       style={[
                         styles.modalOptionText,
-                        active && { color: accentColor, fontWeight: "800" },
+                        active && styles.modalOptionTextSelected,
                       ]}
-                      numberOfLines={1}
+                      numberOfLines={2}
                     >
                       {item.label}
                     </Text>
                     {active ? (
-                      <Ionicons name="checkmark" size={18} color={accentColor} />
+                      <MaterialCommunityIcons
+                        name="check-circle"
+                        size={20}
+                        color={accentColor}
+                      />
                     ) : null}
                   </Pressable>
                 );
@@ -109,67 +140,113 @@ export function SelectSheet({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flex: 1 },
+  wrapper: {
+    alignSelf: "stretch",
+    marginBottom: 12,
+  },
   fieldLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#94a3b8",
+    color: "#64748b",
+    fontSize: 9,
+    fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.4,
   },
   pickerButton: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    backgroundColor: "#fffdf8",
+    borderColor: "#fbbf24",
     borderRadius: 14,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    backgroundColor: "#ffffff",
-    marginTop: 8,
-    gap: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    minHeight: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  pickerButtonPressed: {
+    opacity: 0.75,
+  },
+  iconBox: {
+    alignItems: "center",
+    backgroundColor: "#ffedd5",
+    borderRadius: 9,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  textGroup: {
+    flex: 1,
+    minWidth: 0,
   },
   pickerButtonText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
     color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 1,
   },
   modalOverlay: {
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
   },
   modalSheet: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fffaf0",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "70%",
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    backgroundColor: "#cbd5e1",
+    borderRadius: 2,
+    height: 4,
+    marginBottom: 14,
+    width: 42,
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: "900",
     color: "#0f172a",
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    fontSize: 17,
+    fontWeight: "900",
+    marginBottom: 10,
   },
   modalOption: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-    gap: 8,
+    backgroundColor: "#ffffff",
+    borderColor: "#fed7aa",
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+    minHeight: 52,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+  modalOptionSelected: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#f97316",
+  },
+  optionIcon: {
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 9,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  optionIconSelected: {
+    backgroundColor: "#FDC10B",
   },
   modalOptionText: {
+    color: "#475569",
     flex: 1,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  modalOptionTextSelected: {
     color: "#0f172a",
+    fontWeight: "900",
   },
 });

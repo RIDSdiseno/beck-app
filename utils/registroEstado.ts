@@ -1,4 +1,5 @@
 import type { RegistroHistorialApi } from "@/services/api/registrosApi";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 
 export const estadoColor = {
   pendiente: "#f59e0b",
@@ -41,13 +42,13 @@ export function formatDateTime(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
 
-  return date.toLocaleString("es-CL", {
+  const formattedDate = date.toLocaleDateString("es-CL", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
+
+  return `${formattedDate} ${formatTime24WithPeriod(value)}`;
 }
 
 export function isCorreccionEditable(registro: RegistroHistorialApi) {

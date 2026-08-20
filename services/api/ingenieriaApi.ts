@@ -29,6 +29,7 @@ export type RegistroIngenieriaApi = {
   descripcion_material?: string | null;
   codigo_beck?: string | null;
   itemizado_beck?: string | null;
+  dimensiones?: string | null;
   itemizado_mandante?: string | null;
   recinto?: string | null;
   modulo: string;

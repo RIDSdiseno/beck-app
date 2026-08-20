@@ -1,11 +1,24 @@
 import { getClienteObras, ObraCliente } from "@/services/api/clienteApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { BeckFilterPanel } from "../../components/BeckFilterPanel";
+
+type ClienteObraFiltro = "todas" | "pendientes" | "validadas";
+
+const CLIENTE_OBRA_FILTERS: {
+  value: ClienteObraFiltro;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}[] = [
+  { value: "todas", label: "Todas", icon: "view-grid-outline" },
+  { value: "pendientes", label: "Pendientes", icon: "clock-outline" },
+  { value: "validadas", label: "Validadas", icon: "check-circle-outline" },
+];
 
 export default function ClienteScreen() {
   const insets = useSafeAreaInsets();
@@ -13,6 +26,7 @@ export default function ClienteScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [obraFiltro, setObraFiltro] = useState<ClienteObraFiltro>("todas");
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +59,23 @@ export default function ClienteScreen() {
 
   const totalPendientes = obras.reduce((sum, o) => sum + o.registrosPendientes, 0);
   const totalValidados  = obras.reduce((sum, o) => sum + o.registrosValidados,  0);
+  const filterCounts = useMemo(
+    () => ({
+      todas: obras.length,
+      pendientes: obras.filter((obra) => obra.registrosPendientes > 0).length,
+      validadas: obras.filter((obra) => obra.registrosValidados > 0).length,
+    }),
+    [obras],
+  );
+  const filteredObras = useMemo(
+    () =>
+      obras.filter((obra) => {
+        if (obraFiltro === "pendientes") return obra.registrosPendientes > 0;
+        if (obraFiltro === "validadas") return obra.registrosValidados > 0;
+        return true;
+      }),
+    [obraFiltro, obras],
+  );
 
   if (loading) {
     return (
@@ -90,6 +121,17 @@ export default function ClienteScreen() {
           </View>
         </View>
 
+        <BeckFilterPanel
+          title="Filtrar obras"
+          resultCount={filteredObras.length}
+          options={CLIENTE_OBRA_FILTERS.map((filter) => ({
+            ...filter,
+            count: filterCounts[filter.value],
+          }))}
+          value={obraFiltro}
+          onChange={setObraFiltro}
+        />
+
         {obras.length === 0 && !error ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="domain" size={52} color="#cbd5e1" />
@@ -98,7 +140,15 @@ export default function ClienteScreen() {
           </View>
         ) : null}
 
-        {obras.map((obra) => (
+        {obras.length > 0 && filteredObras.length === 0 && !error ? (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="filter-off-outline" size={48} color="#cbd5e1" />
+            <Text style={styles.emptyTitle}>Sin coincidencias</Text>
+            <Text style={styles.emptyText}>No hay obras para el filtro seleccionado.</Text>
+          </View>
+        ) : null}
+
+        {filteredObras.map((obra) => (
           <Pressable
             key={obra.id}
             style={({ pressed }) => [styles.obraCard, pressed && styles.pressed]}

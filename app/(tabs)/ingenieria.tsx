@@ -1,5 +1,4 @@
 import {
-  EstadoRegistroIngenieria,
   getIngenieriaRegistros,
   getIngenieriaResumen,
   IngenieriaResumen,
@@ -7,6 +6,7 @@ import {
 } from "@/services/api/ingenieriaApi";
 import { getSession } from "@/services/auth/session";
 import { estadoColor, getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -15,7 +15,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -27,17 +26,23 @@ import {
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { BeckSearchInput } from "../../components/BeckSearchInput";
+import { BeckFilterPanel } from "../../components/BeckFilterPanel";
 import { SelectSheet } from "../../components/SelectSheet";
 
-const ACCENT = "#3b82f6";
+const ACCENT = "#f97316";
 
-type FiltroEstado = EstadoRegistroIngenieria | "todos";
+type FiltroEstado = "todos" | "en_revision" | "validado" | "rechazado";
 
-const FILTROS: { label: string; value: FiltroEstado }[] = [
-  { label: "En revisión", value: "en_revision" },
-  { label: "Validados", value: "validado" },
-  { label: "Rechazados", value: "rechazado" },
-  { label: "Todos", value: "todos" },
+const FILTROS: {
+  label: string;
+  value: FiltroEstado;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}[] = [
+  { label: "Todos", value: "todos", icon: "view-grid-outline" },
+  { label: "En revisión", value: "en_revision", icon: "clock-outline" },
+  { label: "Validados", value: "validado", icon: "check-circle-outline" },
+  { label: "Rechazados", value: "rechazado", icon: "alert-circle-outline" },
 ];
 
 const KPI_CONFIG = [
@@ -53,6 +58,24 @@ function getTipoLabel(tipo: string) {
 
 function getTipoColor(tipo: string) {
   return tipo === "junta_lineal_espuma" ? "#0891b2" : "#ea580c";
+}
+
+function matchesSearch(registro: RegistroIngenieriaApi, search: string) {
+  const query = search.trim().toLowerCase();
+  if (!query) return true;
+  return [
+    registro.descripcion_material,
+    registro.numero_sello,
+    registro.nombre_sellador,
+    registro.codigo_beck,
+    registro.folio,
+    registro.obra?.nombre,
+    registro.obra?.codigo,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
 }
 
 export default function IngenieriaScreen() {
@@ -110,25 +133,23 @@ export default function IngenieriaScreen() {
     return registros.filter((r) => {
       if (filtroEstado !== "todos" && r.estado !== filtroEstado) return false;
       if (obraFiltro !== "todas" && r.obra_id !== obraFiltro) return false;
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        const haystack = [
-          r.descripcion_material,
-          r.numero_sello,
-          r.nombre_sellador,
-          r.codigo_beck,
-          r.folio,
-          r.obra?.nombre,
-          r.obra?.codigo,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
+      return matchesSearch(r, search);
     });
   }, [registros, filtroEstado, obraFiltro, search]);
+
+  const filterCounts = useMemo(() => {
+    const base = registros.filter(
+      (registro) =>
+        (obraFiltro === "todas" || registro.obra_id === obraFiltro) &&
+        matchesSearch(registro, search),
+    );
+    return {
+      todos: base.length,
+      en_revision: base.filter((registro) => registro.estado === "en_revision").length,
+      validado: base.filter((registro) => registro.estado === "validado").length,
+      rechazado: base.filter((registro) => registro.estado === "rechazado").length,
+    };
+  }, [obraFiltro, registros, search]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -175,34 +196,23 @@ export default function IngenieriaScreen() {
         </ScrollView>
       ) : null}
 
-      <View style={styles.searchRow}>
-        <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar por material, sellador, sello..."
-          placeholderTextColor="#94a3b8"
-          value={search}
-          onChangeText={setSearch}
-          autoCorrect={false}
-          spellCheck={false}
-          autoComplete="off"
-        />
-        {search ? (
-          <TouchableOpacity onPress={() => setSearch("")}>
-            <MaterialCommunityIcons name="close-circle" size={18} color="#94a3b8" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      <BeckSearchInput
+        placeholder="Buscar por material, sellador o sello"
+        value={search}
+        onChangeText={setSearch}
+      />
 
-      <View style={styles.dropdownRow}>
-        <SelectSheet
-          label="Estado"
-          value={filtroEstado}
-          placeholder="Todos"
-          accentColor={ACCENT}
-          options={FILTROS.map(({ label, value }) => ({ label, value }))}
-          onChange={(v) => setFiltroEstado((v as FiltroEstado) ?? "todos")}
-        />
+      <BeckFilterPanel
+        title="Filtrar registros"
+        resultCount={filtered.length}
+        columns={2}
+        options={FILTROS.map((filter) => ({
+          ...filter,
+          count: filterCounts[filter.value],
+        }))}
+        value={filtroEstado}
+        onChange={setFiltroEstado}
+      >
         <SelectSheet
           label="Obra"
           value={obraFiltro === "todas" ? null : obraFiltro}
@@ -212,7 +222,7 @@ export default function IngenieriaScreen() {
           options={obras.map((obra) => ({ value: obra.id, label: obra.nombre }))}
           onChange={(v) => setObraFiltro(v ?? "todas")}
         />
-      </View>
+      </BeckFilterPanel>
 
       {error ? (
         <Card style={styles.errorCard}>
@@ -225,9 +235,6 @@ export default function IngenieriaScreen() {
         </Card>
       ) : null}
 
-      <Text style={styles.countLabel}>
-        {filtered.length} {filtered.length === 1 ? "registro" : "registros"}
-      </Text>
     </View>
   );
 
@@ -276,7 +283,7 @@ function RegistroCard({ registro }: { registro: RegistroIngenieriaApi }) {
                 {registro.obra?.nombre || "Sin obra"}
               </Text>
               <Text style={styles.obraMeta}>
-                {registro.obra?.codigo || "—"} · {formatShortDate(registro.fecha)}
+                {registro.obra?.codigo || "—"} · {formatShortDate(registro.fecha)} · {formatTime24WithPeriod(registro.created_at)}
               </Text>
             </View>
             <View style={styles.badgeCol}>

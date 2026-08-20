@@ -18,9 +18,22 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { TextInput } from "@/components/AppTextInput";
+import { BeckSearchInput } from "@/components/BeckSearchInput";
+import { BeckFilterPanel } from "@/components/BeckFilterPanel";
 import { BrandHeader } from "../../components/BrandHeader";
 import RegistrosScreen from "./registros";
+
+type EstadoFiltro = "todas" | "activa" | "pausada";
+
+const OBRA_FILTERS: {
+  value: EstadoFiltro;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}[] = [
+  { value: "todas", label: "Todas", icon: "view-grid-outline" },
+  { value: "activa", label: "Activas", icon: "check-circle-outline" },
+  { value: "pausada", label: "Pausadas", icon: "pause-circle-outline" },
+];
 
 function getEstadoLabel(estado?: string | null) {
   switch (estado) {
@@ -59,9 +72,7 @@ export default function MisObrasScreen() {
   const [error, setError] = useState("");
   const [obras, setObras] = useState<ObraApi[]>([]);
   const [search, setSearch] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState<
-    "todas" | "activa" | "pausada"
-  >("todas");
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>("todas");
   const [showRegistro, setShowRegistro] = useState(false);
   const [selectedObra, setSelectedObra] = useState<ObraApi | null>(null);
   const [selectingId, setSelectingId] = useState<string | null>(null);
@@ -79,6 +90,21 @@ export default function MisObrasScreen() {
       return matchesText && matchesEstado;
     });
   }, [estadoFiltro, obras, search]);
+
+  const filterCounts = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const matchingSearch = obras.filter(
+      (obra) =>
+        !term ||
+        `${obra.nombre} ${obra.codigo || ""}`.toLowerCase().includes(term),
+    );
+
+    return {
+      todas: matchingSearch.length,
+      activa: matchingSearch.filter((obra) => obra.estado === "activa").length,
+      pausada: matchingSearch.filter((obra) => obra.estado === "pausada").length,
+    };
+  }, [obras, search]);
 
   const loadObras = useCallback(async (forceRefresh = false) => {
     try {
@@ -136,58 +162,21 @@ export default function MisObrasScreen() {
   const renderHeader = () => (
     <>
       <BrandHeader subtitle="Obras disponibles · BECK" />
-      <TextInput
-        label="Buscar por nombre o código"
+      <BeckSearchInput
+        placeholder="Buscar por nombre o código"
         value={search}
         onChangeText={setSearch}
-        mode="outlined"
-        style={styles.searchInput}
-        left={<TextInput.Icon icon="magnify" />}
       />
-      <View style={styles.filterRow}>
-        <Chip
-          selected={estadoFiltro === "todas"}
-          onPress={() => setEstadoFiltro("todas")}
-          style={[
-            styles.filterChip,
-            estadoFiltro === "todas" && styles.filterChipSelected,
-          ]}
-          textStyle={[
-            styles.filterChipText,
-            estadoFiltro === "todas" && styles.filterChipTextSelected,
-          ]}
-        >
-          Todas
-        </Chip>
-        <Chip
-          selected={estadoFiltro === "activa"}
-          onPress={() => setEstadoFiltro("activa")}
-          style={[
-            styles.filterChip,
-            estadoFiltro === "activa" && styles.filterChipSelected,
-          ]}
-          textStyle={[
-            styles.filterChipText,
-            estadoFiltro === "activa" && styles.filterChipTextSelected,
-          ]}
-        >
-          Activas
-        </Chip>
-        <Chip
-          selected={estadoFiltro === "pausada"}
-          onPress={() => setEstadoFiltro("pausada")}
-          style={[
-            styles.filterChip,
-            estadoFiltro === "pausada" && styles.filterChipSelected,
-          ]}
-          textStyle={[
-            styles.filterChipText,
-            estadoFiltro === "pausada" && styles.filterChipTextSelected,
-          ]}
-        >
-          Pausadas
-        </Chip>
-      </View>
+      <BeckFilterPanel
+        title="Filtrar obras"
+        resultCount={filteredObras.length}
+        options={OBRA_FILTERS.map((filter) => ({
+          ...filter,
+          count: filterCounts[filter.value],
+        }))}
+        value={estadoFiltro}
+        onChange={setEstadoFiltro}
+      />
     </>
   );
 
@@ -484,27 +473,90 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#ffffff",
   },
+  filterPanel: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#fbbf24",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 10,
+  },
+  filterHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 9,
+  },
+  filterTitleGroup: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+  },
+  filterIconBox: {
+    alignItems: "center",
+    backgroundColor: "#ffedd5",
+    borderRadius: 8,
+    height: 29,
+    justifyContent: "center",
+    width: 29,
+  },
+  filterTitle: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  filterResultCount: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "700",
+  },
   filterRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 14,
+    gap: 6,
   },
-  filterChip: {
+  filterOption: {
+    alignItems: "center",
     backgroundColor: "#ffffff",
-    borderColor: "#cbd5e1",
+    borderColor: "#fed7aa",
+    borderRadius: 11,
     borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    gap: 4,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 6,
   },
-  filterChipSelected: {
+  filterOptionSelected: {
     backgroundColor: "#0f172a",
     borderColor: "#0f172a",
   },
-  filterChipText: {
-    color: "#334155",
-    fontWeight: "700",
+  filterOptionPressed: {
+    opacity: 0.75,
   },
-  filterChipTextSelected: {
+  filterOptionText: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  filterOptionTextSelected: {
     color: "#ffffff",
+  },
+  filterBadge: {
+    backgroundColor: "#f1f5f9",
+    borderRadius: 999,
+    color: "#475569",
+    fontSize: 9,
+    fontWeight: "900",
+    minWidth: 19,
+    overflow: "hidden",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    textAlign: "center",
+  },
+  filterBadgeSelected: {
+    backgroundColor: "#FDC10B",
+    color: "#0f172a",
   },
   centerBox: {
     flex: 1,

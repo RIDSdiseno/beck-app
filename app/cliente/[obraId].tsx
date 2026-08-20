@@ -6,6 +6,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import { ActivityIndicator, Button, Chip, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { formatTime24WithPeriod } from "@/utils/dateTime";
 
 function formatDate(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -125,7 +126,9 @@ export default function ClienteObraScreen() {
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {registro.codigoBeck || `Registro ${registro.id.slice(0, 6).toUpperCase()}`}
                   </Text>
-                  <Text style={styles.cardMeta}>{formatDate(registro.fecha)}</Text>
+                  <Text style={styles.cardMeta}>
+                    {formatDate(registro.fecha)} · {formatTime24WithPeriod(registro.createdAt)}
+                  </Text>
                 </View>
                 <Chip
                   compact
