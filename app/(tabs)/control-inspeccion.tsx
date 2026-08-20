@@ -3,7 +3,7 @@ import { formatShortDate } from "@/utils/registroEstado";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Button, Card, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,15 +11,16 @@ import { BrandHeader } from "../../components/BrandHeader";
 
 export default function ControlInspeccionScreen() {
   const insets = useSafeAreaInsets();
+  const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [controles, setControles] = useState<ControlCorreccion[]>([]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (forceRefresh = false) => {
     try {
       setError("");
-      const data = await getControlesPendientesCorreccion();
+      const data = await getControlesPendientesCorreccion(forceRefresh);
       setControles(data);
     } catch (err: any) {
       setError(err?.message || "No se pudo cargar el módulo de control de inspección");
@@ -30,9 +31,13 @@ export default function ControlInspeccionScreen() {
     useCallback(() => {
       let active = true;
       const init = async () => {
-        setLoading(true);
+        const shouldBlockScreen = !hasLoadedRef.current;
+        if (shouldBlockScreen) setLoading(true);
         await loadData();
-        if (active) setLoading(false);
+        if (active) {
+          hasLoadedRef.current = true;
+          if (shouldBlockScreen) setLoading(false);
+        }
       };
       init();
       return () => {
@@ -43,7 +48,7 @@ export default function ControlInspeccionScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadData(true);
     setRefreshing(false);
   };
 
@@ -56,39 +61,33 @@ export default function ControlInspeccionScreen() {
     );
   }
 
-  const renderHeader = () => (
-    <View>
-      <View style={styles.brandHeader}>
-        <BrandHeader subtitle="Control de inspección · Correcciones" />
-      </View>
-      <Text style={styles.subtitle}>
-        Controles de inspección marcados &quot;No conforme&quot; por Ingeniería que necesitan corrección.
-      </Text>
-
-      {error ? (
-        <Card style={styles.errorCard}>
-          <Card.Content>
-            <Text style={styles.errorText}>{error}</Text>
-            <Button mode="contained" onPress={loadData} style={styles.retryBtn}>
-              Reintentar
-            </Button>
-          </Card.Content>
-        </Card>
-      ) : null}
-
-      <Text style={styles.countLabel}>
-        {controles.length} {controles.length === 1 ? "control pendiente" : "controles pendientes"}
-      </Text>
-    </View>
-  );
+  const renderError = () =>
+    error ? (
+      <Card style={styles.errorCard}>
+        <Card.Content>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button mode="contained" onPress={() => loadData(true)} style={styles.retryBtn}>
+            Reintentar
+          </Button>
+        </Card.Content>
+      </Card>
+    ) : null;
 
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: insets.top + 2 }]}
       edges={["top", "left", "right"]}
     >
+      <View style={styles.fixedHeader}>
+        <View style={styles.brandHeader}>
+          <BrandHeader subtitle="Control de inspección · Correcciones" />
+        </View>
+      <Text style={styles.countLabel}>
+        {controles.length} {controles.length === 1 ? "control pendiente" : "controles pendientes"}
+      </Text>
+      </View>
       <FlatList
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderError}
         data={controles}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -168,10 +167,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f7fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f5f7fb" },
   helper: { marginTop: 8, color: "#64748b" },
+  fixedHeader: {
+    backgroundColor: "#f5f7fb",
+    borderBottomColor: "#e2e8f0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 4,
+    zIndex: 2,
+  },
   brandHeader: { marginHorizontal: 16 },
-  title: { marginTop: 12, marginHorizontal: 16, fontWeight: "700", color: "#0f172a" },
-  subtitle: { marginTop: 4, marginHorizontal: 16, color: "#64748b", fontSize: 13 },
-  countLabel: { marginTop: 14, marginHorizontal: 16, marginBottom: 6, color: "#475569", fontSize: 12, fontWeight: "600" },
+  countLabel: { marginTop: 4, marginHorizontal: 16, marginBottom: 6, color: "#475569", fontSize: 12, fontWeight: "600" },
   listContent: { paddingBottom: 24 },
   card: { marginHorizontal: 16, marginTop: 10, borderRadius: 16, backgroundColor: "#fffaf0", borderColor: "#FDC10B", borderWidth: 1, overflow: "hidden" },
   cardAccent: { position: "absolute", top: 0, bottom: 0, left: 0, width: 5, backgroundColor: "#dc2626" },

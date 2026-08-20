@@ -107,6 +107,47 @@ export async function getClienteHistorial(): Promise<RegistroCliente[]> {
   return result.data as RegistroCliente[];
 }
 
+export type ClienteHistorialPage = {
+  items: RegistroCliente[];
+  total: number;
+  nextCursor: string | null;
+  obras?: { id: string; nombre: string }[];
+};
+
+export async function getClienteHistorialPage(params: {
+  cursor?: string | null;
+  limit?: number;
+  search?: string;
+  fecha?: string;
+  obraId?: string;
+} = {}): Promise<ClienteHistorialPage> {
+  const token = await getToken();
+  const query = new URLSearchParams({ paginated: "true" });
+  if (params.cursor) query.set("cursor", params.cursor);
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.fecha) query.set("fecha", params.fecha);
+  if (params.obraId && params.obraId !== "todas") query.set("obraId", params.obraId);
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/cliente/registros/historial?${query.toString()}`,
+    { method: "GET", headers: { Authorization: `Bearer ${token}` } },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) throw new Error(result?.error || "No se pudo obtener el historial");
+  return result.data as ClienteHistorialPage;
+}
+
+export async function getClienteRegistroDetalle(registroId: string): Promise<RegistroCliente> {
+  const token = await getToken();
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/cliente/registros/${registroId}`,
+    { method: "GET", headers: { Authorization: `Bearer ${token}` } },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) throw new Error(result?.error || "No se pudo obtener el detalle del registro");
+  return result.data as RegistroCliente;
+}
+
 export async function validarRegistroCliente(
   registroId: string,
   params: { pathData: string; canvasWidth: number; canvasHeight: number },

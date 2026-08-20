@@ -49,11 +49,30 @@ export type ControlCorreccion = {
 async function getToken() {
   const session = await getSession();
   if (!session.token) throw new Error("No hay sesión activa");
-  return session.token;
+  return {
+    token: session.token,
+    userId: session.user?.id || session.token,
+  };
 }
 
-export async function getControlesPendientesCorreccion(): Promise<ControlCorreccion[]> {
-  const token = await getToken();
+const controlesPendientesCache = new Map<
+  string,
+  { data: ControlCorreccion[]; expiresAt: number }
+>();
+const CONTROLES_PENDIENTES_CACHE_MS = 30_000;
+
+export function clearControlesPendientesCache() {
+  controlesPendientesCache.clear();
+}
+
+export async function getControlesPendientesCorreccion(
+  forceRefresh = false,
+): Promise<ControlCorreccion[]> {
+  const { token, userId } = await getToken();
+  const cached = controlesPendientesCache.get(userId);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
   const response = await authenticatedFetch(
     `${API_BASE_URL}/api/jefeobra/control-inspeccion/pendientes`,
     { method: "GET", headers: { Authorization: `Bearer ${token}` } },
@@ -62,11 +81,16 @@ export async function getControlesPendientesCorreccion(): Promise<ControlCorrecc
   if (!response.ok || !result?.success) {
     throw new Error(result?.error || "No se pudieron obtener los controles pendientes de corrección");
   }
-  return result.data as ControlCorreccion[];
+  const data = result.data as ControlCorreccion[];
+  controlesPendientesCache.set(userId, {
+    data,
+    expiresAt: Date.now() + CONTROLES_PENDIENTES_CACHE_MS,
+  });
+  return data;
 }
 
 export async function getControlCorreccionDetalle(registroId: string): Promise<ControlCorreccion> {
-  const token = await getToken();
+  const { token } = await getToken();
   const response = await authenticatedFetch(
     `${API_BASE_URL}/api/jefeobra/control-inspeccion/${registroId}`,
     { method: "GET", headers: { Authorization: `Bearer ${token}` } },
@@ -82,7 +106,7 @@ export async function enviarCorreccionControlInspeccion(
   controlId: string,
   parametros: { parametroId: string; correccionObservacion?: string }[],
 ): Promise<ControlCorreccion> {
-  const token = await getToken();
+  const { token } = await getToken();
   const response = await authenticatedFetch(
     `${API_BASE_URL}/api/jefeobra/control-inspeccion/${controlId}/correccion`,
     {
@@ -95,6 +119,7 @@ export async function enviarCorreccionControlInspeccion(
   if (!response.ok || !result?.success) {
     throw new Error(result?.error || "No se pudo enviar la corrección");
   }
+  clearControlesPendientesCache();
   return result.data as ControlCorreccion;
 }
 
@@ -102,7 +127,7 @@ export async function uploadCorreccionParametroFotos(
   parametroId: string,
   fotos: { uri: string; name: string; type: string }[],
 ): Promise<FotoCorreccionParametro[]> {
-  const token = await getToken();
+  const { token } = await getToken();
   const formData = new FormData();
 
   fotos.forEach((foto) => {

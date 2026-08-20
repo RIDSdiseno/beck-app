@@ -133,11 +133,31 @@ export type ResumenSupervisorApi = {
 };
 
 const registrosCache = new Map<string, RegistroHistorialApi[]>();
+const supervisorSummaryCache = new Map<
+  string,
+  { data: ResumenSupervisorApi; expiresAt: number }
+>();
+const SUPERVISOR_SUMMARY_CACHE_MS = 30_000;
 
 type GetMisRegistrosParams = {
   obraId?: string;
   estado?: EstadoRegistroApi;
   scope?: "registro" | "historial";
+};
+
+export type HistorialRegistrosPage = {
+  items: RegistroHistorialApi[];
+  total: number;
+  nextCursor: string | null;
+  obras?: { id: string; nombre: string }[];
+};
+
+export type HistorialRegistrosParams = {
+  cursor?: string | null;
+  limit?: number;
+  search?: string;
+  fecha?: string;
+  obraId?: string;
 };
 
 function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
@@ -203,6 +223,7 @@ export async function deleteRegistroPendiente(registroId: string) {
 
 export function clearMisRegistrosCache() {
   registrosCache.clear();
+  supervisorSummaryCache.clear();
 }
 
 export async function getMisRegistros(
@@ -250,13 +271,58 @@ export async function getMisRegistros(
   return data;
 }
 
+export async function getHistorialRegistrosPage(
+  params: HistorialRegistrosParams = {},
+): Promise<HistorialRegistrosPage> {
+  const session = await getSession();
+  if (!session.token) throw new Error("No hay sesión activa");
+  const query = new URLSearchParams();
+  if (params.cursor) query.set("cursor", params.cursor);
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.fecha) query.set("fecha", params.fecha);
+  if (params.obraId && params.obraId !== "todas") query.set("obraId", params.obraId);
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/registros/historial?${query.toString()}`,
+    { method: "GET", headers: { Authorization: `Bearer ${session.token}` } },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo obtener el historial");
+  }
+  return result.data as HistorialRegistrosPage;
+}
+
+export async function getHistorialRegistroDetalle(
+  registroId: string,
+): Promise<RegistroHistorialApi> {
+  const session = await getSession();
+  if (!session.token) throw new Error("No hay sesión activa");
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/registros/historial/${registroId}`,
+    { method: "GET", headers: { Authorization: `Bearer ${session.token}` } },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo obtener el detalle del registro");
+  }
+  return result.data as RegistroHistorialApi;
+}
+
 export async function getResumenSupervisor(
   tipoRegistro: "sello_cortafuego" | "junta_lineal_espuma",
+  forceRefresh = false,
 ): Promise<ResumenSupervisorApi> {
   const session = await getSession();
 
   if (!session.token) {
     throw new Error("No hay sesión activa");
+  }
+
+  const cacheKey = `${session.user?.id || session.token}:${tipoRegistro}`;
+  const cached = supervisorSummaryCache.get(cacheKey);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+    return cached.data;
   }
 
   const query = new URLSearchParams({ tipoRegistro });
@@ -276,7 +342,12 @@ export async function getResumenSupervisor(
     throw new Error(result?.error || "No se pudo obtener el resumen del supervisor");
   }
 
-  return result.data as ResumenSupervisorApi;
+  const data = result.data as ResumenSupervisorApi;
+  supervisorSummaryCache.set(cacheKey, {
+    data,
+    expiresAt: Date.now() + SUPERVISOR_SUMMARY_CACHE_MS,
+  });
+  return data;
 }
 
 export async function uploadRegistroFotos(

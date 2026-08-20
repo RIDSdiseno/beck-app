@@ -417,6 +417,7 @@ export default function RegistrosScreen({
   const [refreshingJefeRegistros, setRefreshingJefeRegistros] =
     useState(false);
   const [loadingJefeRegistros, setLoadingJefeRegistros] = useState(false);
+  const hasLoadedJefeRegistrosRef = useRef(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -815,7 +816,8 @@ export default function RegistrosScreen({
         setNombreSellador(userName);
 
         if (role === "jefeobra") {
-          setLoadingJefeRegistros(true);
+          const shouldBlockScreen = !hasLoadedJefeRegistrosRef.current;
+          if (shouldBlockScreen) setLoadingJefeRegistros(true);
           try {
             const [obrasDisponibles, registros] = await Promise.all([
               getMisObras(),
@@ -824,8 +826,9 @@ export default function RegistrosScreen({
 
             setJefeObras(obrasDisponibles);
             setJefeRegistros(registros);
+            hasLoadedJefeRegistrosRef.current = true;
           } finally {
-            setLoadingJefeRegistros(false);
+            if (shouldBlockScreen) setLoadingJefeRegistros(false);
           }
 
           return;

@@ -8,7 +8,7 @@ import { getSession } from "@/services/auth/session";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Redirect, router, useFocusEffect } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -58,6 +58,7 @@ const EMPTY_SUPERVISOR_SUMMARY: ResumenSupervisorApi = {
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
+  const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -84,8 +85,8 @@ export default function DashboardScreen() {
 
       if (session.user?.rol === "jefeobra") {
         const [sellos, juntas] = await Promise.all([
-          getResumenSupervisor("sello_cortafuego"),
-          getResumenSupervisor("junta_lineal_espuma"),
+          getResumenSupervisor("sello_cortafuego", forceRefresh),
+          getResumenSupervisor("junta_lineal_espuma", forceRefresh),
         ]);
         setSupervisorSummary({
           sello_cortafuego: sellos,
@@ -105,9 +106,13 @@ export default function DashboardScreen() {
       let isActive = true;
 
       const init = async () => {
-        setLoading(true);
+        const shouldBlockScreen = !hasLoadedRef.current;
+        if (shouldBlockScreen) setLoading(true);
         await loadDashboard();
-        if (isActive) setLoading(false);
+        if (isActive) {
+          hasLoadedRef.current = true;
+          if (shouldBlockScreen) setLoading(false);
+        }
       };
 
       init();

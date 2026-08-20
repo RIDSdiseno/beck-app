@@ -1,12 +1,10 @@
 import { clearMisObrasCache } from "@/services/api/obrasApi";
 import {
   clearMisRegistrosCache,
-  getMisRegistros,
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
 import {
   compartirPdfCliente,
-  getClienteHistorial,
   RegistroCliente,
 } from "@/services/api/clienteApi";
 import { clearSession, getSession } from "@/services/auth/session";
@@ -66,20 +64,6 @@ function getInitials(name?: string) {
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "B";
 }
 
-function preferirCopiasCorreccion(registros: RegistroHistorialApi[]) {
-  const originalesConCopia = new Set(
-    registros
-      .map((registro) => registro.registro_origen_id)
-      .filter((id): id is string => Boolean(id)),
-  );
-
-  return registros.filter(
-    (registro) =>
-      !(registro.estado === "rechazado" && originalesConCopia.has(registro.id)),
-  );
-}
-
-
 type ProfileActionProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -125,8 +109,8 @@ function ProfileAction({ icon, label, onPress, beckStyle = false }: ProfileActio
 export default function PerfilScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<ProfileUser | null>(null);
-  const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
-  const [historialCliente, setHistorialCliente] = useState<RegistroCliente[]>([]);
+  const [registros] = useState<RegistroHistorialApi[]>([]);
+  const [historialCliente] = useState<RegistroCliente[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyDate, setHistoryDate] = useState("");
@@ -138,30 +122,9 @@ export default function PerfilScreen() {
   const [sharing, setSharing] = useState(false);
 
   const loadProfile = useCallback(async (forceRefresh = false) => {
+    void forceRefresh;
     const session = await getSession();
     setUser(session.user);
-
-    if (session.user?.rol === "jefeobra" || session.user?.rol === "terreno") {
-      const data = await getMisRegistros(
-        forceRefresh,
-        session.user.rol === "jefeobra" ? { scope: "historial" } : undefined,
-      );
-      const registrosSinDuplicar = preferirCopiasCorreccion(data);
-      setRegistros(
-        session.user?.rol === "jefeobra"
-          ? registrosSinDuplicar.filter(
-              (registro) => registro.estado !== "pendiente",
-            )
-          : registrosSinDuplicar,
-      );
-    }
-
-    if (session.user?.rol === "cliente") {
-      try {
-        const historial = await getClienteHistorial();
-        setHistorialCliente(historial);
-      } catch { /* silenciar */ }
-    }
   }, []);
 
   useFocusEffect(
@@ -203,14 +166,6 @@ export default function PerfilScreen() {
     setHistorySearch("");
     setHistoryDate("");
     setHistoryObraId("todas");
-    if (user?.rol === "terreno" || user?.rol === "jefeobra") {
-      setShowHistory(true);
-      return;
-    }
-    if (user?.rol === "cliente") {
-      setShowHistory(true);
-      return;
-    }
     router.push("/historial");
   };
 
