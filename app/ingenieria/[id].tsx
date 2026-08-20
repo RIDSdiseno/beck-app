@@ -5,6 +5,7 @@ import {
   descargarRegistroPdf,
   getControlInspeccion,
   getIngenieriaRegistroById,
+  iniciarRevisionIngenieria,
   marcarInspeccion,
   ParametroInspeccion,
   rechazarRegistroIngenieria,
@@ -104,7 +105,6 @@ function SectionTitle({ title }: { title: string }) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionLine} />
     </View>
   );
 }
@@ -194,7 +194,10 @@ export default function IngenieriaDetalleScreen() {
       try {
         setLoading(true);
         setError("");
-        const data = await getIngenieriaRegistroById(id);
+        const fetched = await getIngenieriaRegistroById(id);
+        const data = fetched.estado === "en_revision"
+          ? await iniciarRevisionIngenieria(id)
+          : fetched;
         setRegistro(data);
         try {
           const configuracion = await getConfiguracionRegistro(
@@ -548,58 +551,99 @@ export default function IngenieriaDetalleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <SectionTitle title="OBRA" />
-        <InfoRow label="Nombre" value={registro.obra?.nombre} />
-        <InfoRow label="Código" value={registro.obra?.codigo} />
-        <InfoRow label="Cliente" value={registro.obra?.cliente} />
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryAccent} />
+          <View style={styles.summaryHeader}>
+            <View style={styles.summaryIcon}>
+              <MaterialCommunityIcons
+                name={registro.tipo_registro === "junta_lineal_espuma" ? "ruler" : "fire"}
+                size={23}
+                color="#0f172a"
+              />
+            </View>
+            <View style={styles.summaryTitleGroup}>
+              <Text style={styles.summaryTitle}>
+                {registro.tipo_registro === "junta_lineal_espuma" ? "Junta lineal espuma" : "Sello cortafuego"}
+              </Text>
+              <Text style={styles.summarySubtitle} numberOfLines={1}>
+                {registro.obra?.nombre || "Obra sin nombre"} · {registro.obra?.codigo || "Sin código"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.summaryBox}>
+            <View style={styles.summaryRow}>
+              <MaterialCommunityIcons name="map-marker-outline" size={17} color="#f97316" />
+              <Text style={styles.summaryText}>Piso {registro.piso || "—"} · Módulo {registro.modulo || "—"}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <MaterialCommunityIcons name="calendar-outline" size={17} color="#f97316" />
+              <Text style={styles.summaryText}>
+                {formatShortDate(registro.fecha)} · {formatTime24WithPeriod(registro.created_at)} · Sello {registro.numero_sello || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <MaterialCommunityIcons name="account-outline" size={17} color="#f97316" />
+              <Text style={styles.summaryText}>Responsable: {registro.usuario?.nombre || registro.nombre_sellador || "Sin responsable"}</Text>
+            </View>
+          </View>
+        </View>
 
-        <SectionTitle title="REGISTRO" />
-        {campoVisible("codigoBeck") ? <InfoRow label="Código BECK" value={registro.codigo_beck} /> : null}
-        {campoVisible("itemizadoBeck") ? <InfoRow label="Itemizado BECK" value={registro.itemizado_beck} /> : null}
-        {campoVisible("dimensiones") ? <InfoRow label="Dimensiones" value={registro.dimensiones} /> : null}
-        {campoVisible("itemizadoMandante") && registro.itemizado_mandante ? (
-          <InfoRow label="Itemizado Mandante" value={registro.itemizado_mandante} />
-        ) : null}
-        {campoVisible("fechaEjecucionSello") ? <InfoRow label="Fecha ejecución" value={formatShortDate(registro.fecha)} /> : null}
-        {campoVisible("diaSemana") && registro.dia_semana ? (
-          <InfoRow label="Día" value={registro.dia_semana} />
-        ) : null}
-        {campoVisible("piso") ? <InfoRow label="Piso" value={registro.piso} /> : null}
-        {campoVisible("ejeAlfabetico") ? <InfoRow label="Eje alfabético" value={registro.eje_alfabetico} /> : null}
-        {campoVisible("ejeNumerico") ? <InfoRow label="Eje numérico" value={registro.eje_numerico} /> : null}
-        {campoVisible("nombreSellador") ? <InfoRow label="Sellador" value={registro.nombre_sellador} /> : null}
+        <SectionTitle title="INFORMACIÓN DE LA OBRA" />
+        <View style={styles.detailCard}>
+          <InfoRow label="Nombre" value={registro.obra?.nombre} />
+          <InfoRow label="Código" value={registro.obra?.codigo} />
+          <InfoRow label="Cliente" value={registro.obra?.cliente} />
+        </View>
+
+        <SectionTitle title="INFORMACIÓN DEL REGISTRO" />
+        <View style={styles.detailCard}>
+          {campoVisible("codigoBeck") ? <InfoRow label="Código BECK" value={registro.codigo_beck} /> : null}
+          {campoVisible("itemizadoBeck") ? <InfoRow label="Itemizado BECK" value={registro.itemizado_beck} /> : null}
+          {campoVisible("dimensiones") ? <InfoRow label="Dimensiones" value={registro.dimensiones} /> : null}
+          {campoVisible("itemizadoMandante") && registro.itemizado_mandante ? (
+            <InfoRow label="Itemizado Mandante" value={registro.itemizado_mandante} />
+          ) : null}
+          {campoVisible("fechaEjecucionSello") ? <InfoRow label="Fecha ejecución" value={formatShortDate(registro.fecha)} /> : null}
+          {campoVisible("diaSemana") && registro.dia_semana ? <InfoRow label="Día" value={registro.dia_semana} /> : null}
+          {campoVisible("piso") ? <InfoRow label="Piso" value={registro.piso} /> : null}
+          {campoVisible("ejeAlfabetico") ? <InfoRow label="Eje alfabético" value={registro.eje_alfabetico} /> : null}
+          {campoVisible("ejeNumerico") ? <InfoRow label="Eje numérico" value={registro.eje_numerico} /> : null}
+          {campoVisible("nombreSellador") ? <InfoRow label="Sellador" value={registro.nombre_sellador} /> : null}
+        </View>
 
         {campoVisible("foto") && (registro.fotos?.length ?? 0) > 0 ? (
           <>
             <SectionTitle title="FOTOGRAFÍAS" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
-              {registro.fotos!.map((foto) => (
-                <ExpandableImage key={foto.id} uri={foto.url} style={styles.foto} />
-              ))}
-            </ScrollView>
+            <View style={styles.photosCard}>
+              <Text style={styles.photosHint}>Presiona una fotografía para verla en grande y hacer zoom.</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosRow}>
+                {registro.fotos!.map((foto) => (
+                  <ExpandableImage key={foto.id} uri={foto.url} style={styles.foto} />
+                ))}
+              </ScrollView>
+            </View>
           </>
         ) : null}
 
-        {campoVisible("recinto") ? <InfoRow label="Recinto" value={registro.recinto} /> : null}
-        {campoVisible("modulo") ? <InfoRow label="Módulo / Edificio" value={registro.modulo} /> : null}
-        {campoVisible("numeroSello") ? <InfoRow label="Nº Sello" value={registro.numero_sello} /> : null}
-        {campoVisible("cantidadSellos") ? <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} /> : null}
-        {campoVisible("holgura") ? <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} /> : null}
-        {campoVisible("factorPorHolguras") ? <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} /> : null}
-        {campoVisible("cieloModular") ? <InfoRow label="Accesibilidad" value={registro.accesibilidad} /> : null}
-        {campoVisible("cantidadSellosConFactores") ? <InfoRow label="Sellos con factores" value={formatDecimal(registro.cantidad_sellos_con_factores)} /> : null}
-        {campoVisible("aislacion") ? <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} /> : null}
-        {campoVisible("cantidadSellosAislacion") ? <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} /> : null}
-        {campoVisible("reparacionTabique") ? <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} /> : null}
-        {campoVisible("cantidadFinal") ? <InfoRow label="Cantidad final" value={formatDecimal(registro.cantidad_final)} /> : null}
-        {campoVisible("observaciones") && registro.observaciones ? (
-          <InfoRow label="Observaciones" value={registro.observaciones} />
-        ) : null}
-        {campoVisible("folio") ? <InfoRow label="Folio" value={registro.folio} /> : null}
-        {campoVisible("tipoRegistro") ? <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} /> : null}
-        {campoVisible("metrosLineales") && registro.metros_lineales ? (
-          <InfoRow label="Longitud (m)" value={`${registro.metros_lineales} m`} />
-        ) : null}
+        <SectionTitle title="UBICACIÓN Y CANTIDADES" />
+        <View style={styles.detailCard}>
+          {campoVisible("recinto") ? <InfoRow label="Recinto" value={registro.recinto} /> : null}
+          {campoVisible("modulo") ? <InfoRow label="Módulo / Edificio" value={registro.modulo} /> : null}
+          {campoVisible("numeroSello") ? <InfoRow label="Nº Sello" value={registro.numero_sello} /> : null}
+          {campoVisible("cantidadSellos") ? <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} /> : null}
+          {campoVisible("holgura") ? <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} /> : null}
+          {campoVisible("factorPorHolguras") ? <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} /> : null}
+          {campoVisible("cieloModular") ? <InfoRow label="Accesibilidad" value={registro.accesibilidad} /> : null}
+          {campoVisible("cantidadSellosConFactores") ? <InfoRow label="Sellos con factores" value={formatDecimal(registro.cantidad_sellos_con_factores)} /> : null}
+          {campoVisible("aislacion") ? <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} /> : null}
+          {campoVisible("cantidadSellosAislacion") ? <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} /> : null}
+          {campoVisible("reparacionTabique") ? <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} /> : null}
+          {campoVisible("cantidadFinal") ? <InfoRow label="Cantidad final" value={formatDecimal(registro.cantidad_final)} /> : null}
+          {campoVisible("observaciones") && registro.observaciones ? <InfoRow label="Observaciones" value={registro.observaciones} /> : null}
+          {campoVisible("folio") ? <InfoRow label="Folio" value={registro.folio} /> : null}
+          {campoVisible("tipoRegistro") ? <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} /> : null}
+          {campoVisible("metrosLineales") && registro.metros_lineales ? <InfoRow label="Longitud (m)" value={`${registro.metros_lineales} m`} /> : null}
+        </View>
 
         {registro.motivo_rechazo ? (
           <>
@@ -1161,28 +1205,52 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 13,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
     gap: 10,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { flex: 1, fontWeight: "700", fontSize: 16, color: "#0f172a" },
-  estadoBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  backBtn: { alignItems: "center", backgroundColor: "#ffc400", borderRadius: 12, height: 40, justifyContent: "center", width: 40 },
+  headerTitle: { flex: 1, fontWeight: "800", fontSize: 16, color: "#0f172a" },
+  estadoBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   estadoBadgeText: { color: "#ffffff", fontSize: 11, fontWeight: "700" },
-  scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 20, marginBottom: 8 },
-  sectionTitle: { color: "#94a3b8", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-  sectionLine: { flex: 1, height: 1, backgroundColor: "#e2e8f0" },
-  infoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
-  infoLabel: { color: "#64748b", fontSize: 13, flex: 1 },
-  infoValue: { color: "#0f172a", fontSize: 13, fontWeight: "600", flex: 1, textAlign: "right" },
+  scroll: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20 },
+  summaryCard: {
+    backgroundColor: "#fffaf0",
+    borderColor: "#fbbf24",
+    borderRadius: 18,
+    borderWidth: 1,
+    elevation: 2,
+    padding: 14,
+    paddingLeft: 17,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  summaryAccent: { backgroundColor: "#f97316", borderBottomLeftRadius: 18, borderTopLeftRadius: 18, bottom: 0, left: 0, position: "absolute", top: 0, width: 5 },
+  summaryHeader: { alignItems: "center", flexDirection: "row", gap: 10 },
+  summaryIcon: { alignItems: "center", backgroundColor: "#ffc400", borderRadius: 11, height: 42, justifyContent: "center", width: 42 },
+  summaryTitleGroup: { flex: 1 },
+  summaryTitle: { color: "#0f172a", fontSize: 16, fontWeight: "800" },
+  summarySubtitle: { color: "#64748b", fontSize: 12, fontWeight: "600", marginTop: 2 },
+  summaryBox: { backgroundColor: "#ffffff", borderColor: "#fde68a", borderRadius: 13, borderWidth: 1, gap: 7, marginTop: 12, padding: 11 },
+  summaryRow: { alignItems: "center", flexDirection: "row", gap: 7 },
+  summaryText: { color: "#334155", flex: 1, fontSize: 12, fontWeight: "600" },
+  sectionHeader: { alignItems: "center", flexDirection: "row", marginBottom: 8, marginTop: 18 },
+  sectionTitle: { color: "#0f172a", fontSize: 13, fontWeight: "800", letterSpacing: 0.3 },
+  detailCard: { backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 5 },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#e2e8f0" },
+  infoLabel: { color: "#64748b", fontSize: 13, flex: 1, paddingRight: 10 },
+  infoValue: { color: "#0f172a", fontSize: 13, fontWeight: "700", flex: 1.25, textAlign: "right" },
   observacionesText: { color: "#334155", fontSize: 14, lineHeight: 20, backgroundColor: "#f8fafc", padding: 12, borderRadius: 10 },
   rechazoBadge: { flexDirection: "row", gap: 8, backgroundColor: "#fef2f2", padding: 12, borderRadius: 10, alignItems: "flex-start" },
   rechazoText: { color: "#dc2626", fontSize: 13, flex: 1, lineHeight: 18 },
-  fotosRow: { marginTop: 4 },
-  foto: { width: 140, height: 140, borderRadius: 12, marginRight: 10 },
+  photosCard: { backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: 16, borderWidth: 1, padding: 12 },
+  photosHint: { color: "#64748b", fontSize: 12, lineHeight: 17, marginBottom: 9 },
+  fotosRow: { marginTop: 2 },
+  foto: { width: 190, height: 150, borderRadius: 14, marginRight: 10 },
   inspeccionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   inspeccionToggleBtn: { borderRadius: 10 },
   controlRow: { marginTop: 8 },
@@ -1199,9 +1267,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
   },
-  actionBtnOutline: { flex: 1, borderRadius: 12 },
+  actionBtnOutline: { flex: 1, borderRadius: 999 },
   actionBtnRed: { borderColor: "#dc2626" },
-  actionBtnGreen: { flex: 1, borderRadius: 12, backgroundColor: "#16a34a" },
+  actionBtnGreen: { flex: 1, borderRadius: 999, backgroundColor: "#16a34a" },
   actionBtnLabel: { fontSize: 12 },
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
   modalCard: { backgroundColor: "#ffffff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },

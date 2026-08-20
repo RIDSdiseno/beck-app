@@ -28,6 +28,10 @@ import {
 } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { AdminResumen, getAdminResumen } from "@/services/api/adminApi";
+import {
+  getIngenieriaResumen,
+  IngenieriaResumen,
+} from "@/services/api/ingenieriaApi";
 
 function formatDate(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -67,6 +71,15 @@ const EMPTY_ADMIN_SUMMARY: AdminResumen = {
   accionesAdministrador: 0,
 };
 
+const EMPTY_ENGINEERING_SUMMARY: IngenieriaResumen = {
+  pendientesRevision: 0,
+  enRevisionMios: 0,
+  correccionesRecibidas: 0,
+  validadosMes: 0,
+  rechazadosMes: 0,
+  revisionesResueltasMes: 0,
+};
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
@@ -80,6 +93,9 @@ export default function DashboardScreen() {
   >("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
   const [adminSummary, setAdminSummary] = useState(EMPTY_ADMIN_SUMMARY);
+  const [engineeringSummary, setEngineeringSummary] = useState(
+    EMPTY_ENGINEERING_SUMMARY,
+  );
   const [supervisorSummary, setSupervisorSummary] = useState<{
     sello_cortafuego: ResumenSupervisorApi;
     junta_lineal_espuma: ResumenSupervisorApi;
@@ -95,7 +111,10 @@ export default function DashboardScreen() {
       setUserName(session.user?.nombre || "Usuario Beck");
       setUserRole(session.user?.rol || "");
 
-      if (session.user?.rol === "administrador") {
+      if (session.user?.rol === "ingenieria") {
+        setEngineeringSummary(await getIngenieriaResumen());
+        setRegistros([]);
+      } else if (session.user?.rol === "administrador") {
         setAdminSummary(await getAdminResumen());
         setRegistros([]);
       } else if (session.user?.rol === "jefeobra") {
@@ -201,12 +220,171 @@ export default function DashboardScreen() {
     );
   }
 
-  if (userRole === "ingenieria") {
-    return <Redirect href="/(tabs)/ingenieria" />;
-  }
-
   if (userRole === "cliente") {
     return <Redirect href="/(tabs)/cliente" />;
+  }
+
+  if (userRole === "ingenieria") {
+    const engineeringMetrics = [
+      {
+        label: "Pendientes de revisión",
+        value: engineeringSummary.pendientesRevision,
+        icon: "clipboard-clock-outline" as const,
+        cardStyle: styles.terrenoKpiYellow,
+        iconStyle: styles.terrenoKpiIconYellow,
+        iconColor: "#0f172a",
+      },
+      {
+        label: "En revisión por mí",
+        value: engineeringSummary.enRevisionMios,
+        icon: "account-clock-outline" as const,
+        cardStyle: styles.terrenoKpiBlue,
+        iconStyle: styles.terrenoKpiIconBlue,
+        iconColor: "#2563eb",
+      },
+      {
+        label: "Correcciones recibidas",
+        value: engineeringSummary.correccionesRecibidas,
+        icon: "file-document-refresh-outline" as const,
+        cardStyle: styles.terrenoKpiOrange,
+        iconStyle: styles.terrenoKpiIconOrange,
+        iconColor: "#ea580c",
+      },
+      {
+        label: "Validados por mí este mes",
+        value: engineeringSummary.validadosMes,
+        icon: "check-decagram-outline" as const,
+        cardStyle: styles.terrenoKpiGreen,
+        iconStyle: styles.terrenoKpiIconGreen,
+        iconColor: "#16a34a",
+      },
+    ];
+
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        edges={["top", "left", "right"]}
+      >
+        <View style={styles.fixedHeader}>
+          <View style={styles.supervisorWelcome}>
+            <View style={styles.supervisorWelcomeIcon}>
+              <MaterialCommunityIcons
+                name="clipboard-check-outline"
+                size={25}
+                color="#0f172a"
+              />
+            </View>
+            <View style={styles.terrenoWelcomeInfo}>
+              <Text style={styles.supervisorWelcomeEyebrow}>
+                Panel de Ingeniería
+              </Text>
+              <Text style={styles.supervisorWelcomeTitle}>
+                Hola, {userName.split(" ")[0] || "Ingeniería"}
+              </Text>
+              <Text style={styles.supervisorWelcomeSubtitle}>
+                Revisa, valida y da seguimiento a los registros recibidos.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {error ? (
+            <Card style={styles.errorCard}>
+              <Card.Content>
+                <Text style={styles.errorText}>{error}</Text>
+                <Button onPress={() => loadDashboard(true)}>Reintentar</Button>
+              </Card.Content>
+            </Card>
+          ) : null}
+
+          <View style={styles.kpiGrid}>
+            {engineeringMetrics.map((metric) => (
+              <Card
+                key={metric.label}
+                style={[
+                  styles.kpiCard,
+                  styles.terrenoKpiCard,
+                  metric.cardStyle,
+                ]}
+              >
+                <Card.Content style={styles.terrenoKpiContent}>
+                  <View style={[styles.terrenoKpiIcon, metric.iconStyle]}>
+                    <MaterialCommunityIcons
+                      name={metric.icon}
+                      size={21}
+                      color={metric.iconColor}
+                    />
+                  </View>
+                  <Text style={styles.kpiValue}>{metric.value}</Text>
+                  <Text style={styles.kpiLabel}>{metric.label}</Text>
+                </Card.Content>
+              </Card>
+            ))}
+          </View>
+
+          <Text style={styles.supervisorSectionLabel}>Mi actividad este mes</Text>
+          <View style={styles.kpiGrid}>
+            <Card
+              style={[
+                styles.kpiCard,
+                styles.terrenoKpiCard,
+                styles.terrenoKpiOrange,
+              ]}
+            >
+              <Card.Content style={styles.terrenoKpiContent}>
+                <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconOrange]}>
+                  <MaterialCommunityIcons
+                    name="close-octagon-outline"
+                    size={21}
+                    color="#ea580c"
+                  />
+                </View>
+                <Text style={styles.kpiValue}>{engineeringSummary.rechazadosMes}</Text>
+                <Text style={styles.kpiLabel}>Rechazados por mí</Text>
+              </Card.Content>
+            </Card>
+            <Card
+              style={[
+                styles.kpiCard,
+                styles.terrenoKpiCard,
+                styles.terrenoKpiPurple,
+              ]}
+            >
+              <Card.Content style={styles.terrenoKpiContent}>
+                <View style={[styles.terrenoKpiIcon, styles.terrenoKpiIconPurple]}>
+                  <MaterialCommunityIcons
+                    name="clipboard-check-multiple-outline"
+                    size={21}
+                    color="#7c3aed"
+                  />
+                </View>
+                <Text style={styles.kpiValue}>
+                  {engineeringSummary.revisionesResueltasMes}
+                </Text>
+                <Text style={styles.kpiLabel}>Revisiones resueltas</Text>
+              </Card.Content>
+            </Card>
+          </View>
+
+          <Button
+            mode="contained"
+            icon="clipboard-search-outline"
+            onPress={() => router.push("/ingenieria")}
+            buttonColor="#0f172a"
+            style={styles.supervisorMainButton}
+            contentStyle={styles.supervisorMainButtonContent}
+          >
+            Ir a revisión
+          </Button>
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   if (userRole === "administrador") {

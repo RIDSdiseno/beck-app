@@ -94,11 +94,12 @@ export type RegistroIngenieriaApi = {
 };
 
 export type IngenieriaResumen = {
-  pendientes: number;
-  enRevision: number;
-  validados: number;
-  rechazados: number;
-  total: number;
+  pendientesRevision: number;
+  enRevisionMios: number;
+  correccionesRecibidas: number;
+  validadosMes: number;
+  rechazadosMes: number;
+  revisionesResueltasMes: number;
 };
 
 export type ParametroInspeccion = {
@@ -207,6 +208,24 @@ export async function getIngenieriaRegistroById(
   const result = await readJsonResponse(response);
   if (!response.ok || !result?.success) {
     throw new Error(result?.error || "No se pudo obtener el registro");
+  }
+  return result.data as RegistroIngenieriaApi;
+}
+
+export async function iniciarRevisionIngenieria(
+  registroId: string,
+): Promise<RegistroIngenieriaApi> {
+  const token = await getToken();
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/ingenieria/registros/${registroId}/iniciar-revision`,
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudo iniciar la revisión");
   }
   return result.data as RegistroIngenieriaApi;
 }

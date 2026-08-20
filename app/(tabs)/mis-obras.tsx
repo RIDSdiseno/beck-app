@@ -4,7 +4,8 @@ import {
   ObraApi,
 } from "@/services/api/obrasApi";
 import { getSession, saveSelectedObra } from "@/services/auth/session";
-import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -67,6 +68,7 @@ function getEstadoBg(estado?: string | null) {
 
 export default function MisObrasScreen() {
   const insets = useSafeAreaInsets();
+  const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -118,16 +120,31 @@ export default function MisObrasScreen() {
     }
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
     const init = async () => {
-      setLoading(true);
-      const [session] = await Promise.all([getSession(), loadObras()]);
-      setIsAdmin(session.user?.rol === "administrador");
-      setLoading(false);
+      const shouldBlockScreen = !hasLoadedRef.current;
+      if (shouldBlockScreen) setLoading(true);
+      try {
+        const [session] = await Promise.all([getSession(), loadObras()]);
+        if (active) {
+          setIsAdmin(session.user?.rol === "administrador");
+        }
+      } finally {
+        if (active) {
+          hasLoadedRef.current = true;
+          if (shouldBlockScreen) setLoading(false);
+        }
+      }
     };
 
-    init();
-  }, [loadObras]);
+      void init();
+      return () => {
+        active = false;
+      };
+    }, [loadObras]),
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
