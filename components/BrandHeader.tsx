@@ -5,12 +5,14 @@ import { Text, Button } from "react-native-paper";
 type Props = {
   title?: string;
   subtitle?: string;
+  onBack?: () => void;
   onLogout?: () => void;
 };
 
 export const BrandHeader: React.FC<Props> = ({
   title = "BECK Soluciones",
   subtitle,
+  onBack,
   onLogout,
 }) => {
   return (
@@ -34,7 +36,20 @@ export const BrandHeader: React.FC<Props> = ({
           ) : null}
         </View>
       </View>
-      {onLogout ? (
+      {onBack ? (
+        <View style={styles.logoutWrapper}>
+          <Button
+            mode="text"
+            icon="chevron-left"
+            compact
+            labelStyle={styles.logoutLabel}
+            onPress={onBack}
+            accessibilityLabel="Volver a perfil"
+          >
+            Volver
+          </Button>
+        </View>
+      ) : onLogout ? (
         <View style={styles.logoutWrapper}>
           <Button
             mode="text"

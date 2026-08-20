@@ -1562,18 +1562,6 @@ export default function RegistrosScreen({
         icon="format-list-bulleted"
       />
 
-      {campoConfiguradoVisible("dimensiones") ? (
-        <TextInput
-          label="Dimensiones"
-          value={dimensiones}
-          onChangeText={setDimensiones}
-          mode="outlined"
-          placeholder="Ej: 60 mm"
-          maxLength={100}
-          style={styles.input}
-        />
-      ) : null}
-
       <Checkbox.Item
         label="Otras: escribir"
         status={otroItemizado ? "checked" : "unchecked"}
@@ -1587,6 +1575,18 @@ export default function RegistrosScreen({
           value={itemizadoBeck}
           onChangeText={setItemizadoBeck}
           mode="outlined"
+          style={styles.input}
+        />
+      ) : null}
+
+      {campoConfiguradoVisible("dimensiones") ? (
+        <TextInput
+          label="Dimensiones"
+          value={dimensiones}
+          onChangeText={setDimensiones}
+          mode="outlined"
+          placeholder="Ej: 60 mm"
+          maxLength={100}
           style={styles.input}
         />
       ) : null}

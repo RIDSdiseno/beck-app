@@ -17,6 +17,7 @@ import {
 } from "@/services/api/registrosApi";
 import { getSession, STORAGE_KEYS } from "@/services/auth/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
@@ -40,6 +41,7 @@ function isClienteItem(item: HistoryItem): item is RegistroCliente {
 }
 
 export default function HistorialScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const requestIdRef = useRef(0);
   const [role, setRole] = useState("");
@@ -159,7 +161,10 @@ export default function HistorialScreen() {
 
   const fixedHeader = (
     <View style={styles.fixedHeader}>
-      <BrandHeader subtitle="Registros realizados · BECK" />
+      <BrandHeader
+        subtitle="Registros realizados · BECK"
+        onBack={() => router.replace("/perfil")}
+      />
       <RegistroHistorySearch value={search} onChangeText={setSearch} />
       <View style={styles.filters}>
         <BeckDateFilter value={dateFilter} onChange={setDateFilter} compact containerStyle={styles.filter} />

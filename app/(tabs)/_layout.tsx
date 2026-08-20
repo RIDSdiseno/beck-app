@@ -69,17 +69,10 @@ export default function TabLayout() {
 
   const currentTab = String(segments[segments.length - 1] || "index");
   const restrictedTabs = new Set(["cotizaciones", "reportes"]);
-  const limitedRoleHiddenTabs = new Set(
-    userRole === "terreno" || userRole === "jefeobra" ? ["historial"] : [],
-  );
   const jefeObraHiddenTabs = new Set(["mis-obras"]);
 
   if (!canViewAllModules(userRole) && restrictedTabs.has(currentTab)) {
     return <Redirect href="/(tabs)" />;
-  }
-
-  if (!canViewAllModules(userRole) && limitedRoleHiddenTabs.has(currentTab)) {
-    return <Redirect href="/perfil" />;
   }
 
   if (userRole === "jefeobra" && jefeObraHiddenTabs.has(currentTab)) {
