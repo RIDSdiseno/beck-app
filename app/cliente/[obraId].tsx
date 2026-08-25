@@ -6,13 +6,10 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import { ActivityIndicator, Button, Chip, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import { formatTime24WithPeriod } from "@/utils/dateTime";
+import { formatDateOnly, formatTime24WithPeriod } from "@/utils/dateTime";
 
 function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "Sin fecha";
-  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+  return formatDateOnly(value, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function ClienteObraScreen() {

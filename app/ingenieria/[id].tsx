@@ -52,6 +52,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { TextInput } from "@/components/AppTextInput";
 import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { ExpandableImage } from "@/components/ExpandableImage";
+import { getAislacionLabel, getAplicacionLabel } from "@/utils/factoresRegistro";
 
 type FotoLocal = { uri: string; name: string; type: string };
 
@@ -635,9 +636,9 @@ export default function IngenieriaDetalleScreen() {
           {campoVisible("factorPorHolguras") ? <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} /> : null}
           {campoVisible("cieloModular") ? <InfoRow label="Accesibilidad" value={registro.accesibilidad} /> : null}
           {campoVisible("cantidadSellosConFactores") ? <InfoRow label="Sellos con factores" value={formatDecimal(registro.cantidad_sellos_con_factores)} /> : null}
-          {campoVisible("aislacion") ? <InfoRow label="Aislación" value={formatDecimal(registro.aislacion)} /> : null}
+          {campoVisible("aislacion") ? <InfoRow label="Aislación" value={getAislacionLabel(registro)} /> : null}
           {campoVisible("cantidadSellosAislacion") ? <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} /> : null}
-          {campoVisible("reparacionTabique") ? <InfoRow label="Reparación tabique" value={formatDecimal(registro.reparacion_tabique)} /> : null}
+          {campoVisible("reparacionTabique") ? <InfoRow label="Reparación tabique" value={getAplicacionLabel(registro.reparacion_tabique)} /> : null}
           {campoVisible("cantidadFinal") ? <InfoRow label="Cantidad final" value={formatDecimal(registro.cantidad_final)} /> : null}
           {campoVisible("observaciones") && registro.observaciones ? <InfoRow label="Observaciones" value={registro.observaciones} /> : null}
           {campoVisible("folio") ? <InfoRow label="Folio" value={registro.folio} /> : null}

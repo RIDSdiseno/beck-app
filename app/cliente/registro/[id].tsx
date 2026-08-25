@@ -25,14 +25,13 @@ import { ActivityIndicator, Button, Chip, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { BrandHeader } from "../../../components/BrandHeader";
+import { getAislacionLabel, getAplicacionLabel } from "../../../utils/factoresRegistro";
+import { formatDateOnly } from "../../../utils/dateTime";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
 function formatDate(value?: string | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
+  return formatDateOnly(value, { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function SectionTitle({ title }: { title: string }) {
@@ -446,9 +445,9 @@ export default function ClienteRegistroScreen() {
             <FieldRow label="Factor holgura"  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
             <FieldRow label="Accesibilidad"   value={campoVisible("cieloModular") ? registro.accesibilidad : null} />
             <FieldRow label="Sellos con factores" value={campoVisible("cantidadSellosConFactores") ? registro.cantidadSellosConFactores : null} />
-            <FieldRow label="Aislación" value={campoVisible("aislacion") ? registro.aislacion : null} />
+            <FieldRow label="Aislación" value={campoVisible("aislacion") ? getAislacionLabel(registro) : null} />
             <FieldRow label="Sellos aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />
-            <FieldRow label="Reparación tabique" value={campoVisible("reparacionTabique") ? registro.reparacionTabique : null} />
+            <FieldRow label="Reparación tabique" value={campoVisible("reparacionTabique") ? getAplicacionLabel(registro.reparacionTabique) : null} />
             <FieldRow label="Itemizado BECK"     value={campoVisible("itemizadoBeck") ? registro.itemizadoBeck : null} />
             <FieldRow label="Dimensiones" value={campoVisible("dimensiones") ? registro.dimensiones : null} />
             <FieldRow label="Itemizado mandante" value={campoVisible("itemizadoMandante") ? registro.itemizadoMandante : null} />

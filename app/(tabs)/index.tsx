@@ -5,7 +5,7 @@ import {
   ResumenSupervisorApi,
 } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
-import { formatTime24WithPeriod } from "@/utils/dateTime";
+import { formatDateOnly, formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Redirect, router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
@@ -34,15 +34,7 @@ import {
 } from "@/services/api/ingenieriaApi";
 
 function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sin fecha";
-
-  return date.toLocaleDateString("es-CL", {
-    day: "2-digit",
-    month: "short",
-  });
+  return formatDateOnly(value, { day: "2-digit", month: "short" });
 }
 
 function getRegistroKind(registro: RegistroHistorialApi) {

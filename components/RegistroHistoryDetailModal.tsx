@@ -3,6 +3,7 @@ import { getConfiguracionRegistro } from "@/services/api/obrasApi";
 import type { RegistroHistorialApi } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
+import { getAislacionLabel, getAplicacionLabel } from "@/utils/factoresRegistro";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -170,6 +171,7 @@ export function RegistroHistoryDetailModal({
         accesibilidad: registro.accesibilidad,
         cantidadConFactores: registro.cantidad_sellos_con_factores,
         aislacion: registro.aislacion,
+        aislacionAplica: registro.aislacion_aplica,
         cantidadAislacion: registro.cantidad_sellos_aislacion,
         reparacionTabique: registro.reparacion_tabique,
         cantidadFinal: registro.cantidad_final,
@@ -206,6 +208,7 @@ export function RegistroHistoryDetailModal({
       accesibilidad: registro.accesibilidad,
       cantidadConFactores: registro.cantidadSellosConFactores,
       aislacion: registro.aislacion,
+      aislacionAplica: registro.aislacionAplica,
       cantidadAislacion: registro.cantidadSellosAislacion,
       reparacionTabique: registro.reparacionTabique,
       cantidadFinal: registro.cantidadFinal,
@@ -313,9 +316,15 @@ export function RegistroHistoryDetailModal({
                     <DetailField label="Factor por holguras" value={detail.factorHolguras} />
                     <DetailField label="Accesibilidad" value={detail.accesibilidad} />
                     <DetailField label="Sellos con factores" value={detail.cantidadConFactores} />
-                    <DetailField label="Aislación" value={detail.aislacion} />
+                    <DetailField
+                      label="Aislación"
+                      value={getAislacionLabel({
+                        aislacion: detail.aislacion,
+                        aislacionAplica: detail.aislacionAplica,
+                      })}
+                    />
                     <DetailField label="Sellos por aislación" value={detail.cantidadAislacion} />
-                    <DetailField label="Reparación de tabique" value={detail.reparacionTabique} />
+                    <DetailField label="Reparación de tabique" value={getAplicacionLabel(detail.reparacionTabique)} />
                     <DetailField label="Cantidad final" value={detail.cantidadFinal} />
                   </>
                 )}

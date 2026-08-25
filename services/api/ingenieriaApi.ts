@@ -45,6 +45,7 @@ export type RegistroIngenieriaApi = {
   accesibilidad?: number | null;
   cielo_modular?: number | null;
   aislacion?: string | number | null;
+  aislacion_aplica?: boolean | null;
   cantidad_sellos_aislacion?: string | number | null;
   reparacion_tabique?: string | number | null;
   cantidad_final?: string | number | null;

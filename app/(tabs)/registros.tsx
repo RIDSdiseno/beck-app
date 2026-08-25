@@ -31,7 +31,9 @@ import { HOLGURA_OPTIONS } from "@/utils/holgura";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import {
   ACCESIBILIDAD_OPTIONS,
+  getAislacionLabel,
   getAislacionOption,
+  getAplicacionLabel,
 } from "@/utils/factoresRegistro";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -3462,9 +3464,9 @@ export default function RegistrosScreen({
                         <RegistroDetailField label="Factor por holguras" value={selectedTecnicoRegistro.factor_por_holguras} />
                         <RegistroDetailField label="Accesibilidad" value={selectedTecnicoRegistro.accesibilidad} />
                         <RegistroDetailField label="Sellos con factores" value={selectedTecnicoRegistro.cantidad_sellos_con_factores} />
-                        <RegistroDetailField label="Aislación" value={selectedTecnicoRegistro.aislacion} />
+                        <RegistroDetailField label="Aislación" value={getAislacionLabel(selectedTecnicoRegistro)} />
                         <RegistroDetailField label="Sellos por aislación" value={selectedTecnicoRegistro.cantidad_sellos_aislacion} />
-                        <RegistroDetailField label="Reparación de tabique" value={selectedTecnicoRegistro.reparacion_tabique} />
+                        <RegistroDetailField label="Reparación de tabique" value={getAplicacionLabel(selectedTecnicoRegistro.reparacion_tabique)} />
                         <RegistroDetailField label="Cantidad final" value={selectedTecnicoRegistro.cantidad_final} />
                       </>
                     )}

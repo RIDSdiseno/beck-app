@@ -51,6 +51,7 @@ export type RegistroCliente = {
   accesibilidad: number | null;
   cantidadSellosConFactores: number | null;
   aislacion: number | null;
+  aislacionAplica?: boolean | null;
   cantidadSellosAislacion: number | null;
   reparacionTabique: number | null;
   folio: string | null;

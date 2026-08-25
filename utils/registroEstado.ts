@@ -1,5 +1,5 @@
 import type { RegistroHistorialApi } from "@/services/api/registrosApi";
-import { formatTime24WithPeriod } from "@/utils/dateTime";
+import { formatDateOnly, formatTime24WithPeriod } from "@/utils/dateTime";
 
 export const estadoColor = {
   pendiente: "#f59e0b",
@@ -24,16 +24,7 @@ export function getEstadoLabel(estado: RegistroHistorialApi["estado"]) {
 }
 
 export function formatShortDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sin fecha";
-
-  return date.toLocaleDateString("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDateOnly(value);
 }
 
 export function formatDateTime(value?: string | null) {
