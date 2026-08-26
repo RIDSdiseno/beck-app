@@ -146,7 +146,7 @@ export async function associateFirematBarcode(payload: {
 export async function createFirematScanReception(payload: {
   recepcionId: string;
   motivo: string;
-  items: Array<{ codigo: string; cantidadEscaneos: number }>;
+  items: { codigo: string; cantidadEscaneos: number; unidadesIngresadas?: number }[];
 }) {
   const data = await request("/inventario/recepciones", {
     method: "POST",

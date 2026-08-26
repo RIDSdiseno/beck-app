@@ -9,7 +9,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import {
   Alert,
@@ -28,6 +28,7 @@ type CartItem = {
   producto: FirematProducto;
   unidadesPorEscaneo: number;
   cantidadEscaneos: number;
+  unidadesIngresadas: number;
 };
 
 type PendingAssociation = {
@@ -51,6 +52,7 @@ export default function FirematScannerScreen() {
   const [motivo, setMotivo] = React.useState("Recepción de mercadería");
   const [saving, setSaving] = React.useState(false);
   const receptionId = React.useRef(createReceptionId());
+  const scanLockRef = React.useRef(false);
 
   const [pending, setPending] = React.useState<PendingAssociation | null>(null);
   const [selectedProduct, setSelectedProduct] = React.useState<FirematProducto | null>(null);
@@ -60,10 +62,40 @@ export default function FirematScannerScreen() {
   const [productOptions, setProductOptions] = React.useState<FirematProducto[]>([]);
   const [loadingProducts, setLoadingProducts] = React.useState(false);
   const [associating, setAssociating] = React.useState(false);
+  const [editingItem, setEditingItem] = React.useState<CartItem | null>(null);
+  const [editedUnits, setEditedUnits] = React.useState("");
+
+  const resetReception = React.useCallback(() => {
+    scanLockRef.current = false;
+    receptionId.current = createReceptionId();
+    setScanEnabled(true);
+    setLookingUp(false);
+    setTorch(false);
+    setLastMessage("Apunta al código de barras de una caja");
+    setCart({});
+    setMotivo("Recepción de mercadería");
+    setSaving(false);
+    setPending(null);
+    setSelectedProduct(null);
+    setUnits("1");
+    setShowProductPicker(false);
+    setProductQuery("");
+    setProductOptions([]);
+    setLoadingProducts(false);
+    setAssociating(false);
+    setEditingItem(null);
+    setEditedUnits("");
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      resetReception();
+    }, [resetReception]),
+  );
 
   const cartItems = React.useMemo(() => Object.values(cart), [cart]);
   const totalUnits = React.useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.cantidadEscaneos * item.unidadesPorEscaneo, 0),
+    () => cartItems.reduce((sum, item) => sum + item.unidadesIngresadas, 0),
     [cartItems],
   );
 
@@ -93,6 +125,7 @@ export default function FirematScannerScreen() {
             producto,
             unidadesPorEscaneo,
             cantidadEscaneos: (existing?.cantidadEscaneos ?? 0) + 1,
+            unidadesIngresadas: (existing?.unidadesIngresadas ?? 0) + unidadesPorEscaneo,
           },
         };
       });
@@ -104,7 +137,8 @@ export default function FirematScannerScreen() {
 
   const handleBarcode = React.useCallback(
     async ({ data }: BarcodeScanningResult) => {
-      if (!scanEnabled || lookingUp) return;
+      if (scanLockRef.current || !scanEnabled || lookingUp) return;
+      scanLockRef.current = true;
       setScanEnabled(false);
       setLookingUp(true);
       try {
@@ -127,6 +161,7 @@ export default function FirematScannerScreen() {
         setLastMessage(candidate ? "Confirma el producto y contenido de la caja" : "Código nuevo: selecciona su producto");
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       } catch (error) {
+        scanLockRef.current = false;
         setScanEnabled(true);
         Alert.alert("No se pudo leer la etiqueta", error instanceof Error ? error.message : "Error desconocido");
       } finally {
@@ -137,6 +172,7 @@ export default function FirematScannerScreen() {
   );
 
   const closeAssociation = () => {
+    scanLockRef.current = false;
     setPending(null);
     setSelectedProduct(null);
     setShowProductPicker(false);
@@ -179,11 +215,61 @@ export default function FirematScannerScreen() {
         delete next[codigo];
         return next;
       }
-      return { ...current, [codigo]: { ...item, cantidadEscaneos: nextCount } };
+      return {
+        ...current,
+        [codigo]: {
+          ...item,
+          cantidadEscaneos: nextCount,
+          unidadesIngresadas: Math.max(1, item.unidadesIngresadas + delta * item.unidadesPorEscaneo),
+        },
+      };
     });
   };
 
+  const openUnitsEditor = (item: CartItem) => {
+    setEditingItem(item);
+    setEditedUnits(String(item.unidadesIngresadas));
+  };
+
+  const saveEditedUnits = () => {
+    const parsed = Number(editedUnits);
+    if (!editingItem || !Number.isSafeInteger(parsed) || parsed <= 0 || parsed > 1_000_000) {
+      Alert.alert("Cantidad inválida", "Ingresa una cantidad de unidades mayor que cero.");
+      return;
+    }
+    setCart((current) => {
+      const item = current[editingItem.codigo];
+      if (!item) return current;
+      return { ...current, [editingItem.codigo]: { ...item, unidadesIngresadas: parsed } };
+    });
+    setEditingItem(null);
+    setEditedUnits("");
+  };
+
+  const removeCartItem = (item: CartItem) => {
+    Alert.alert(
+      "Eliminar producto",
+      `${item.producto.nombre} y sus cajas se quitarán de esta recepción.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            setCart((current) => {
+              const next = { ...current };
+              delete next[item.codigo];
+              return next;
+            });
+            setLastMessage(`${item.producto.nombre}: eliminado de la recepción`);
+          },
+        },
+      ],
+    );
+  };
+
   const enableNextScan = () => {
+    scanLockRef.current = false;
     setScanEnabled(true);
     setLastMessage("Apunta a la siguiente caja");
   };
@@ -206,6 +292,7 @@ export default function FirematScannerScreen() {
                 items: cartItems.map((item) => ({
                   codigo: item.codigo,
                   cantidadEscaneos: item.cantidadEscaneos,
+                  unidadesIngresadas: item.unidadesIngresadas,
                 })),
               });
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -284,10 +371,27 @@ export default function FirematScannerScreen() {
 
         {cartItems.length ? cartItems.map((item) => (
           <View key={item.codigo} style={styles.cartCard}>
-            <View style={styles.cartInfo}>
-              <Text style={styles.productName}>{item.producto.nombre}</Text>
-              <Text style={styles.productMeta}>SKU {item.producto.sku} · {item.unidadesPorEscaneo} por caja</Text>
-              <Text style={styles.productMeta}>Código {item.codigo}</Text>
+            <View style={styles.cartTopRow}>
+              <View style={styles.cartInfo}>
+                <Text style={styles.productName}>{item.producto.nombre}</Text>
+                <Text style={styles.productMeta}>SKU {item.producto.sku} · {item.unidadesPorEscaneo} por caja</Text>
+                <Text style={styles.productMeta}>Código {item.codigo}</Text>
+                <View style={styles.currentStockRow}>
+                  <MaterialCommunityIcons name="warehouse" size={16} color="#fbbf24" />
+                  <Text style={styles.currentStockText}>
+                    Stock actual: {item.producto.stockActual} unidades
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Eliminar ${item.producto.nombre} de la recepción`}
+                onPress={() => removeCartItem(item)}
+                style={styles.deleteButton}
+                hitSlop={8}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={21} color="#fca5a5" />
+              </TouchableOpacity>
             </View>
             <View style={styles.counter}>
               <TouchableOpacity onPress={() => changeScanCount(item.codigo, -1)} style={styles.counterButton}>
@@ -301,7 +405,18 @@ export default function FirematScannerScreen() {
                 <MaterialCommunityIcons name="plus" size={20} color="#ffffff" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.lineTotal}>+{item.cantidadEscaneos * item.unidadesPorEscaneo} unidades</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Editar unidades a ingresar de ${item.producto.nombre}`}
+              onPress={() => openUnitsEditor(item)}
+              style={styles.unitsEditorButton}
+            >
+              <View>
+                <Text style={styles.unitsEditorLabel}>Unidades a ingresar</Text>
+                <Text style={styles.lineTotal}>+{item.unidadesIngresadas} unidades</Text>
+              </View>
+              <MaterialCommunityIcons name="pencil-outline" size={20} color="#ef4444" />
+            </TouchableOpacity>
           </View>
         )) : <Text style={styles.empty}>Aún no has escaneado ninguna caja.</Text>}
 
@@ -321,6 +436,37 @@ export default function FirematScannerScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={Boolean(editingItem)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingItem(null)}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={styles.editModalCard}>
+            <Text style={styles.modalTitle}>Editar unidades de esta entrada</Text>
+            <Text style={styles.editModalProduct}>{editingItem?.producto.nombre}</Text>
+            <Text style={styles.help}>
+              La caja normalmente contiene {editingItem?.unidadesPorEscaneo ?? 0} unidades. Este ajuste solo se aplicará a la recepción actual.
+            </Text>
+            <TextInput
+              label="Unidades reales a ingresar"
+              value={editedUnits}
+              onChangeText={setEditedUnits}
+              keyboardType="number-pad"
+              mode="outlined"
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+              autoFocus
+            />
+            <View style={styles.editModalActions}>
+              <Button textColor="#d4d4d4" onPress={() => setEditingItem(null)}>Cancelar</Button>
+              <Button mode="contained" buttonColor="#dc2626" onPress={saveEditedUnits}>Guardar</Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={Boolean(pending)} transparent animationType="slide" onRequestClose={closeAssociation}>
         <View style={styles.modalOverlay}>
@@ -414,11 +560,17 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 14, marginBottom: 10 },
   sectionTitle: { color: "#ffffff", fontSize: 18, fontWeight: "800" }, sectionTotal: { color: "#ef4444", fontWeight: "800" },
   cartCard: { backgroundColor: "#171717", borderWidth: 1, borderColor: "#303030", borderRadius: 18, padding: 14, marginBottom: 10 },
-  cartInfo: { marginBottom: 12 }, productName: { color: "#ffffff", fontWeight: "800" }, productMeta: { color: "#a3a3a3", marginTop: 3, fontSize: 12 },
+  cartTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 12 },
+  cartInfo: { flex: 1, minWidth: 0 }, productName: { color: "#ffffff", fontWeight: "800" }, productMeta: { color: "#a3a3a3", marginTop: 3, fontSize: 12 },
+  deleteButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#450a0a", borderWidth: 1, borderColor: "#991b1b", alignItems: "center", justifyContent: "center" },
+  currentStockRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
+  currentStockText: { color: "#fbbf24", fontSize: 12, fontWeight: "800", flex: 1 },
   counter: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16 },
   counterButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#2d2d2d", alignItems: "center", justifyContent: "center" },
   counterValue: { minWidth: 64, alignItems: "center" }, counterNumber: { color: "#ffffff", fontSize: 22, fontWeight: "900" }, counterLabel: { color: "#a3a3a3", fontSize: 11 },
   lineTotal: { color: "#4ade80", fontWeight: "800", textAlign: "right", marginTop: 8 },
+  unitsEditorButton: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 8 },
+  unitsEditorLabel: { color: "#a3a3a3", fontSize: 11, textAlign: "right" },
   empty: { color: "#737373", textAlign: "center", paddingVertical: 28 },
   input: { backgroundColor: "#202020", marginTop: 12 }, inputOutline: { borderRadius: 16 },
   saveButton: { borderRadius: 16, marginTop: 14 },
@@ -432,4 +584,8 @@ const styles = StyleSheet.create({
   pickerArea: { height: 300 }, search: { backgroundColor: "#202020", borderWidth: 1, borderColor: "#404040" }, searchInput: { color: "#ffffff" },
   productLoader: { marginTop: 30 }, productList: { marginTop: 8 }, productOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#303030" },
   help: { color: "#a3a3a3", fontSize: 12, marginTop: 8 },
+  editModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", padding: 22 },
+  editModalCard: { width: "100%", maxWidth: 430, backgroundColor: "#171717", borderRadius: 22, padding: 18, borderWidth: 1, borderColor: "#303030" },
+  editModalProduct: { color: "#ffffff", fontWeight: "800", marginTop: 8 },
+  editModalActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8, marginTop: 18 },
 });
