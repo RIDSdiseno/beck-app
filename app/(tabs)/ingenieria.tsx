@@ -1,12 +1,12 @@
 import {
-  getIngenieriaRegistros,
+  getIngenieriaRegistrosPage,
   RegistroIngenieriaApi,
 } from "@/services/api/ingenieriaApi";
 import { getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -28,7 +28,7 @@ import { SelectSheet } from "../../components/SelectSheet";
 
 const ACCENT = "#f97316";
 
-type FiltroEstado = "todos" | "pendiente" | "en_revision" | "validado" | "rechazado";
+type FiltroEstado = "todos" | "en_revision" | "validado" | "rechazado";
 
 const FILTROS: {
   label: string;
@@ -36,7 +36,6 @@ const FILTROS: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
   { label: "Todos", value: "todos", icon: "view-grid-outline" },
-  { label: "Pendientes", value: "pendiente", icon: "clipboard-clock-outline" },
   { label: "En revisión", value: "en_revision", icon: "clock-outline" },
   { label: "Validados", value: "validado", icon: "check-circle-outline" },
   { label: "Rechazados", value: "rechazado", icon: "alert-circle-outline" },
@@ -44,21 +43,6 @@ const FILTROS: {
 
 function getTipoLabel(tipo: string) {
   return tipo === "junta_lineal_espuma" ? "Junta Lineal" : "Sello";
-}
-
-function matchesSearch(registro: RegistroIngenieriaApi, search: string) {
-  const query = search.trim().toLowerCase();
-  if (!query) return true;
-  return [
-    registro.numero_sello,
-    registro.nombre_sellador,
-    registro.usuario?.nombre,
-    registro.piso,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
 }
 
 export default function IngenieriaScreen() {
@@ -72,15 +56,84 @@ export default function IngenieriaScreen() {
   const [obraFiltro, setObraFiltro] = useState<string>("todas");
   const [fechaFiltro, setFechaFiltro] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [obras, setObras] = useState<
+    { id: string; nombre: string; codigo?: string | null }[]
+  >([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
+  const queryVersionRef = useRef(0);
+  const [filterCounts, setFilterCounts] = useState({
+    todos: 0,
+    en_revision: 0,
+    validado: 0,
+    rechazado: 0,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadData = useCallback(async (forceRefresh = false) => {
+    void forceRefresh;
+    const queryVersion = ++queryVersionRef.current;
     try {
       setError("");
-      setRegistros(await getIngenieriaRegistros({ limit: 100 }));
+      setNextCursor(null);
+      const page = await getIngenieriaRegistrosPage({
+        estado: filtroEstado,
+        obraId: obraFiltro,
+        fecha: fechaFiltro,
+        search: debouncedSearch,
+        limit: 30,
+      });
+      if (queryVersionRef.current !== queryVersion) return;
+      setRegistros(page.items);
+      setNextCursor(page.nextCursor);
+      setFilterCounts(page.counts);
+      setObras(page.obras);
     } catch (err: any) {
-      setError(err?.message || "No se pudo cargar el módulo de ingeniería");
+      if (queryVersionRef.current === queryVersion) {
+        setError(err?.message || "No se pudo cargar el módulo de ingeniería");
+      }
     }
-  }, []);
+  }, [debouncedSearch, fechaFiltro, filtroEstado, obraFiltro]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMoreRef.current) return;
+
+    const queryVersion = queryVersionRef.current;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const page = await getIngenieriaRegistrosPage({
+        estado: filtroEstado,
+        obraId: obraFiltro,
+        fecha: fechaFiltro,
+        search: debouncedSearch,
+        cursor: nextCursor,
+        limit: 30,
+      });
+      if (queryVersionRef.current !== queryVersion) return;
+      setRegistros((current) => {
+        const ids = new Set(current.map((registro) => registro.id));
+        return [
+          ...current,
+          ...page.items.filter((registro) => !ids.has(registro.id)),
+        ];
+      });
+      setNextCursor(page.nextCursor);
+      setFilterCounts(page.counts);
+      setObras(page.obras);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron cargar más registros");
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [debouncedSearch, fechaFiltro, filtroEstado, nextCursor, obraFiltro]);
 
   useFocusEffect(
     useCallback(() => {
@@ -98,41 +151,6 @@ export default function IngenieriaScreen() {
       return () => { active = false; };
     }, [loadData]),
   );
-
-  const obras = useMemo(() => {
-    const map = new Map<string, string>();
-    registros.forEach((r) => {
-      if (r.obra?.id && r.obra?.nombre) {
-        map.set(r.obra.id, r.obra.nombre);
-      }
-    });
-    return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }));
-  }, [registros]);
-
-  const filtered = useMemo(() => {
-    return registros.filter((r) => {
-      if (filtroEstado !== "todos" && r.estado !== filtroEstado) return false;
-      if (obraFiltro !== "todas" && r.obra_id !== obraFiltro) return false;
-      if (fechaFiltro && r.fecha.slice(0, 10) !== fechaFiltro) return false;
-      return matchesSearch(r, search);
-    });
-  }, [registros, filtroEstado, obraFiltro, fechaFiltro, search]);
-
-  const filterCounts = useMemo(() => {
-    const base = registros.filter(
-      (registro) =>
-        (obraFiltro === "todas" || registro.obra_id === obraFiltro) &&
-        (!fechaFiltro || registro.fecha.slice(0, 10) === fechaFiltro) &&
-        matchesSearch(registro, search),
-    );
-    return {
-      todos: base.length,
-      pendiente: base.filter((registro) => registro.estado === "pendiente").length,
-      en_revision: base.filter((registro) => registro.estado === "en_revision").length,
-      validado: base.filter((registro) => registro.estado === "validado").length,
-      rechazado: base.filter((registro) => registro.estado === "rechazado").length,
-    };
-  }, [fechaFiltro, obraFiltro, registros, search]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -154,7 +172,7 @@ export default function IngenieriaScreen() {
       <BrandHeader subtitle="Procesamiento · Ingeniería" />
 
       <BeckSearchInput
-        placeholder="Buscar por responsable, N° de sello o piso"
+        placeholder="Buscar por registro, responsable, sello, piso o eje"
         value={search}
         onChangeText={setSearch}
       />
@@ -220,10 +238,20 @@ export default function IngenieriaScreen() {
     >
       <View style={styles.fixedHeader}>{renderHeader()}</View>
       <FlatList
-        data={filtered}
+        data={registros}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onEndReached={() => void loadMore()}
+        onEndReachedThreshold={0.35}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator color={ACCENT} />
+              <Text style={styles.helper}>Cargando más registros...</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="clipboard-check-outline" size={40} color="#cbd5e1" />
@@ -331,6 +359,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100 },
+  loadingMore: { alignItems: "center", paddingVertical: 18 },
   center: {
     flex: 1,
     backgroundColor: "#f5f7fb",

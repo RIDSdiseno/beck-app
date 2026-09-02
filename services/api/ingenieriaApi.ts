@@ -103,6 +103,19 @@ export type IngenieriaResumen = {
   revisionesResueltasMes: number;
 };
 
+export type IngenieriaRegistrosPage = {
+  items: RegistroIngenieriaApi[];
+  total: number;
+  nextCursor: string | null;
+  counts: {
+    todos: number;
+    en_revision: number;
+    validado: number;
+    rechazado: number;
+  };
+  obras: { id: string; nombre: string; codigo?: string | null }[];
+};
+
 export type ParametroInspeccion = {
   orden: number;
   parametro: string;
@@ -196,6 +209,38 @@ export async function getIngenieriaRegistros(params?: {
     throw new Error(result?.error || "No se pudieron obtener los registros");
   }
   return result.data as RegistroIngenieriaApi[];
+}
+
+export async function getIngenieriaRegistrosPage(params?: {
+  estado?: "en_revision" | "validado" | "rechazado" | "todos";
+  obraId?: string;
+  fecha?: string;
+  search?: string;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<IngenieriaRegistrosPage> {
+  const token = await getToken();
+  const query = new URLSearchParams({ paginated: "true" });
+  if (params?.estado && params.estado !== "todos") {
+    query.set("estado", params.estado);
+  }
+  if (params?.obraId && params.obraId !== "todas") {
+    query.set("obraId", params.obraId);
+  }
+  if (params?.fecha) query.set("fecha", params.fecha);
+  if (params?.search?.trim()) query.set("search", params.search.trim());
+  if (params?.cursor) query.set("cursor", params.cursor);
+  if (params?.limit) query.set("limit", String(params.limit));
+
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/ingenieria/registros?${query.toString()}`,
+    { method: "GET", headers: { Authorization: `Bearer ${token}` } },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudieron obtener los registros");
+  }
+  return result.data as IngenieriaRegistrosPage;
 }
 
 export async function getIngenieriaRegistroById(
