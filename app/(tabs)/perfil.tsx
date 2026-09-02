@@ -13,10 +13,7 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Avatar, Button, Text } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { RegistroHistoryDetailModal } from "../../components/RegistroHistoryDetailModal";
 import { RegistroHistoryCard } from "../../components/RegistroHistoryCard";
@@ -107,7 +104,6 @@ function ProfileAction({ icon, label, onPress, beckStyle = false }: ProfileActio
 }
 
 export default function PerfilScreen() {
-  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [registros] = useState<RegistroHistorialApi[]>([]);
   const [historialCliente] = useState<RegistroCliente[]>([]);
@@ -229,7 +225,7 @@ export default function PerfilScreen() {
     return (
       <>
         <SafeAreaView
-          style={[styles.container, { paddingTop: insets.top + 2 }]}
+          style={[styles.container, { paddingTop: 2 }]}
           edges={["top", "left", "right"]}
         >
           <View style={styles.fixedHeader}>
@@ -339,7 +335,7 @@ export default function PerfilScreen() {
     return (
       <>
       <SafeAreaView
-        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        style={[styles.container, { paddingTop: 2 }]}
         edges={["top", "left", "right"]}
       >
         {isFixedHistoryHeader ? (
@@ -452,7 +448,7 @@ export default function PerfilScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       {isFixedProfileHeader ? (

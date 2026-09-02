@@ -229,6 +229,23 @@ export default function TabLayout() {
                 options={{ title: "Mi actividad", href: null }}
               />
               <Tabs.Screen
+                name="inventario-beck"
+                options={{
+                  title: userRole === "terreno" ? "Mi equipo" : "Inventario",
+                  href:
+                    userRole === "terreno" || userRole === "jefeobra"
+                      ? undefined
+                      : null,
+                  tabBarIcon: ({ color, size }) => (
+                    <MaterialCommunityIcons
+                      name={userRole === "terreno" ? "account-hard-hat" : "toolbox-outline"}
+                      color={color}
+                      size={size}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
                 name="perfil"
                 options={{
                   title: "Perfil",

@@ -22,7 +22,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type HistoryItem = RegistroHistorialApi | RegistroCliente;
 type ObraOption = { value: string; label: string };
@@ -43,7 +43,6 @@ function isClienteItem(item: HistoryItem): item is RegistroCliente {
 
 export default function HistorialScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const requestIdRef = useRef(0);
   const [role, setRole] = useState("");
   const [ready, setReady] = useState(false);
@@ -199,7 +198,7 @@ export default function HistorialScreen() {
 
   return (
     <>
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+      <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
         {fixedHeader}
         {loading && !items.length ? (
           <View style={styles.center}><ActivityIndicator size="large" color="#f97316" /><Text style={styles.helper}>Cargando historial...</Text></View>

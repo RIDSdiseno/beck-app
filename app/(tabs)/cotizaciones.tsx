@@ -2,10 +2,7 @@ import dayjs from "dayjs";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Card, Chip, DataTable, Text } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { BrandHeader } from "../../components/BrandHeader";
 
@@ -88,7 +85,6 @@ export default function CotizacionesScreen() {
   >();
   const [filtroOrigen, setFiltroOrigen] = useState<string | undefined>();
   const [filtroTipo, setFiltroTipo] = useState<TipoCotizacion | undefined>();
-  const insets = useSafeAreaInsets();
 
   const filtradas = useMemo(() => {
     return data.filter((c) => {
@@ -142,7 +138,7 @@ export default function CotizacionesScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       <ScrollView

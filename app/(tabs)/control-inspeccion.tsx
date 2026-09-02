@@ -6,11 +6,10 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Button, Card, Text } from "react-native-paper";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 
 export default function ControlInspeccionScreen() {
-  const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -75,7 +74,7 @@ export default function ControlInspeccionScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       <View style={styles.fixedHeader}>

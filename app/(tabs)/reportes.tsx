@@ -8,10 +8,7 @@ import {
 } from "react-native";
 import { BarChart, PieChart } from "react-native-chart-kit";
 import { Card, Chip, DataTable, Text } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { useRegistros } from "../../context/RegistrosContext";
 
@@ -55,7 +52,6 @@ const screenWidth = Dimensions.get("window").width - 48;
 
 export default function ReportesScreen() {
   const { registros } = useRegistros();
-  const insets = useSafeAreaInsets();
 
   const stats = useMemo(() => {
     const totalSellos = registros.length;
@@ -107,7 +103,7 @@ export default function ReportesScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       <ScrollView

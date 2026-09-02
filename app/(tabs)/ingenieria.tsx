@@ -20,7 +20,7 @@ import {
   Card,
   Text,
 } from "react-native-paper";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { BeckSearchInput } from "../../components/BeckSearchInput";
 import { BeckDateFilter } from "../../components/BeckDateFilter";
@@ -46,7 +46,6 @@ function getTipoLabel(tipo: string) {
 }
 
 export default function IngenieriaScreen() {
-  const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -233,7 +232,7 @@ export default function IngenieriaScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       <View style={styles.fixedHeader}>{renderHeader()}</View>

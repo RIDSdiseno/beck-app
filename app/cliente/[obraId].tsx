@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Chip, Text } from "react-native-paper";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { formatDateOnly, formatTime24WithPeriod } from "@/utils/dateTime";
 
@@ -13,7 +13,6 @@ function formatDate(value?: string | null) {
 }
 
 export default function ClienteObraScreen() {
-  const insets = useSafeAreaInsets();
   const { obraId } = useLocalSearchParams<{ obraId: string }>();
 
   const [registros, setRegistros] = useState<RegistroCliente[]>([]);
@@ -60,7 +59,7 @@ export default function ClienteObraScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
       <View style={styles.fixedHeader}>
         <View style={styles.headerRow}>
           <BrandHeader subtitle="Registros pendientes · BECK" />

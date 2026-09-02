@@ -22,10 +22,7 @@ import {
   Chip,
   Text,
 } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { AdminResumen, getAdminResumen } from "@/services/api/adminApi";
 import {
@@ -73,7 +70,6 @@ const EMPTY_ENGINEERING_SUMMARY: IngenieriaResumen = {
 };
 
 export default function DashboardScreen() {
-  const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -254,7 +250,7 @@ export default function DashboardScreen() {
 
     return (
       <SafeAreaView
-        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        style={[styles.container, { paddingTop: 2 }]}
         edges={["top", "left", "right"]}
       >
         <View style={styles.fixedHeader}>
@@ -387,7 +383,7 @@ export default function DashboardScreen() {
       { label: "Validados", value: adminSummary.validados, icon: "check-decagram-outline" as const, style: styles.summaryGreen },
     ];
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+      <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
         <View style={styles.fixedHeader}>
           <View style={styles.supervisorWelcome}>
             <View style={styles.supervisorWelcomeIcon}>
@@ -434,7 +430,7 @@ export default function DashboardScreen() {
   if (userRole === "jefeobra") {
     return (
       <SafeAreaView
-        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        style={[styles.container, { paddingTop: 2 }]}
         edges={["top", "left", "right"]}
       >
         <View style={styles.fixedHeader}>
@@ -606,7 +602,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       {userRole === "terreno" ? (

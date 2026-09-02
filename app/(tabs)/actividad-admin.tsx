@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Card, Text } from "react-native-paper";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODULOS = [
   { value: "operario", label: "Operario" },
@@ -30,7 +30,6 @@ function formatDate(value: string) {
 
 export default function ActividadAdminScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const requestRef = useRef(0);
   const [items, setItems] = useState<ActividadAdministrador[]>([]);
   const [search, setSearch] = useState("");
@@ -78,7 +77,7 @@ export default function ActividadAdminScreen() {
   }, [fecha, modulo, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
       <View style={styles.fixedHeader}>
         <BrandHeader subtitle="Mi actividad · Administración" onBack={() => router.replace("/perfil")} />
         <BeckSearchInput placeholder="Buscar acción o módulo" value={search} onChangeText={setSearch} />

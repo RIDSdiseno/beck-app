@@ -352,7 +352,7 @@ export default function ClienteRegistroScreen() {
 
   if (error || !registro) {
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top + 14 }]} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { paddingTop: 14 }]} edges={["top"]}>
         <View style={styles.errorState}>
           <Text style={styles.errorText}>{error || "Registro no encontrado"}</Text>
           <Button mode="contained" onPress={() => router.back()}>Volver</Button>
@@ -367,7 +367,7 @@ export default function ClienteRegistroScreen() {
 
   return (
     <>
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+      <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerRow}>

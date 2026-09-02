@@ -199,7 +199,7 @@ export default function ControlInspeccionDetalleScreen() {
   const parametros = control.controles_inspeccion_parametros || [];
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 8 }]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { paddingTop: 8 }]} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#0f172a" />

@@ -4,7 +4,7 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { BeckFilterPanel } from "../../components/BeckFilterPanel";
 
@@ -21,7 +21,6 @@ const CLIENTE_OBRA_FILTERS: {
 ];
 
 export default function ClienteScreen() {
-  const insets = useSafeAreaInsets();
   const [obras, setObras] = useState<ObraCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -87,7 +86,7 @@ export default function ClienteScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 2 }]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
       <View style={styles.fixedHeader}>
         <BrandHeader subtitle="Validación · BECK" />
         <Text variant="titleLarge" style={styles.title}>Mis Obras</Text>

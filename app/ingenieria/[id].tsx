@@ -538,7 +538,7 @@ export default function IngenieriaDetalleScreen() {
   const esEnRevision = registro.estado === "en_revision";
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#0f172a" />

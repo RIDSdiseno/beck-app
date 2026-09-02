@@ -15,10 +15,7 @@ import {
   Text,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { BeckFilterPanel } from "@/components/BeckFilterPanel";
 import { BrandHeader } from "../../components/BrandHeader";
@@ -67,7 +64,6 @@ function getEstadoBg(estado?: string | null) {
 }
 
 export default function MisObrasScreen() {
-  const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -280,7 +276,7 @@ export default function MisObrasScreen() {
   if (!obras.length) {
     return (
       <SafeAreaView
-        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        style={[styles.container, { paddingTop: 2 }]}
         edges={["top", "left", "right"]}
       >
         <View style={styles.fixedHeader}>{renderHeader()}</View>
@@ -308,7 +304,7 @@ export default function MisObrasScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       <View style={styles.fixedHeader}>{renderHeader()}</View>

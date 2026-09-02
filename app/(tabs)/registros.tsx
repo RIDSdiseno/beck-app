@@ -59,10 +59,7 @@ import {
   SegmentedButtons,
   Text,
 } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
 import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { BeckFilterPanel } from "@/components/BeckFilterPanel";
@@ -411,7 +408,6 @@ export default function RegistrosScreen({
   onChangeObra,
   operationalRole,
 }: RegistrosScreenProps = {}) {
-  const insets = useSafeAreaInsets();
   const [obra, setObra] = useState<ObraSeleccionada | null>(initialObra);
   const [currentUserName, setCurrentUserName] = useState("");
   const [sessionRole, setSessionRole] = useState("");
@@ -1961,7 +1957,7 @@ export default function RegistrosScreen({
   if (userRole === "jefeobra") {
     return (
       <SafeAreaView
-        style={[styles.container, { paddingTop: insets.top + 2 }]}
+        style={[styles.container, { paddingTop: 2 }]}
         edges={["top", "left", "right"]}
       >
         {isJefeObraObrasList ? (
@@ -2685,7 +2681,7 @@ export default function RegistrosScreen({
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: insets.top + 2 }]}
+      style={[styles.container, { paddingTop: 2 }]}
       edges={["top", "left", "right"]}
     >
       {isTerrenoRegistroList ? (
