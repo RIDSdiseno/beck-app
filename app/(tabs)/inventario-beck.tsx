@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -605,10 +607,11 @@ export default function InventarioBeckScreen() {
       )}
 
       <Modal visible={asignacionOpen} animationType="slide" transparent onRequestClose={() => !saving && setAsignacionOpen(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => !saving && setAsignacionOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHandle} />
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={styles.keyboardAvoider} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <Pressable style={styles.modalOverlay} onPress={() => !saving && setAsignacionOpen(false)}>
+            <Pressable style={styles.modalSheet} onPress={() => {}}>
+              <View style={styles.modalHandle} />
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}>
               <View style={styles.modalTitleRow}>
                 <View><Text style={styles.modalEyebrow}>NUEVA ENTREGA</Text><Text style={styles.modalTitle}>Asignar a operario</Text></View>
                 <Pressable style={styles.closeButton} onPress={() => !saving && setAsignacionOpen(false)}><MaterialCommunityIcons name="close" size={22} color={COLORS.navy} /></Pressable>
@@ -620,55 +623,64 @@ export default function InventarioBeckScreen() {
               <Pressable disabled={!trabajadorId || saving} style={[styles.confirmButton, (!trabajadorId || saving) && styles.disabledButton]} onPress={() => void confirmAsignacion()}>
                 {saving ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="check-circle-outline" size={21} color="#fff" /><Text style={styles.confirmButtonText}>Confirmar entrega</Text></>}
               </Pressable>
-            </ScrollView>
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={Boolean(devolucionItem)} animationType="slide" transparent onRequestClose={() => !saving && setDevolucionItem(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => !saving && setDevolucionItem(null)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalTitleRow}>
-              <View><Text style={styles.modalEyebrow}>DEVOLUCIÓN</Text><Text style={styles.modalTitle}>Informar al supervisor</Text></View>
-              <Pressable style={styles.closeButton} onPress={() => !saving && setDevolucionItem(null)}><MaterialCommunityIcons name="close" size={22} color={COLORS.navy} /></Pressable>
-            </View>
-            {devolucionItem ? <View style={styles.summaryBox}><MaterialCommunityIcons name={tipoIcon(devolucionItem.tipoItem)} size={22} color={COLORS.orange} /><Text style={styles.summaryText}>{devolucionItem.nombre} · {devolucionItem.cantidad} {devolucionItem.cantidad === 1 ? "unidad" : "unidades"}</Text></View> : null}
-            <Text style={styles.inputLabel}>Motivo u observación opcional</Text>
-            <TextInput style={styles.observationInput} value={devolucionMotivo} onChangeText={setDevolucionMotivo} placeholder="Ej.: Trabajo terminado o cambio de talla" placeholderTextColor="#94a3b8" multiline maxLength={1000} />
-            <Pressable disabled={saving} style={[styles.confirmButton, saving && styles.disabledButton]} onPress={() => void solicitarDevolucion()}>
-              {saving ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="keyboard-return" size={21} color="#fff" /><Text style={styles.confirmButtonText}>Solicitar devolución</Text></>}
+        <KeyboardAvoidingView style={styles.keyboardAvoider} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <Pressable style={styles.modalOverlay} onPress={() => !saving && setDevolucionItem(null)}>
+            <Pressable style={styles.modalSheet} onPress={() => {}}>
+              <View style={styles.modalHandle} />
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}>
+                <View style={styles.modalTitleRow}>
+                  <View><Text style={styles.modalEyebrow}>DEVOLUCIÓN</Text><Text style={styles.modalTitle}>Informar al supervisor</Text></View>
+                  <Pressable style={styles.closeButton} onPress={() => !saving && setDevolucionItem(null)}><MaterialCommunityIcons name="close" size={22} color={COLORS.navy} /></Pressable>
+                </View>
+                {devolucionItem ? <View style={styles.summaryBox}><MaterialCommunityIcons name={tipoIcon(devolucionItem.tipoItem)} size={22} color={COLORS.orange} /><Text style={styles.summaryText}>{devolucionItem.nombre} · {devolucionItem.cantidad} {devolucionItem.cantidad === 1 ? "unidad" : "unidades"}</Text></View> : null}
+                <Text style={styles.inputLabel}>Motivo u observación opcional</Text>
+                <TextInput style={styles.observationInput} value={devolucionMotivo} onChangeText={setDevolucionMotivo} placeholder="Ej.: Trabajo terminado o cambio de talla" placeholderTextColor="#94a3b8" multiline maxLength={1000} />
+                <Pressable disabled={saving} style={[styles.confirmButton, saving && styles.disabledButton]} onPress={() => void solicitarDevolucion()}>
+                  {saving ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="keyboard-return" size={21} color="#fff" /><Text style={styles.confirmButtonText}>Solicitar devolución</Text></>}
+                </Pressable>
+              </ScrollView>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={Boolean(bodegaItem)} animationType="slide" transparent onRequestClose={() => !saving && setBodegaItem(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => !saving && setBodegaItem(null)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalTitleRow}>
-              <View><Text style={styles.modalEyebrow}>DEVOLUCIÓN A BODEGA</Text><Text style={styles.modalTitle}>Reintegrar stock</Text></View>
-              <Pressable style={styles.closeButton} onPress={() => !saving && setBodegaItem(null)}><MaterialCommunityIcons name="close" size={22} color={COLORS.navy} /></Pressable>
-            </View>
-            {bodegaItem ? <>
-              <View style={styles.summaryBox}><MaterialCommunityIcons name={tipoIcon(bodegaItem.tipoItem)} size={22} color={COLORS.orange} /><Text style={styles.summaryText}>{bodegaItem.nombre} · {bodegaItem.disponible} disponibles</Text></View>
-              <View style={styles.returnQuantityBox}>
-                <Text style={styles.inputLabel}>Cantidad a devolver</Text>
-                <View style={styles.stepper}>
-                  <Pressable style={styles.stepButton} onPress={() => setBodegaCantidad((value) => Math.max(1, value - 1))}><MaterialCommunityIcons name="minus" size={20} color={COLORS.navy} /></Pressable>
-                  <Text style={styles.quantityValue}>{bodegaCantidad}</Text>
-                  <Pressable style={styles.stepButton} onPress={() => setBodegaCantidad((value) => Math.min(bodegaItem.disponible, bodegaItem.tipoItem === "herramienta" ? 1 : value + 1))}><MaterialCommunityIcons name="plus" size={20} color={COLORS.navy} /></Pressable>
+        <KeyboardAvoidingView style={styles.keyboardAvoider} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <Pressable style={styles.modalOverlay} onPress={() => !saving && setBodegaItem(null)}>
+            <Pressable style={styles.modalSheet} onPress={() => {}}>
+              <View style={styles.modalHandle} />
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}>
+                <View style={styles.modalTitleRow}>
+                  <View><Text style={styles.modalEyebrow}>DEVOLUCIÓN A BODEGA</Text><Text style={styles.modalTitle}>Reintegrar stock</Text></View>
+                  <Pressable style={styles.closeButton} onPress={() => !saving && setBodegaItem(null)}><MaterialCommunityIcons name="close" size={22} color={COLORS.navy} /></Pressable>
                 </View>
-              </View>
-            </> : null}
-            <Text style={styles.inputLabel}>Motivo u observación opcional</Text>
-            <TextInput style={styles.observationInput} value={bodegaMotivo} onChangeText={setBodegaMotivo} placeholder="Ej.: Sobrante de obra" placeholderTextColor="#94a3b8" multiline maxLength={1000} />
-            <Pressable disabled={saving} style={[styles.dangerButton, saving && styles.disabledButton]} onPress={() => void devolverABodega()}>
-              {saving ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="warehouse" size={21} color="#fff" /><Text style={styles.confirmButtonText}>Confirmar devolución a bodega</Text></>}
+                {bodegaItem ? <>
+                  <View style={styles.summaryBox}><MaterialCommunityIcons name={tipoIcon(bodegaItem.tipoItem)} size={22} color={COLORS.orange} /><Text style={styles.summaryText}>{bodegaItem.nombre} · {bodegaItem.disponible} disponibles</Text></View>
+                  <View style={styles.returnQuantityBox}>
+                    <Text style={styles.inputLabel}>Cantidad a devolver</Text>
+                    <View style={styles.stepper}>
+                      <Pressable style={styles.stepButton} onPress={() => setBodegaCantidad((value) => Math.max(1, value - 1))}><MaterialCommunityIcons name="minus" size={20} color={COLORS.navy} /></Pressable>
+                      <Text style={styles.quantityValue}>{bodegaCantidad}</Text>
+                      <Pressable style={styles.stepButton} onPress={() => setBodegaCantidad((value) => Math.min(bodegaItem.disponible, bodegaItem.tipoItem === "herramienta" ? 1 : value + 1))}><MaterialCommunityIcons name="plus" size={20} color={COLORS.navy} /></Pressable>
+                    </View>
+                  </View>
+                </> : null}
+                <Text style={styles.inputLabel}>Motivo u observación opcional</Text>
+                <TextInput style={styles.observationInput} value={bodegaMotivo} onChangeText={setBodegaMotivo} placeholder="Ej.: Sobrante de obra" placeholderTextColor="#94a3b8" multiline maxLength={1000} />
+                <Pressable disabled={saving} style={[styles.dangerButton, saving && styles.disabledButton]} onPress={() => void devolverABodega()}>
+                  {saving ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="warehouse" size={21} color="#fff" /><Text style={styles.confirmButtonText}>Confirmar devolución a bodega</Text></>}
+                </Pressable>
+              </ScrollView>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={trazabilidadOpen} animationType="slide" transparent onRequestClose={() => setTrazabilidadOpen(false)}>
@@ -783,6 +795,7 @@ const styles = StyleSheet.create({
   floatingArea: { bottom: 10, left: 14, position: "absolute", right: 14 },
   assignButton: { alignItems: "center", backgroundColor: COLORS.orange, borderRadius: 16, flexDirection: "row", gap: 9, justifyContent: "center", paddingVertical: 15, shadowColor: "#0f172a", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   assignButtonText: { color: "#fff", fontSize: 15, fontWeight: "900" },
+  keyboardAvoider: { flex: 1 },
   modalOverlay: { backgroundColor: "rgba(15,23,42,0.55)", flex: 1, justifyContent: "flex-end" },
   modalSheet: { backgroundColor: COLORS.background, borderTopLeftRadius: 26, borderTopRightRadius: 26, maxHeight: "85%", paddingBottom: 30, paddingHorizontal: 16, paddingTop: 10 },
   modalHandle: { alignSelf: "center", backgroundColor: "#cbd5e1", borderRadius: 2, height: 4, marginBottom: 14, width: 42 },
