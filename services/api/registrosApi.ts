@@ -162,6 +162,26 @@ export type HistorialRegistrosParams = {
   estado?: EstadoRegistroApi | "todos";
 };
 
+export type SupervisorRegistrosPage = {
+  items: RegistroHistorialApi[];
+  total: number;
+  nextCursor: string | null;
+  counts: {
+    todos: number;
+    pendiente: number;
+    rechazado: number;
+  };
+};
+
+export type SupervisorRegistrosParams = {
+  obraId: string;
+  cursor?: string | null;
+  limit?: number;
+  search?: string;
+  estado?: "pendiente" | "rechazado" | "todos";
+  vista?: "supervisor";
+};
+
 function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
   return JSON.stringify({
     userId,
@@ -273,6 +293,43 @@ export async function getMisRegistros(
   );
   registrosCache.set(cacheKey, data);
   return data;
+}
+
+export async function getRegistrosSupervisorPage(
+  params: SupervisorRegistrosParams,
+): Promise<SupervisorRegistrosPage> {
+  const session = await getSession();
+  if (!session.token) throw new Error("No hay sesión activa");
+
+  const query = new URLSearchParams({
+    obraId: params.obraId,
+    scope: "registro",
+    paginated: "true",
+  });
+  if (params.cursor) query.set("cursor", params.cursor);
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.estado && params.estado !== "todos") {
+    query.set("estado", params.estado);
+  }
+  if (params.vista) query.set("vista", params.vista);
+
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/registros/mis-registros?${query.toString()}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || "No se pudieron obtener los registros");
+  }
+
+  return result.data as SupervisorRegistrosPage;
 }
 
 export async function getHistorialRegistrosPage(

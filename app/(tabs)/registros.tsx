@@ -4,6 +4,7 @@ import {
   enviarRegistroATecnico,
   enviarRegistroAIngenieria,
   getMisRegistros,
+  getRegistrosSupervisorPage,
   reenviarRegistroComoTecnico,
   RegistroHistorialApi,
   uploadRegistroFotos,
@@ -97,6 +98,7 @@ type FotoLocal = {
 };
 
 const MAX_REGISTRO_FOTOS = 10;
+const SUPERVISOR_REGISTROS_PAGE_SIZE = 30;
 const FALLBACK_IMAGE_TYPE = "image/jpeg";
 const UPLOAD_IMAGE_MAX_SIZE = 1600;
 const UPLOAD_IMAGE_QUALITY = 0.65;
@@ -434,6 +436,20 @@ export default function RegistrosScreen({
   const [jefeRegistroSearch, setJefeRegistroSearch] = useState("");
   const [jefeEstadoFiltro, setJefeEstadoFiltro] =
     useState<RegistroEstadoFiltro>("todos");
+  const [jefeRegistroSearchDebounced, setJefeRegistroSearchDebounced] =
+    useState("");
+  const [jefeRegistrosTotal, setJefeRegistrosTotal] = useState(0);
+  const [jefeRegistrosNextCursor, setJefeRegistrosNextCursor] =
+    useState<string | null>(null);
+  const [loadingMoreJefeRegistros, setLoadingMoreJefeRegistros] =
+    useState(false);
+  const loadingMoreJefeRegistrosRef = useRef(false);
+  const [jefeFilterCounts, setJefeFilterCounts] = useState({
+    todos: 0,
+    pendiente: 0,
+    rechazado: 0,
+  });
+  const jefeRegistrosQueryVersionRef = useRef(0);
   const [tecnicoRegistroSearch, setTecnicoRegistroSearch] = useState("");
   const [tecnicoEstadoFiltro, setTecnicoEstadoFiltro] =
     useState<RegistroEstadoFiltro>("todos");
@@ -551,8 +567,15 @@ export default function RegistrosScreen({
     [jefeRegistros, selectedJefeObraId],
   );
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setJefeRegistroSearchDebounced(jefeRegistroSearch.trim());
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [jefeRegistroSearch]);
+
   const filteredJefeRegistros = useMemo(() => {
-    const term = jefeRegistroSearch.trim().toLowerCase();
+    const term = jefeRegistroSearchDebounced.toLowerCase();
     const registrosSinDuplicar = preferirCopiasCorreccion(jefeRegistrosPorObra);
     const visibles = registrosSinDuplicar.filter((registro) => {
       const isCorreccion = Boolean(
@@ -581,53 +604,11 @@ export default function RegistrosScreen({
     if (!term) return visibles;
 
     return visibles.filter((registro) =>
-      `${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.numero_sello || ""} ${registro.tipo_registro}`
+      `REG-${registro.id.slice(0, 6)} ${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.numero_sello || ""} ${registro.tipo_registro}`
         .toLowerCase()
         .includes(term),
     );
-  }, [jefeEstadoFiltro, jefeRegistroSearch, jefeRegistrosPorObra]);
-
-  const jefeFilterCounts = useMemo(() => {
-    const term = jefeRegistroSearch.trim().toLowerCase();
-    const registrosSinDuplicar = preferirCopiasCorreccion(jefeRegistrosPorObra);
-    const matchingSearch = registrosSinDuplicar.filter((registro) => {
-      const isCorreccion = Boolean(
-        registro.es_correccion || registro.registro_origen_id,
-      );
-      const correccionEnManosDelOperario =
-        isCorreccion &&
-        registro.estado === "pendiente" &&
-        registro.devuelto_a_tecnico === true;
-      if (correccionEnManosDelOperario) return false;
-
-      const esEstadoVisible =
-        registro.estado === "pendiente" || registro.estado === "rechazado";
-      if (!esEstadoVisible) return false;
-
-      return (
-        !term ||
-        `${registro.usuarios?.nombre || registro.nombre_sellador} ${registro.piso} ${registro.eje_alfabetico}-${registro.eje_numerico} ${registro.numero_sello || ""} ${registro.tipo_registro}`
-          .toLowerCase()
-          .includes(term)
-      );
-    });
-
-    const estadoVisual = (registro: RegistroHistorialApi) =>
-      (registro.es_correccion || registro.registro_origen_id) &&
-      !registro.corregido_at
-        ? "rechazado"
-        : registro.estado;
-
-    return {
-      todos: matchingSearch.length,
-      pendiente: matchingSearch.filter(
-        (registro) => estadoVisual(registro) === "pendiente",
-      ).length,
-      rechazado: matchingSearch.filter(
-        (registro) => estadoVisual(registro) === "rechazado",
-      ).length,
-    };
-  }, [jefeRegistroSearch, jefeRegistrosPorObra]);
+  }, [jefeEstadoFiltro, jefeRegistroSearchDebounced, jefeRegistrosPorObra]);
 
   const tecnicoRegistrosSinDuplicar = useMemo(
     () => preferirCopiasCorreccion(tecnicoRegistros),
@@ -714,37 +695,62 @@ export default function RegistrosScreen({
       setRefreshingJefeRegistros(true);
       setError("");
       clearSuccessMessage();
-      const [obrasDisponibles, registros] = await Promise.all([
+      const queryVersion = ++jefeRegistrosQueryVersionRef.current;
+      const [obrasDisponibles, page] = await Promise.all([
         getMisObras(true),
-        getMisRegistros(true, {
-          obraId: selectedJefeObraId ?? undefined,
-          scope: "registro",
-          vista: isAdminSession ? "supervisor" : undefined,
-        }),
+        selectedJefeObraId
+          ? getRegistrosSupervisorPage({
+              obraId: selectedJefeObraId,
+              limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
+              search: jefeRegistroSearchDebounced,
+              estado: jefeEstadoFiltro,
+              vista: isAdminSession ? "supervisor" : undefined,
+            })
+          : Promise.resolve(null),
       ]);
       setJefeObras(obrasDisponibles);
-      setJefeRegistros(registros);
+      if (page && jefeRegistrosQueryVersionRef.current === queryVersion) {
+        setJefeRegistros(page.items);
+        setJefeRegistrosTotal(page.total);
+        setJefeRegistrosNextCursor(page.nextCursor);
+        setJefeFilterCounts(page.counts);
+      }
     } catch (err: any) {
       setError(err?.message || "No se pudieron obtener los registros");
     } finally {
       setRefreshingJefeRegistros(false);
     }
-  }, [clearSuccessMessage, isAdminSession, selectedJefeObraId]);
+  }, [
+    clearSuccessMessage,
+    isAdminSession,
+    jefeEstadoFiltro,
+    jefeRegistroSearchDebounced,
+    selectedJefeObraId,
+  ]);
 
   useEffect(() => {
     if (userRole !== "jefeobra" || !selectedJefeObraId) return;
 
     let active = true;
+    const queryVersion = ++jefeRegistrosQueryVersionRef.current;
     const cargarRegistrosObra = async () => {
       setLoadingJefeRegistros(true);
       setError("");
+      setJefeRegistrosNextCursor(null);
       try {
-        const registros = await getMisRegistros(true, {
+        const page = await getRegistrosSupervisorPage({
           obraId: selectedJefeObraId,
-          scope: "registro",
+          limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
+          search: jefeRegistroSearchDebounced,
+          estado: jefeEstadoFiltro,
           vista: isAdminSession ? "supervisor" : undefined,
         });
-        if (active) setJefeRegistros(registros);
+        if (active && jefeRegistrosQueryVersionRef.current === queryVersion) {
+          setJefeRegistros(page.items);
+          setJefeRegistrosTotal(page.total);
+          setJefeRegistrosNextCursor(page.nextCursor);
+          setJefeFilterCounts(page.counts);
+        }
       } catch (err: any) {
         if (active) {
           setError(err?.message || "No se pudieron obtener los registros de la obra");
@@ -758,7 +764,60 @@ export default function RegistrosScreen({
     return () => {
       active = false;
     };
-  }, [isAdminSession, selectedJefeObraId, userRole]);
+  }, [
+    isAdminSession,
+    jefeEstadoFiltro,
+    jefeRegistroSearchDebounced,
+    selectedJefeObraId,
+    userRole,
+  ]);
+
+  const cargarMasRegistrosJefeObra = useCallback(async () => {
+    if (
+      !selectedJefeObraId ||
+      !jefeRegistrosNextCursor ||
+      loadingJefeRegistros ||
+      loadingMoreJefeRegistrosRef.current
+    ) return;
+
+    const queryVersion = jefeRegistrosQueryVersionRef.current;
+    loadingMoreJefeRegistrosRef.current = true;
+    setLoadingMoreJefeRegistros(true);
+    try {
+      const page = await getRegistrosSupervisorPage({
+        obraId: selectedJefeObraId,
+        cursor: jefeRegistrosNextCursor,
+        limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
+        search: jefeRegistroSearchDebounced,
+        estado: jefeEstadoFiltro,
+        vista: isAdminSession ? "supervisor" : undefined,
+      });
+      if (jefeRegistrosQueryVersionRef.current !== queryVersion) return;
+
+      setJefeRegistros((current) => {
+        const ids = new Set(current.map((registro) => registro.id));
+        return [
+          ...current,
+          ...page.items.filter((registro) => !ids.has(registro.id)),
+        ];
+      });
+      setJefeRegistrosTotal(page.total);
+      setJefeRegistrosNextCursor(page.nextCursor);
+      setJefeFilterCounts(page.counts);
+    } catch (err: any) {
+      setError(err?.message || "No se pudieron cargar más registros");
+    } finally {
+      loadingMoreJefeRegistrosRef.current = false;
+      setLoadingMoreJefeRegistros(false);
+    }
+  }, [
+    isAdminSession,
+    jefeEstadoFiltro,
+    jefeRegistroSearchDebounced,
+    jefeRegistrosNextCursor,
+    loadingJefeRegistros,
+    selectedJefeObraId,
+  ]);
 
   const refreshConfiguracionFormulario = useCallback(async () => {
     const obraId =
@@ -864,16 +923,13 @@ export default function RegistrosScreen({
           const shouldBlockScreen = !hasLoadedJefeRegistrosRef.current;
           if (shouldBlockScreen) setLoadingJefeRegistros(true);
           try {
-            const [obrasDisponibles, registros] = await Promise.all([
-              getMisObras(),
-              getMisRegistros(false, {
-                scope: "registro",
-                vista: role === "administrador" ? "supervisor" : undefined,
-              }),
-            ]);
-
+            const obrasDisponibles = await getMisObras();
             setJefeObras(obrasDisponibles);
-            setJefeRegistros(registros);
+            if (!selectedJefeObraId) {
+              setJefeRegistros([]);
+              setJefeRegistrosTotal(0);
+              setJefeRegistrosNextCursor(null);
+            }
             hasLoadedJefeRegistrosRef.current = true;
           } finally {
             if (shouldBlockScreen) setLoadingJefeRegistros(false);
@@ -921,7 +977,7 @@ export default function RegistrosScreen({
       };
 
       loadInitialData();
-    }, [clearSuccessMessage, initialObra, operationalRole]),
+    }, [clearSuccessMessage, initialObra, operationalRole, selectedJefeObraId]),
   );
 
   const resetForm = () => {
@@ -1443,12 +1499,22 @@ export default function RegistrosScreen({
           : undefined,
       });
 
-      const registros = await getMisRegistros(true, {
-        obraId: selectedJefeObraId ?? undefined,
-        scope: "registro",
-        vista: isAdminSession ? "supervisor" : undefined,
-      });
-      setJefeRegistros(registros);
+      if (selectedJefeObraId) {
+        const queryVersion = ++jefeRegistrosQueryVersionRef.current;
+        const page = await getRegistrosSupervisorPage({
+          obraId: selectedJefeObraId,
+          limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
+          search: jefeRegistroSearchDebounced,
+          estado: jefeEstadoFiltro,
+          vista: isAdminSession ? "supervisor" : undefined,
+        });
+        if (jefeRegistrosQueryVersionRef.current === queryVersion) {
+          setJefeRegistros(page.items);
+          setJefeRegistrosTotal(page.total);
+          setJefeRegistrosNextCursor(page.nextCursor);
+          setJefeFilterCounts(page.counts);
+        }
+      }
       setEditingRegistro(null);
       resetForm();
       showSuccessMessage("Registro enviado a ingeniería.");
@@ -1561,12 +1627,22 @@ export default function RegistrosScreen({
       setSuccess("");
 
       await enviarRegistroATecnico(registro.id);
-      const registros = await getMisRegistros(true, {
-        obraId: selectedJefeObraId ?? undefined,
-        scope: "registro",
-        vista: isAdminSession ? "supervisor" : undefined,
-      });
-      setJefeRegistros(registros);
+      if (selectedJefeObraId) {
+        const queryVersion = ++jefeRegistrosQueryVersionRef.current;
+        const page = await getRegistrosSupervisorPage({
+          obraId: selectedJefeObraId,
+          limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
+          search: jefeRegistroSearchDebounced,
+          estado: jefeEstadoFiltro,
+          vista: isAdminSession ? "supervisor" : undefined,
+        });
+        if (jefeRegistrosQueryVersionRef.current === queryVersion) {
+          setJefeRegistros(page.items);
+          setJefeRegistrosTotal(page.total);
+          setJefeRegistrosNextCursor(page.nextCursor);
+          setJefeFilterCounts(page.counts);
+        }
+      }
       showSuccessMessage("Registro enviado al Operario para corrección.");
     } catch (err: any) {
       setError(err?.message || "No se pudo enviar al Operario.");
@@ -1935,14 +2011,14 @@ export default function RegistrosScreen({
             <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
 
             <BeckSearchInput
-              placeholder="Buscar por operario, sello, piso o eje"
+              placeholder="Buscar por registro, operario, sello, piso o eje"
               value={jefeRegistroSearch}
               onChangeText={setJefeRegistroSearch}
             />
 
             <BeckFilterPanel
               title="Filtrar registros"
-              resultCount={filteredJefeRegistros.length}
+              resultCount={jefeRegistrosTotal}
               options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
                 ...filter,
                 count: jefeFilterCounts[filter.value],
@@ -1961,6 +2037,16 @@ export default function RegistrosScreen({
           ]}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
+          onScroll={({ nativeEvent }) => {
+            if (!isJefeObraRegistrosList) return;
+            const distanceToBottom =
+              nativeEvent.contentSize.height -
+              (nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y);
+            if (distanceToBottom <= 240) {
+              void cargarMasRegistrosJefeObra();
+            }
+          }}
+          scrollEventThrottle={200}
           refreshControl={
             editingRegistro ? (
               <RefreshControl
@@ -2388,14 +2474,14 @@ export default function RegistrosScreen({
                   </View>
 
                   <BeckSearchInput
-                    placeholder="Buscar por operario, sello, piso o eje"
+                    placeholder="Buscar por registro, operario, sello, piso o eje"
                     value={jefeRegistroSearch}
                     onChangeText={setJefeRegistroSearch}
                   />
 
-                  <BeckFilterPanel
-                    title="Filtrar registros"
-                    resultCount={filteredJefeRegistros.length}
+                    <BeckFilterPanel
+                      title="Filtrar registros"
+                      resultCount={jefeRegistrosTotal}
                     options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
                       ...filter,
                       count: jefeFilterCounts[filter.value],
@@ -2406,7 +2492,8 @@ export default function RegistrosScreen({
                 </>
               ) : null}
               {filteredJefeRegistros.length ? (
-                filteredJefeRegistros.map((registro) => (
+                <>
+                {filteredJefeRegistros.map((registro) => (
                   <Card key={registro.id} style={[styles.historyCard, styles.jefeHistoryCard]}>
                     <View style={styles.jefeHistoryClip}>
                     <View
@@ -2498,8 +2585,15 @@ export default function RegistrosScreen({
                     </Card.Content>
                     </View>
                   </Card>
-                ))
-              ) : (
+                ))}
+                {loadingMoreJefeRegistros ? (
+                  <View style={styles.loadingBox}>
+                    <ActivityIndicator color="#f97316" />
+                    <Text style={styles.emptyText}>Cargando más registros...</Text>
+                  </View>
+                ) : null}
+                </>
+              ) : !loadingJefeRegistros ? (
                 <Card style={styles.card}>
                   <Card.Content>
                     <Text style={styles.emptyText}>
@@ -2507,7 +2601,7 @@ export default function RegistrosScreen({
                     </Text>
                   </Card.Content>
                 </Card>
-              )}
+              ) : null}
             </>
           ) : (
             <>
