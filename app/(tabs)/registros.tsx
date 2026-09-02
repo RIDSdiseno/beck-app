@@ -717,6 +717,8 @@ export default function RegistrosScreen({
       const [obrasDisponibles, registros] = await Promise.all([
         getMisObras(true),
         getMisRegistros(true, {
+          obraId: selectedJefeObraId ?? undefined,
+          scope: "registro",
           vista: isAdminSession ? "supervisor" : undefined,
         }),
       ]);
@@ -727,7 +729,36 @@ export default function RegistrosScreen({
     } finally {
       setRefreshingJefeRegistros(false);
     }
-  }, [clearSuccessMessage, isAdminSession]);
+  }, [clearSuccessMessage, isAdminSession, selectedJefeObraId]);
+
+  useEffect(() => {
+    if (userRole !== "jefeobra" || !selectedJefeObraId) return;
+
+    let active = true;
+    const cargarRegistrosObra = async () => {
+      setLoadingJefeRegistros(true);
+      setError("");
+      try {
+        const registros = await getMisRegistros(true, {
+          obraId: selectedJefeObraId,
+          scope: "registro",
+          vista: isAdminSession ? "supervisor" : undefined,
+        });
+        if (active) setJefeRegistros(registros);
+      } catch (err: any) {
+        if (active) {
+          setError(err?.message || "No se pudieron obtener los registros de la obra");
+        }
+      } finally {
+        if (active) setLoadingJefeRegistros(false);
+      }
+    };
+
+    void cargarRegistrosObra();
+    return () => {
+      active = false;
+    };
+  }, [isAdminSession, selectedJefeObraId, userRole]);
 
   const refreshConfiguracionFormulario = useCallback(async () => {
     const obraId =
@@ -836,6 +867,7 @@ export default function RegistrosScreen({
             const [obrasDisponibles, registros] = await Promise.all([
               getMisObras(),
               getMisRegistros(false, {
+                scope: "registro",
                 vista: role === "administrador" ? "supervisor" : undefined,
               }),
             ]);
@@ -1412,6 +1444,8 @@ export default function RegistrosScreen({
       });
 
       const registros = await getMisRegistros(true, {
+        obraId: selectedJefeObraId ?? undefined,
+        scope: "registro",
         vista: isAdminSession ? "supervisor" : undefined,
       });
       setJefeRegistros(registros);
@@ -1528,6 +1562,8 @@ export default function RegistrosScreen({
 
       await enviarRegistroATecnico(registro.id);
       const registros = await getMisRegistros(true, {
+        obraId: selectedJefeObraId ?? undefined,
+        scope: "registro",
         vista: isAdminSession ? "supervisor" : undefined,
       });
       setJefeRegistros(registros);
