@@ -110,7 +110,7 @@ export default function LoginScreen() {
       }
 
       if (result.type === "error") {
-        setError(result.error?.message || "Microsoft no completó el login.");
+        setError(result.error?.description || "Microsoft no completó el login.");
       }
     } catch (err: unknown) {
       if (__DEV__) console.warn("PROMPT MICROSOFT ERROR", err);

@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.96)",
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   imageFrame: {
     alignItems: "center",
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   controls: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   closeButton: {
     position: "absolute",

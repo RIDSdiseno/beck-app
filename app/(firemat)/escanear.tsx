@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 38 },
   cameraShell: { height: 245, borderRadius: 22, overflow: "hidden", borderWidth: 1, borderColor: "#404040", backgroundColor: "#171717" },
   scanFrame: { position: "absolute", left: 28, right: 28, top: 78, height: 88, borderWidth: 2, borderColor: "#ef4444", borderRadius: 14 },
-  cameraLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  cameraLoading: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
   scanMessage: { color: "#d4d4d4", textAlign: "center", marginVertical: 12 },
   nextButton: { borderRadius: 16, marginBottom: 8 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 14, marginBottom: 10 },

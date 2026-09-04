@@ -45,6 +45,13 @@ function tipoIcon(tipo: string): keyof typeof MaterialCommunityIcons.glyphMap {
   return "tools";
 }
 
+function estadoUnidadLabel(estado?: ResultadoEscaneoInventario["estadoUnidad"]) {
+  if (estado === "asignado_operario") return "Asignado a operario";
+  if (estado === "disponible_supervisor") return "Disponible con supervisor";
+  if (estado === "en_bodega") return "Devuelto a bodega";
+  return null;
+}
+
 export default function EscanearInventarioBeckScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
@@ -167,7 +174,12 @@ export default function EscanearInventarioBeckScreen() {
                 obraId,
                 trabajadorId: trabajador.id,
                 observacion: observacion.trim() || "Asignación realizada mediante escaneo",
-                lineas: [{ tipoItem: selected.tipoItem, itemId: selected.itemId, cantidad }],
+                lineas: [{
+                  tipoItem: selected.tipoItem,
+                  itemId: selected.itemId,
+                  cantidad: selected.subSku ? 1 : cantidad,
+                  ...(selected.subSku ? { subSku: selected.subSku } : {}),
+                }],
               });
               const refreshed = await getInventarioPorCodigo(codigoConsultado!);
               setResultados(refreshed.resultados);
@@ -242,7 +254,7 @@ export default function EscanearInventarioBeckScreen() {
               <View><Text style={styles.resultEyebrow}>CÓDIGO LEÍDO</Text><Text style={styles.codeText}>{codigoConsultado}</Text></View>
               <Pressable style={styles.scanAgain} onPress={resetScan}><MaterialCommunityIcons name="barcode-scan" size={18} color={COLORS.orange} /><Text style={styles.scanAgainText}>Otro código</Text></Pressable>
             </View>
-            {resultados.length > 1 ? <View style={styles.warningBox}><MaterialCommunityIcons name="alert-outline" size={20} color="#92400e" /><Text style={styles.warningText}>Este SKU coincide con {resultados.length} registros. Selecciona el artículo correcto.</Text></View> : null}
+            {resultados.length > 1 ? <View style={styles.warningBox}><MaterialCommunityIcons name="alert-outline" size={20} color="#92400e" /><Text style={styles.warningText}>Este código coincide con {resultados.length} registros. Selecciona el artículo correcto.</Text></View> : null}
             {resultados.length === 0 ? (
               <View style={styles.emptyCard}><MaterialCommunityIcons name="barcode-off" size={38} color={COLORS.orange} /><Text style={styles.emptyTitle}>Código no registrado</Text><Text style={styles.emptyText}>No existe un EPP, implemento o herramienta activa con este SKU.</Text></View>
             ) : resultados.map((item) => {
@@ -251,9 +263,12 @@ export default function EscanearInventarioBeckScreen() {
                 <Pressable key={`${item.tipoItem}:${item.itemId}`} style={[styles.itemCard, active && styles.itemCardActive]} onPress={() => seleccionarResultado(item)}>
                   <View style={styles.itemTop}>
                     <View style={styles.itemIcon}><MaterialCommunityIcons name={tipoIcon(item.tipoItem)} size={24} color={COLORS.navy} /></View>
-                    <View style={styles.itemInfo}><Text style={styles.typeText}>{tipoLabel(item.tipoItem)}</Text><Text style={styles.itemName}>{item.nombre}</Text><Text style={styles.itemMeta}>{[item.detalle, item.talla ? `Talla ${item.talla}` : null, item.color].filter(Boolean).join(" · ") || `SKU ${item.sku}`}</Text></View>
+                    <View style={styles.itemInfo}><Text style={styles.typeText}>{tipoLabel(item.tipoItem)}</Text><Text style={styles.itemName}>{item.nombre}</Text><Text style={styles.itemMeta}>{[item.detalle, item.talla ? `Talla ${item.talla}` : null, item.color].filter(Boolean).join(" · ") || `SKU ${item.sku}`}</Text>{item.subSku ? <Text style={styles.unitCode}>Unidad {item.subSku}</Text> : null}</View>
                     {active ? <MaterialCommunityIcons name="check-circle" size={23} color={COLORS.orange} /> : null}
                   </View>
+                  {item.estadoUnidad ? (
+                    <View style={styles.unitStateRow}><MaterialCommunityIcons name="barcode" size={18} color={COLORS.navy} /><Text style={styles.unitStateText}>{estadoUnidadLabel(item.estadoUnidad)}</Text></View>
+                  ) : null}
                   {item.custodios.map((custodio) => (
                     <View key={custodio.asignacionId} style={styles.ownerRow}>
                       <MaterialCommunityIcons name={custodio.custodio.rol === "operario" ? "account-hard-hat" : "account-tie"} size={18} color={custodio.esMio ? "#047857" : COLORS.muted} />
@@ -278,7 +293,7 @@ export default function EscanearInventarioBeckScreen() {
             <Text style={styles.assignmentTitle}>Asignar artículo escaneado</Text>
             <SelectSheet label="Obra" value={obraId} placeholder="Selecciona la obra" options={selected.disponibleSupervisorPorObra.map((item) => ({ value: item.obra.id, label: `${item.obra.nombre}${item.obra.codigo ? ` · ${item.obra.codigo}` : ""} · ${item.cantidad} disponibles` }))} onChange={(value) => void cambiarObra(value)} icon="office-building-outline" />
             <SelectSheet label="Operario" value={trabajadorId} placeholder={obraId ? operarios.length ? "Selecciona un operario" : "No hay operarios vinculados" : "Primero selecciona una obra"} options={operarios.map((item) => ({ value: item.id, label: `${item.nombre} · ${item.email}` }))} onChange={setTrabajadorId} icon="account-hard-hat" />
-            {obraId ? <View style={styles.quantityRow}><Text style={styles.quantityLabel}>Cantidad</Text><View style={styles.stepper}><Pressable style={styles.stepButton} onPress={() => setCantidad((value) => Math.max(1, value - 1))}><MaterialCommunityIcons name="minus" size={20} color={COLORS.navy} /></Pressable><Text style={styles.quantityValue}>{cantidad}</Text><Pressable style={styles.stepButton} onPress={() => setCantidad((value) => Math.min(disponibleSeleccionado, selected.tipoItem === "herramienta" ? 1 : value + 1))}><MaterialCommunityIcons name="plus" size={20} color={COLORS.navy} /></Pressable></View></View> : null}
+            {obraId ? <View style={styles.quantityRow}><Text style={styles.quantityLabel}>{selected.subSku ? "Unidad identificada" : "Cantidad"}</Text>{selected.subSku ? <View style={styles.scannedUnitPill}><MaterialCommunityIcons name="barcode" size={18} color={COLORS.navy} /><Text style={styles.scannedUnitText}>{selected.subSku}</Text></View> : <View style={styles.stepper}><Pressable style={styles.stepButton} onPress={() => setCantidad((value) => Math.max(1, value - 1))}><MaterialCommunityIcons name="minus" size={20} color={COLORS.navy} /></Pressable><Text style={styles.quantityValue}>{cantidad}</Text><Pressable style={styles.stepButton} onPress={() => setCantidad((value) => Math.min(disponibleSeleccionado, selected.tipoItem === "herramienta" ? 1 : value + 1))}><MaterialCommunityIcons name="plus" size={20} color={COLORS.navy} /></Pressable></View>}</View> : null}
             <TextInput value={observacion} onChangeText={setObservacion} placeholder="Observación opcional" placeholderTextColor="#94a3b8" multiline style={styles.observationInput} maxLength={1000} />
             <Pressable disabled={!trabajadorId || saving} style={[styles.assignButton, (!trabajadorId || saving) && styles.disabled]} onPress={confirmarAsignacion}>{saving ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="account-arrow-right" size={21} color="#fff" /><Text style={styles.assignText}>Asignar al operario</Text></>}</Pressable>
           </View>
@@ -299,7 +314,7 @@ const styles = StyleSheet.create({
   content: { padding: 14, paddingBottom: 40 },
   cameraShell: { backgroundColor: "#111827", borderRadius: 22, height: 235, overflow: "hidden" },
   scanFrame: { borderColor: COLORS.yellow, borderRadius: 16, borderWidth: 2, bottom: 70, left: 35, position: "absolute", right: 35, top: 70 },
-  cameraLoading: { ...StyleSheet.absoluteFillObject, alignItems: "center", backgroundColor: "rgba(15,23,42,0.45)", justifyContent: "center" },
+  cameraLoading: { ...StyleSheet.absoluteFill, alignItems: "center", backgroundColor: "rgba(15,23,42,0.45)", justifyContent: "center" },
   manualRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   manualInput: { backgroundColor: "#fff", borderColor: "#cbd5e1", borderRadius: 15, borderWidth: 1, color: COLORS.navy, flex: 1, minHeight: 48, paddingHorizontal: 13 },
   lookupButton: { alignItems: "center", backgroundColor: COLORS.orange, borderRadius: 15, justifyContent: "center", width: 50 },
@@ -323,6 +338,9 @@ const styles = StyleSheet.create({
   typeText: { color: COLORS.orange, fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
   itemName: { color: COLORS.navy, fontSize: 14, fontWeight: "900", marginTop: 2 },
   itemMeta: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginTop: 3 },
+  unitCode: { color: COLORS.navy, fontSize: 11, fontWeight: "900", marginTop: 4 },
+  unitStateRow: { alignItems: "center", alignSelf: "flex-start", backgroundColor: "#fef3c7", borderRadius: 10, flexDirection: "row", gap: 6, marginTop: 9, paddingHorizontal: 9, paddingVertical: 6 },
+  unitStateText: { color: COLORS.navy, fontSize: 10, fontWeight: "900" },
   ownerRow: { alignItems: "flex-start", backgroundColor: "#f8fafc", borderRadius: 11, flexDirection: "row", gap: 8, marginTop: 9, padding: 9 },
   ownerText: { flex: 1 },
   ownerName: { color: COLORS.navy, fontSize: 11, fontWeight: "900" },
@@ -334,6 +352,8 @@ const styles = StyleSheet.create({
   quantityRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   quantityLabel: { color: COLORS.navy, fontSize: 12, fontWeight: "800" },
   stepper: { alignItems: "center", flexDirection: "row", gap: 13 },
+  scannedUnitPill: { alignItems: "center", backgroundColor: "#fef3c7", borderRadius: 12, flexDirection: "row", gap: 7, paddingHorizontal: 11, paddingVertical: 8 },
+  scannedUnitText: { color: COLORS.navy, fontSize: 12, fontWeight: "900" },
   stepButton: { alignItems: "center", backgroundColor: "#fef3c7", borderRadius: 18, height: 36, justifyContent: "center", width: 36 },
   quantityValue: { color: COLORS.navy, fontSize: 18, fontWeight: "900", minWidth: 22, textAlign: "center" },
   observationInput: { backgroundColor: "#fff", borderColor: "#cbd5e1", borderRadius: 15, borderWidth: 1, color: COLORS.navy, minHeight: 72, padding: 12, textAlignVertical: "top" },

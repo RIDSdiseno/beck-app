@@ -56,7 +56,8 @@ export default function FirematProductosScreen() {
 
   const load = React.useCallback(async (search = query, refresh = false) => {
     try {
-      refresh ? setRefreshing(true) : setLoading(true);
+      if (refresh) setRefreshing(true);
+      else setLoading(true);
       setError("");
       const [items, categories, session] = await Promise.all([
         getFirematProductos(search),

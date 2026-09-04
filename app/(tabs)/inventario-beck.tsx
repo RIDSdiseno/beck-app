@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "expo-router/react-navigation";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -92,10 +92,19 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-function ItemMeta({ sku, detalle, talla, color }: Pick<ItemDisponible, "sku" | "detalle" | "talla" | "color">) {
+function codigosEvento(datos: unknown): string[] {
+  if (!datos || typeof datos !== "object" || !("subSkus" in datos)) return [];
+  const subSkus = (datos as { subSkus?: unknown }).subSkus;
+  return Array.isArray(subSkus) ? subSkus.filter((valor): valor is string => typeof valor === "string") : [];
+}
+
+function ItemMeta({ sku, detalle, talla, color, subSkus }: Pick<ItemDisponible, "sku" | "detalle" | "talla" | "color" | "subSkus">) {
   const datos = [sku ? `SKU ${sku}` : null, detalle, talla ? `Talla ${talla}` : null, color].filter(Boolean);
-  if (datos.length === 0) return null;
-  return <Text style={styles.itemMeta}>{datos.join(" · ")}</Text>;
+  const codigos = subSkus?.length
+    ? `${subSkus.length === 1 ? "Unidad" : "Unidades"}: ${subSkus.slice(0, 3).join(", ")}${subSkus.length > 3 ? ` +${subSkus.length - 3}` : ""}`
+    : null;
+  if (datos.length === 0 && !codigos) return null;
+  return <Text style={styles.itemMeta}>{[...datos, codigos].filter(Boolean).join(" · ")}</Text>;
 }
 
 function EmptyState({ icon, title, message }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; message: string }) {
@@ -115,6 +124,7 @@ export default function InventarioBeckScreen() {
   const [rol, setRol] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [obras, setObras] = useState<ObraInventario[]>([]);
@@ -154,9 +164,10 @@ export default function InventarioBeckScreen() {
   }, []);
 
   const load = useCallback(async (forceRefresh = false) => {
+    const shouldBlockScreen = !hasLoadedRef.current;
     if (forceRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
+    else if (shouldBlockScreen) setLoading(true);
+    if (forceRefresh || shouldBlockScreen) setError(null);
     try {
       const session = await getSession();
       const currentRole = session.user?.rol ?? null;
@@ -179,11 +190,17 @@ export default function InventarioBeckScreen() {
         setMiEquipo(equipo);
         setHistorialEquipo(historial);
       }
+      hasLoadedRef.current = true;
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar el inventario.");
+      if (forceRefresh || shouldBlockScreen) {
+        setError(err instanceof Error ? err.message : "No se pudo cargar el inventario.");
+      } else if (__DEV__) {
+        console.warn("No se pudo actualizar el inventario en segundo plano", err);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (shouldBlockScreen) setLoading(false);
+      if (forceRefresh) setRefreshing(false);
     }
   }, [loadSupervisorObra]);
 
@@ -207,19 +224,19 @@ export default function InventarioBeckScreen() {
 
   const normalizedSearch = search.trim().toLocaleLowerCase("es-CL");
   const visibleDisponibles = useMemo(() => disponibles.filter((item) =>
-    !normalizedSearch || [item.nombre, item.sku, item.detalle, item.tipoItem]
+    !normalizedSearch || [item.nombre, item.sku, item.detalle, item.tipoItem, item.subSkus?.join(" ")]
       .some((value) => value?.toLocaleLowerCase("es-CL").includes(normalizedSearch))),
   [disponibles, normalizedSearch]);
   const visibleEntregados = useMemo(() => entregados.filter((item) =>
-    !normalizedSearch || [item.nombre, item.sku, item.detalle, item.trabajador.nombre]
+    !normalizedSearch || [item.nombre, item.sku, item.detalle, item.trabajador.nombre, item.subSkus?.join(" ")]
       .some((value) => value?.toLocaleLowerCase("es-CL").includes(normalizedSearch))),
   [entregados, normalizedSearch]);
   const visibleMiEquipo = useMemo(() => miEquipo.filter((item) =>
-    !normalizedSearch || [item.nombre, item.sku, item.detalle, item.obra.nombre, item.obra.codigo]
+    !normalizedSearch || [item.nombre, item.sku, item.detalle, item.obra.nombre, item.obra.codigo, item.subSkus?.join(" ")]
       .some((value) => value?.toLocaleLowerCase("es-CL").includes(normalizedSearch))),
   [miEquipo, normalizedSearch]);
   const visibleHistorialEquipo = useMemo(() => historialEquipo.filter((item) =>
-    !normalizedSearch || [item.nombre, item.sku, item.obra.nombre, item.obra.codigo, item.actor.nombre]
+    !normalizedSearch || [item.nombre, item.sku, item.obra.nombre, item.obra.codigo, item.actor.nombre, item.subSkus?.join(" ")]
       .some((value) => value?.toLocaleLowerCase("es-CL").includes(normalizedSearch))),
   [historialEquipo, normalizedSearch]);
 
@@ -593,7 +610,7 @@ export default function InventarioBeckScreen() {
               <Pressable style={styles.itemCard} onPress={() => void abrirTrazabilidad({ asignacionId: item.asignacionId })}>
                 <View style={styles.cardTop}>
                   <View style={styles.typeIcon}><MaterialCommunityIcons name={tipoIcon(item.tipoItem)} size={22} color={COLORS.navy} /></View>
-                  <View style={styles.itemText}><Text style={styles.typeText}>{accionLabel(item.accion)}</Text><Text style={styles.itemName}>{item.nombre}</Text><Text style={styles.itemMeta}>{item.obra.nombre}{item.obra.codigo ? ` · ${item.obra.codigo}` : ""}</Text></View>
+                  <View style={styles.itemText}><Text style={styles.typeText}>{accionLabel(item.accion)}</Text><Text style={styles.itemName}>{item.nombre}</Text><Text style={styles.itemMeta}>{item.obra.nombre}{item.obra.codigo ? ` · ${item.obra.codigo}` : ""}{item.subSkus?.length ? ` · ${item.subSkus.join(", ")}` : ""}</Text></View>
                   <View style={styles.quantityBadge}><Text style={styles.quantityBadgeText}>×{item.cantidad}</Text></View>
                 </View>
                 <View style={styles.deliveryInfo}><MaterialCommunityIcons name="account-outline" size={16} color={COLORS.muted} /><Text style={styles.deliveryText}>{item.actor.nombre}</Text></View>
@@ -707,6 +724,7 @@ export default function InventarioBeckScreen() {
                       <Text style={styles.traceAction}>{accionLabel(item.accion)}</Text>
                       <Text style={styles.traceMeta}>{formatDate(item.created_at)} · {item.usuarios_trazabilidad_inventario_beck_actor_idTousuarios.nombre}</Text>
                       <Text style={styles.traceQuantity}>{item.cantidad} {item.cantidad === 1 ? "unidad" : "unidades"}</Text>
+                      {codigosEvento(item.datos).length ? <Text style={styles.traceDetail}>Código: {codigosEvento(item.datos).join(", ")}</Text> : null}
                       {item.detalle ? <Text style={styles.traceDetail}>{item.detalle}</Text> : null}
                     </View>
                   </View>

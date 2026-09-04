@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Modal, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { Text } from "react-native-paper";
 
@@ -45,10 +45,6 @@ export function BeckDateFilter({ value, onChange, compact = false, containerStyl
   const [visible, setVisible] = useState(false);
   const [month, setMonth] = useState(() => parseLocalDate(value));
 
-  useEffect(() => {
-    if (visible) setMonth(parseLocalDate(value));
-  }, [value, visible]);
-
   const days = useMemo(() => {
     const year = month.getFullYear();
     const monthIndex = month.getMonth();
@@ -73,7 +69,10 @@ export function BeckDateFilter({ value, onChange, compact = false, containerStyl
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Seleccionar fecha del historial"
-          onPress={() => setVisible(true)}
+          onPress={() => {
+            setMonth(parseLocalDate(value));
+            setVisible(true);
+          }}
           style={({ pressed }) => [styles.selectButton, pressed && styles.pressed]}
         >
           {!compact ? (

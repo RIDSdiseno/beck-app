@@ -249,5 +249,5 @@ const styles = StyleSheet.create({
   footerLoader: { marginVertical: 18 },
   removeButton: { borderColor: "#dc2626", marginBottom: 12, marginTop: -5 },
   removeLabel: { color: "#dc2626", fontWeight: "700" },
-  detailOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(15,23,42,0.22)", zIndex: 20 },
+  detailOverlay: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(15,23,42,0.22)", zIndex: 20 },
 });

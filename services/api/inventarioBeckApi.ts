@@ -26,6 +26,7 @@ export type ItemInventario = {
   talla?: string | null;
   color?: string | null;
   unidadMedida?: string | null;
+  subSkus?: string[];
 };
 
 export type ItemDisponible = ItemInventario & { disponible: number };
@@ -83,6 +84,11 @@ export type EventoHistorialEquipo = ItemInventario & {
 };
 
 export type ResultadoEscaneoInventario = ItemInventario & {
+  subSku?: string | null;
+  tipoConsulta?: "sku" | "unidad";
+  estadoUnidad?: "en_bodega" | "disponible_supervisor" | "asignado_operario";
+  asignacionId?: string | null;
+  ultimaActualizacion?: string | null;
   saldoBodega: number | null;
   custodios: {
     asignacionId: string;
@@ -147,7 +153,7 @@ export async function asignarInventario(input: {
   obraId: string;
   trabajadorId: string;
   observacion?: string;
-  lineas: { tipoItem: TipoInventarioBeck; itemId: string; cantidad: number }[];
+  lineas: { tipoItem: TipoInventarioBeck; itemId: string; cantidad: number; subSku?: string }[];
 }) {
   return request<{ ids: string[]; cantidadLineas: number }>(
     "/api/inventario-beck/supervisor/asignaciones",
@@ -223,7 +229,7 @@ export async function getHistorialMiEquipo() {
 }
 
 export async function getInventarioPorCodigo(codigo: string) {
-  return request<{ codigo: string; resultados: ResultadoEscaneoInventario[] }>(
+  return request<{ codigo: string; tipoConsulta: "sku" | "unidad"; resultados: ResultadoEscaneoInventario[] }>(
     `/api/inventario-beck/supervisor/codigo/${encodeURIComponent(codigo.trim())}`,
   );
 }

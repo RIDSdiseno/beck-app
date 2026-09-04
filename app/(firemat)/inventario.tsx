@@ -39,7 +39,8 @@ export default function FirematInventarioScreen() {
 
   const load = React.useCallback(async (refresh = false) => {
     try {
-      refresh ? setRefreshing(true) : setLoading(true);
+      if (refresh) setRefreshing(true);
+      else setLoading(true);
       setError("");
       const [data, session] = await Promise.all([
         getFirematInventario(query, bajoStock),

@@ -82,7 +82,7 @@ export default function TabLayout() {
   return (
     <PaperProvider theme={theme}>
       <View style={styles.container}>
-            <StatusBar style="dark" backgroundColor="#f5f7fb" />
+            <StatusBar style="dark" />
             <Tabs
               screenOptions={{
                 headerShown: false,

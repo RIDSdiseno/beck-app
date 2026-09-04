@@ -10,7 +10,7 @@ import {
 } from "@/services/api/obrasApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -68,7 +68,9 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
     onPathChange(combined, w, h);
   }, [onPathChange]);
 
-  const panResponder = PanResponder.create({
+  // PanResponder conserva estos callbacks y solo accede a los refs durante los gestos.
+  // eslint-disable-next-line react-hooks/refs
+  const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder:       () => true,
     onMoveShouldSetPanResponder:        () => true,
     onStartShouldSetPanResponderCapture: () => true,
@@ -110,7 +112,7 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
       setCurrentPath("");
       isDrawing.current = false;
     },
-  });
+  }), [notifyChange, onScrollLock]);
 
   const handleClear = () => {
     completedPathsRef.current = [];
@@ -230,11 +232,7 @@ export default function ClienteRegistroScreen() {
   const [showFotos, setShowFotos] = useState(false);
 
   useEffect(() => {
-    if (!id || !obraId) {
-      setError("Faltan parámetros de navegación");
-      setLoading(false);
-      return;
-    }
+    if (!id || !obraId) return;
     const load = async () => {
       try {
         const registros = await getClienteRegistrosObra(obraId);
@@ -250,7 +248,7 @@ export default function ClienteRegistroScreen() {
         setLoading(false);
       }
     };
-    load();
+    void load();
   }, [id, obraId]);
 
   useEffect(() => {
@@ -341,6 +339,17 @@ export default function ClienteRegistroScreen() {
       setSharing(false);
     }
   };
+
+  if (!id || !obraId) {
+    return (
+      <SafeAreaView style={[styles.container, { paddingTop: 14 }]} edges={["top"]}>
+        <View style={styles.errorState}>
+          <Text style={styles.errorText}>Faltan parámetros de navegación</Text>
+          <Button mode="contained" onPress={() => router.back()}>Volver</Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (loading) {
     return (

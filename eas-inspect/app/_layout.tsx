@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -52,7 +52,7 @@ export default function RootLayout() {
       </ThemeProvider>
 
       {!splashDone && (
-        <Animated.View style={[StyleSheet.absoluteFillObject, splashStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, splashStyle]}>
           <BeckSplash />
         </Animated.View>
       )}
