@@ -10,6 +10,17 @@
         "buildType": "apk"
       }
     },
+    "production-apk": {
+      "channel": "production",
+      "environment": "production",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://beck-mobile-backend-production.up.railway.app"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "channel": "production",
       "android": {
