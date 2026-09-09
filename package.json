@@ -13,14 +13,16 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "update:prod": "node ./scripts/publish-update.js production",
+    "update:expo-go": "node ./scripts/publish-update.js expo-go"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "axios": "^1.18.1",
     "dayjs": "^1.11.19",
-    "expo": "^57.0.20",
+    "expo": "~57.0.21",
     "expo-auth-session": "~57.0.11",
     "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.17",
@@ -31,7 +33,7 @@
     "expo-image-manipulator": "~57.0.16",
     "expo-image-picker": "~57.0.16",
     "expo-linking": "~57.0.9",
-    "expo-router": "~57.0.19",
+    "expo-router": "~57.0.20",
     "expo-secure-store": "~57.0.3",
     "expo-sharing": "~57.0.18",
     "expo-splash-screen": "~57.0.8",

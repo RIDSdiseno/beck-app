@@ -2,6 +2,7 @@ import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
 import { ResultadoParametro } from "@/services/api/ingenieriaApi";
+import { File } from "expo-file-system";
 
 export type FotoCorreccionParametro = {
   id: string;
@@ -131,11 +132,7 @@ export async function uploadCorreccionParametroFotos(
   const formData = new FormData();
 
   fotos.forEach((foto) => {
-    formData.append("fotos", {
-      uri: foto.uri,
-      name: foto.name,
-      type: foto.type,
-    } as any);
+    formData.append("fotos", new File(foto.uri), foto.name);
   });
 
   const response = await authenticatedFetch(

@@ -13,6 +13,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import {
   Alert,
+  BackHandler,
   FlatList,
   Modal,
   ScrollView,
@@ -65,6 +66,14 @@ export default function FirematScannerScreen() {
   const [editingItem, setEditingItem] = React.useState<CartItem | null>(null);
   const [editedUnits, setEditedUnits] = React.useState("");
 
+  const returnToInventory = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/(firemat)/inventario");
+  }, [router]);
+
   const resetReception = React.useCallback(() => {
     scanLockRef.current = false;
     receptionId.current = createReceptionId();
@@ -91,6 +100,16 @@ export default function FirematScannerScreen() {
     React.useCallback(() => {
       resetReception();
     }, [resetReception]),
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        returnToInventory();
+        return true;
+      });
+      return () => subscription.remove();
+    }, [returnToInventory]),
   );
 
   const cartItems = React.useMemo(() => Object.values(cart), [cart]);
@@ -297,7 +316,7 @@ export default function FirematScannerScreen() {
               });
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Recepción guardada", `Se agregaron ${totalUnits} unidades al inventario.`, [
-                { text: "Aceptar", onPress: () => router.back() },
+                { text: "Aceptar", onPress: returnToInventory },
               ]);
             } catch (error) {
               Alert.alert("No se pudo guardar", error instanceof Error ? error.message : "Error desconocido");
@@ -322,7 +341,7 @@ export default function FirematScannerScreen() {
           <Text style={styles.permissionTitle}>Permiso de cámara</Text>
           <Text style={styles.muted}>Firemat necesita la cámara para leer las etiquetas de las cajas.</Text>
           <Button mode="contained" buttonColor="#dc2626" onPress={requestPermission}>Permitir cámara</Button>
-          <Button textColor="#d4d4d4" onPress={() => router.back()}>Volver</Button>
+          <Button textColor="#d4d4d4" onPress={returnToInventory}>Volver</Button>
         </View>
       </SafeAreaView>
     );
@@ -331,7 +350,7 @@ export default function FirematScannerScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity onPress={returnToInventory} style={styles.headerButton}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.headerText}>

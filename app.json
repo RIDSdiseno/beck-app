@@ -26,11 +26,17 @@
     },
     "android": {
       "package": "com.expotest2sorganization.beckapp",
+      "userInterfaceStyle": "light",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-foreground-small.png",
         "backgroundColor": "#facc15"
       },
       "predictiveBackGestureEnabled": false
+    },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#f5f7fb",
+      "translucent": true
     },
     "web": {
       "output": "static",

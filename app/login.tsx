@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -43,8 +44,8 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-// Se habilitará cuando las pruebas se realicen con un development build de EAS.
-const MICROSOFT_LOGIN_ENABLED = false;
+const MICROSOFT_LOGIN_ENABLED = true;
+const FIREMAT_MICROSOFT_LOGIN_CONFIGURED = false;
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -83,6 +84,14 @@ export default function LoginScreen() {
 
   const onMicrosoftLogin = async () => {
     if (!MICROSOFT_LOGIN_ENABLED) return;
+
+    if (isFiremat && !FIREMAT_MICROSOFT_LOGIN_CONFIGURED) {
+      Alert.alert(
+        "Acceso Microsoft Firemat",
+        "La conexión con Microsoft para Firemat aún no está configurada.",
+      );
+      return;
+    }
 
     try {
       setError("");
@@ -128,6 +137,14 @@ export default function LoginScreen() {
     try {
       setError("");
 
+      if (!email.trim() || !password) {
+        const message =
+          "Debes ingresar el correo y la contraseña para iniciar sesión.";
+        setError(message);
+        Alert.alert("Credenciales requeridas", message);
+        return;
+      }
+
       if (!isValidEmail(email)) {
         setError("Correo no válido.");
         return;
@@ -150,8 +167,7 @@ export default function LoginScreen() {
   const isLoading = isMicrosoftLoading || isEmailLoading;
   const hasEmailValue = Boolean(email.trim());
   const hasEmailError = hasEmailValue && !isValidEmail(email);
-  const isEmailLoginDisabled =
-    isLoading || !email.trim() || hasEmailError || !password;
+  const isEmailLoginDisabled = isLoading;
   const isMicrosoftLoginDisabled =
     !MICROSOFT_LOGIN_ENABLED || !request || isLoading;
   const isAndroid = Platform.OS === "android";
@@ -219,7 +235,11 @@ export default function LoginScreen() {
               </View>
 
               <Card
-                style={[styles.card, isAndroid && styles.androidCard]}
+                style={[
+                  styles.card,
+                  Platform.OS === "ios" && styles.iosCard,
+                  isAndroid && styles.androidCard,
+                ]}
                 elevation={3}
               >
                 <Card.Content>
@@ -342,7 +362,7 @@ export default function LoginScreen() {
                     ]}
                     labelStyle={styles.buttonLabel}
                   >
-                    Acceso Microsoft próximamente
+                    Ingresar con Microsoft
                   </Button>
 
                   {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -426,6 +446,7 @@ const styles = StyleSheet.create({
   androidContainer: {
     justifyContent: "center",
     paddingBottom: 0,
+    transform: [{ translateY: 24 }],
   },
   logoContainer: {
     alignItems: "center",
@@ -444,7 +465,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   firematLogo: {
-    transform: [{ translateX: 12 }],
+    transform: [{ translateX: 4 }],
   },
   androidLogo: {
     height: 235,
@@ -459,6 +480,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 0,
     paddingVertical: 6,
+  },
+  iosCard: {
+    transform: [{ translateY: -14 }],
   },
   androidCard: {
     borderRadius: 18,

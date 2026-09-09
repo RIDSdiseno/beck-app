@@ -6,8 +6,14 @@ import {
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import React from "react";
-import { LogBox } from "react-native";
+import {
+  LogBox,
+  Platform,
+  StatusBar as NativeStatusBar,
+  StyleSheet,
+} from "react-native";
 import { MD3LightTheme, Provider as PaperProvider } from "react-native-paper";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,6 +23,15 @@ import { RegistrosProvider } from "@/context/RegistrosContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const ANDROID_ROOT_BACKGROUND = "#f5f7fb";
+
+if (Platform.OS === "android") {
+  SystemUI.setBackgroundColorAsync(ANDROID_ROOT_BACKGROUND).catch(() => {});
+  NativeStatusBar.setTranslucent(true);
+  NativeStatusBar.setBackgroundColor("transparent", true);
+  NativeStatusBar.setBarStyle("dark-content", true);
+}
 
 LogBox.ignoreLogs([
   "SafeAreaView has been deprecated and will be removed in a future release",
@@ -44,8 +59,8 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider style={styles.root}>
         <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
           <PaperProvider theme={paperTheme}>
             <HistorialProvider>
@@ -71,3 +86,11 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor:
+      Platform.OS === "android" ? ANDROID_ROOT_BACKGROUND : undefined,
+  },
+});

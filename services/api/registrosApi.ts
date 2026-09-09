@@ -1,6 +1,7 @@
 import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
+import { File } from "expo-file-system";
 
 export type CreateRegistroPayload = {
   obraId: string;
@@ -453,11 +454,7 @@ async function uploadRegistroFotosRequest(
   const formData = new FormData();
 
   fotos.forEach((foto) => {
-    formData.append("fotos", {
-      uri: foto.uri,
-      name: foto.name,
-      type: foto.type,
-    } as any);
+    formData.append("fotos", new File(foto.uri), foto.name);
   });
 
   const replaceQuery = replaceExisting ? "?replace=true" : "";

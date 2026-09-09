@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Image } from "react-native";
+import { View, StyleSheet, Image, Platform } from "react-native";
 import { Text, Button } from "react-native-paper";
 
 type Props = {
@@ -72,6 +72,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: Platform.OS === "android" ? 8 : 0,
     marginBottom: 12,
     gap: 8,
   },

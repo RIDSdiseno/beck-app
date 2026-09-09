@@ -1,6 +1,7 @@
 import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
+import { File } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
@@ -407,11 +408,7 @@ export async function uploadControlInspeccionFotos(
   const formData = new FormData();
 
   fotos.forEach((foto) => {
-    formData.append("fotos", {
-      uri: foto.uri,
-      name: foto.name,
-      type: foto.type,
-    } as any);
+    formData.append("fotos", new File(foto.uri), foto.name);
   });
 
   const response = await authenticatedFetch(
