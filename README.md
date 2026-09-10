@@ -283,7 +283,8 @@ El proyecto usa **EAS Build** para generar los binarios de producción y **EAS U
 
 | Perfil | Canal | Formato | Uso |
 |--------|-------|---------|-----|
-| `preview` | `production` | APK (Android) | Testing interno, distribución directa |
+| `preview` | `preview` | APK (Android) | Testing interno, distribución directa |
+| `production-apk` | `production` | APK (Android) | Verificar el build de producción sin pasar por la tienda |
 | `production` | `production` | AAB (Android) / IPA (iOS) | Google Play / App Store |
 
 ### Generar un build
@@ -301,12 +302,32 @@ eas build --profile production --platform ios
 
 ### Actualización OTA
 
+Usá **siempre** el script del repo, nunca `eas update` directo:
+
 ```bash
-# Publicar actualización sin necesidad de nuevo build
-eas update --channel production --message "Descripción del cambio"
+# Producción (Google Play / App Store)
+node ./scripts/publish-update.js production "Descripción del cambio"
+
+# Testing interno (APK del perfil preview)
+node ./scripts/publish-update.js preview "Descripción del cambio"
 ```
 
+> ⚠️ **No corras `eas update --channel …` a mano.** Expo CLI carga `.env.local` con prioridad sobre `.env`, y `.env.local` apunta al backend de desarrollo en la red local. Publicar así hornea la IP de LAN en el bundle de todos los usuarios. El script fija las variables desde `.env` (producción) y desactiva la carga de dotenv para evitarlo.
+
 > Las actualizaciones OTA solo funcionan para cambios en JavaScript/assets. Cambios en código nativo (plugins, permisos, etc.) requieren nuevo build.
+
+### ⚠️ `version` y runtime: no tocar sin rebuildear
+
+`app.json` usa `runtimeVersion: { "policy": "appVersion" }`, así que **el runtime del build ES el campo `version`**. Hoy `version: "1.0.5"` → runtime `1.0.5`.
+
+Si subís `version` a `1.0.6`:
+
+1. Todo update posterior sale con runtime `1.0.6`.
+2. Los APK ya instalados siguen en runtime `1.0.5`.
+3. **Esos dispositivos dejan de recibir updates OTA de forma permanente** — el servidor responde `204 NO_UPDATE_AVAILABLE`, sin error visible ni aviso.
+4. La única salida es rebuildear y redistribuir el APK a todo el equipo.
+
+**Regla:** mientras haya que mandar OTA a la flota interna, no toques `version`. Cuando la subas, hacé todo junto y en este orden: subir `version` → build → distribuir → recién entonces publicar updates.
 
 ### IDs de la app
 

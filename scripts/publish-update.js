@@ -14,6 +14,7 @@ const path = require("node:path");
 const RAIZ = path.resolve(__dirname, "..");
 const DESTINOS = {
   production: { canal: "production", expoGo: false },
+  preview: { canal: "preview", expoGo: false },
   "expo-go": { canal: "expo-go", expoGo: true },
 };
 
@@ -48,6 +49,19 @@ function leerEnv(archivo) {
   return variables;
 }
 
+// Resuelve el runtime literal que va a llevar el update para dejarlo a la vista
+// antes de publicar. Con la policy "appVersion" el runtime es el campo `version`
+// de app.json: si cambia, los builds ya instalados dejan de recibir OTA.
+function resolverRuntime(expoGo) {
+  if (expoGo) {
+    const { version: versionExpo } = require("expo/package.json");
+    return `exposdk:${versionExpo.split(".")[0]}.0.0 (Expo Go)`;
+  }
+
+  const { expo } = require(path.join(RAIZ, "app.json"));
+  return `${expo.version} (policy appVersion)`;
+}
+
 const [destinoPedido, ...restoArgs] = process.argv.slice(2);
 const destino = DESTINOS[destinoPedido];
 
@@ -75,7 +89,7 @@ if (faltantes.length > 0) {
 
 console.log(`Canal: ${destino.canal}`);
 console.log(`API: ${variables.EXPO_PUBLIC_API_BASE_URL}`);
-console.log(`Runtime: ${destino.expoGo ? "exposdk (Expo Go)" : "appVersion (builds de tienda)"}\n`);
+console.log(`Runtime: ${resolverRuntime(destino.expoGo)}\n`);
 
 const resultado = spawnSync(
   "npx",
