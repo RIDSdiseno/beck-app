@@ -25,7 +25,7 @@
       }
     },
     "android": {
-      "package": "com.expotest2sorganization.beckapp",
+      "package": "com.beckcrm.app",
       "userInterfaceStyle": "light",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-foreground-small.png",

@@ -284,7 +284,7 @@ El proyecto usa **EAS Build** para generar los binarios de producción y **EAS U
 | Perfil | Canal | Formato | Uso |
 |--------|-------|---------|-----|
 | `preview` | `preview` | APK (Android) | Testing interno, distribución directa |
-| `production-apk` | `production` | APK (Android) | Verificar el build de producción sin pasar por la tienda |
+| `production-apk` | `staging` | APK (Android) | Verificar el build de producción sin pasar por la tienda |
 | `production` | `production` | AAB (Android) / IPA (iOS) | Google Play / App Store |
 
 ### Generar un build
@@ -310,6 +310,9 @@ node ./scripts/publish-update.js production "Descripción del cambio"
 
 # Testing interno (APK del perfil preview)
 node ./scripts/publish-update.js preview "Descripción del cambio"
+
+# Verificación del build de producción (APK del perfil production-apk)
+node ./scripts/publish-update.js staging "Descripción del cambio"
 ```
 
 > ⚠️ **No corras `eas update --channel …` a mano.** Expo CLI carga `.env.local` con prioridad sobre `.env`, y `.env.local` apunta al backend de desarrollo en la red local. Publicar así hornea la IP de LAN en el bundle de todos los usuarios. El script fija las variables desde `.env` (producción) y desactiva la carga de dotenv para evitarlo.
@@ -329,9 +332,20 @@ Si subís `version` a `1.0.6`:
 
 **Regla:** mientras haya que mandar OTA a la flota interna, no toques `version`. Cuando la subas, hacé todo junto y en este orden: subir `version` → build → distribuir → recién entonces publicar updates.
 
+### Pendientes antes del release en Google Play
+
+Detectados y **no resueltos todavía**. Revisar antes de subir el AAB:
+
+| # | Pendiente | Detalle |
+|---|-----------|---------|
+| P1 | Icono adaptativo mal preparado | `android-foreground-small.png` es 1254×1254 **sin canal alfa**: el `backgroundColor` `#facc15` nunca se ve y el logo se recorta con la máscara del launcher (zona segura = 66% central). Reexportar el foreground con transparencia y el logo contenido. Falta también `monochromeImage` para iconos temáticos de Android 13+ (opcional). |
+| P1 | Permisos sensibles sin uso | El APK de release declara `RECORD_AUDIO` y `SYSTEM_ALERT_WINDOW`. `recordAudioAndroid: false` está bien configurado y el plugin lo respeta, pero se cuelan por merge de un AAR (CameraX/MLKit). Quitarlos con un config plugin usando `tools:node="remove"`. |
+| P1 | Texto de permiso inconsistente | El `cameraPermission` dice *"Firemat necesita usar la cámara…"* y la app se llama "Beck App". |
+| P0 | Política de privacidad | Play Console exige una URL pública. La app recolecta email, nombre, rol, fotos y usa cámara. **A cargo del dueño del proyecto.** |
+
 ### IDs de la app
 
 | Plataforma | Bundle ID |
 |-----------|-----------|
 | iOS | `com.beckcrm.app` |
-| Android | `com.expotest2sorganization.beckapp` |
+| Android | `com.beckcrm.app` |

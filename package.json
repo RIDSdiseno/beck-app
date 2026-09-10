@@ -15,7 +15,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "update:prod": "node ./scripts/publish-update.js production",
-    "update:expo-go": "node ./scripts/publish-update.js expo-go"
+    "update:staging": "node ./scripts/publish-update.js staging",
+    "update:preview": "node ./scripts/publish-update.js preview"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
