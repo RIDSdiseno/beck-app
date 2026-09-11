@@ -1858,6 +1858,89 @@ export default function RegistrosScreen({
     </Modal>
   );
 
+  const renderCalendarModal = () => (
+    <Modal
+      visible={calendarVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setCalendarVisible(false)}
+    >
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={() => setCalendarVisible(false)}
+      >
+        <Pressable style={styles.calendarModal} onPress={() => {}}>
+          <View style={styles.calendarHeader}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mes anterior"
+              onPress={() => changeCalendarMonth(-1)}
+              style={styles.calendarMonthButton}
+            >
+              <MaterialCommunityIcons name="chevron-left" size={24} color="#0f172a" />
+            </Pressable>
+            <Text style={styles.calendarTitle}>
+              {MONTH_NAMES[calendarMonth.getMonth()]}{" "}
+              {calendarMonth.getFullYear()}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mes siguiente"
+              onPress={() => changeCalendarMonth(1)}
+              style={styles.calendarMonthButton}
+            >
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#0f172a" />
+            </Pressable>
+          </View>
+
+          <View style={styles.weekRow}>
+            {WEEK_DAYS.map((day, index) => (
+              <Text key={`${day}-${index}`} style={styles.weekDay}>
+                {day}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {buildCalendarDays(calendarMonth).map((day, index) => {
+              const dayDate = day
+                ? formatDate(
+                    new Date(
+                      calendarMonth.getFullYear(),
+                      calendarMonth.getMonth(),
+                      day,
+                    ),
+                  )
+                : "";
+              const isSelected = dayDate === fecha;
+
+              return (
+                <Pressable
+                  key={`${day || "empty"}-${index}`}
+                  disabled={!day}
+                  onPress={() => day && selectCalendarDay(day)}
+                  style={[
+                    styles.calendarDay,
+                    isSelected && styles.calendarDaySelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.calendarDayText,
+                      isSelected && styles.calendarDayTextSelected,
+                    ]}
+                  >
+                    {day || ""}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
   const renderFotos = (options?: {
     existingFotos?: NonNullable<RegistroHistorialApi["fotos"]>;
     replacementMode?: boolean;
@@ -2675,6 +2758,7 @@ export default function RegistrosScreen({
         </ScrollView>
         </TouchableWithoutFeedback>
         {renderItemizadoSelectorModal()}
+        {renderCalendarModal()}
       </SafeAreaView>
     );
   }
@@ -3644,86 +3728,7 @@ export default function RegistrosScreen({
         </SafeAreaView>
       </Modal>
 
-      <Modal
-        visible={calendarVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCalendarVisible(false)}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setCalendarVisible(false)}
-        >
-          <Pressable style={styles.calendarModal} onPress={() => {}}>
-            <View style={styles.calendarHeader}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mes anterior"
-                onPress={() => changeCalendarMonth(-1)}
-                style={styles.calendarMonthButton}
-              >
-                <MaterialCommunityIcons name="chevron-left" size={24} color="#0f172a" />
-              </Pressable>
-              <Text style={styles.calendarTitle}>
-                {MONTH_NAMES[calendarMonth.getMonth()]}{" "}
-                {calendarMonth.getFullYear()}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mes siguiente"
-                onPress={() => changeCalendarMonth(1)}
-                style={styles.calendarMonthButton}
-              >
-                <MaterialCommunityIcons name="chevron-right" size={24} color="#0f172a" />
-              </Pressable>
-            </View>
-
-            <View style={styles.weekRow}>
-              {WEEK_DAYS.map((day, index) => (
-                <Text key={`${day}-${index}`} style={styles.weekDay}>
-                  {day}
-                </Text>
-              ))}
-            </View>
-
-            <View style={styles.calendarGrid}>
-              {buildCalendarDays(calendarMonth).map((day, index) => {
-                const dayDate = day
-                  ? formatDate(
-                      new Date(
-                        calendarMonth.getFullYear(),
-                        calendarMonth.getMonth(),
-                        day,
-                      ),
-                    )
-                  : "";
-                const isSelected = dayDate === fecha;
-
-                return (
-                  <Pressable
-                    key={`${day || "empty"}-${index}`}
-                    disabled={!day}
-                    onPress={() => day && selectCalendarDay(day)}
-                    style={[
-                      styles.calendarDay,
-                      isSelected && styles.calendarDaySelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.calendarDayText,
-                        isSelected && styles.calendarDayTextSelected,
-                      ]}
-                    >
-                      {day || ""}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {renderCalendarModal()}
 
       <Modal
         visible={confirmVisible}
