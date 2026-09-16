@@ -1,6 +1,7 @@
 import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
+import { markFirematInventoryChanged } from "./firematInventoryChanges";
 
 export type FirematProducto = {
   id: number;
@@ -85,6 +86,7 @@ export async function createFirematProducto(payload: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  markFirematInventoryChanged();
   return data.data as FirematProducto;
 }
 
@@ -94,6 +96,7 @@ export async function updateFirematProducto(id: number, payload: Record<string, 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  markFirematInventoryChanged();
   return data.data as FirematProducto;
 }
 
@@ -117,6 +120,7 @@ export async function updateFirematInventario(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  markFirematInventoryChanged();
   return data.data as FirematProducto;
 }
 
@@ -153,6 +157,7 @@ export async function createFirematScanReception(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  markFirematInventoryChanged();
   return {
     duplicada: Boolean(data.duplicada),
     productos: ensureArray(data?.data, "Respuesta de recepción inválida") as FirematProducto[],

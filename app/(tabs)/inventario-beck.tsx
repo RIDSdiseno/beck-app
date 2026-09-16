@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { SelectSheet } from "@/components/SelectSheet";
+import { nuevaOperacionBodega } from "@/services/api/bodegaBeckApi";
 import {
   asignarInventario,
   confirmarRecepcionInventario,
@@ -75,6 +76,7 @@ function accionLabel(accion: string) {
     DEVOLUCION_SOLICITADA_OPERARIO: "Devolución solicitada",
     DEVOLUCION_RECIBIDA_SUPERVISOR: "Devolución recibida por supervisor",
     DEVUELTO_BODEGA: "Devuelto a bodega",
+    DEVOLUCION_SOLICITADA_BODEGA: "Pendiente de recepción en bodega",
   };
   return labels[accion] ?? accion.replaceAll("_", " ").toLocaleLowerCase("es-CL");
 }
@@ -148,6 +150,7 @@ export default function InventarioBeckScreen() {
   const [bodegaItem, setBodegaItem] = useState<ItemDisponible | null>(null);
   const [bodegaCantidad, setBodegaCantidad] = useState(1);
   const [bodegaMotivo, setBodegaMotivo] = useState("");
+  const solicitudBodega = useRef({ firma: "", id: "", enviando: false });
   const [trazabilidadOpen, setTrazabilidadOpen] = useState(false);
   const [trazabilidadLoading, setTrazabilidadLoading] = useState(false);
   const [trazabilidad, setTrazabilidad] = useState<EventoTrazabilidad[]>([]);
@@ -347,7 +350,10 @@ export default function InventarioBeckScreen() {
   };
 
   const devolverABodega = async () => {
-    if (!bodegaItem || !obraId) return;
+    if (!bodegaItem || !obraId || solicitudBodega.current.enviando) return;
+    const firma = JSON.stringify([obraId, bodegaItem.itemId, bodegaItem.tipoItem, bodegaCantidad, bodegaMotivo]);
+    if (solicitudBodega.current.firma !== firma) solicitudBodega.current = { firma, id: nuevaOperacionBodega(), enviando: false };
+    solicitudBodega.current.enviando = true;
     setSaving(true);
     try {
       await devolverInventarioABodega({
@@ -356,16 +362,19 @@ export default function InventarioBeckScreen() {
         itemId: bodegaItem.itemId,
         cantidad: bodegaCantidad,
         motivo: bodegaMotivo,
+        requestId: solicitudBodega.current.id,
       });
       await loadSupervisorObra(obraId);
       setSeleccion({});
       setBodegaItem(null);
       setBodegaCantidad(1);
       setBodegaMotivo("");
-      Alert.alert("Devolución registrada", "Las unidades fueron reintegradas al stock de bodega.");
+      solicitudBodega.current.firma = "";
+      Alert.alert("Devolución solicitada", "Las unidades quedan reservadas hasta que bodega confirme su recepción.");
     } catch (err) {
       Alert.alert("No se pudo devolver", err instanceof Error ? err.message : "Intenta nuevamente.");
     } finally {
+      solicitudBodega.current.enviando = false;
       setSaving(false);
     }
   };

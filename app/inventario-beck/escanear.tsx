@@ -46,6 +46,7 @@ function tipoIcon(tipo: string): keyof typeof MaterialCommunityIcons.glyphMap {
 }
 
 function estadoUnidadLabel(estado?: ResultadoEscaneoInventario["estadoUnidad"]) {
+  if (estado === "pendiente_bodega") return "Pendiente de recepción en bodega";
   if (estado === "asignado_operario") return "Asignado a operario";
   if (estado === "disponible_supervisor") return "Disponible con supervisor";
   if (estado === "en_bodega") return "Devuelto a bodega";

@@ -84,13 +84,15 @@ export type EventoHistorialEquipo = ItemInventario & {
 };
 
 export type ResultadoEscaneoInventario = ItemInventario & {
+  pendienteBodega?: boolean;
   subSku?: string | null;
   tipoConsulta?: "sku" | "unidad";
-  estadoUnidad?: "en_bodega" | "disponible_supervisor" | "asignado_operario";
+  estadoUnidad?: "en_bodega" | "disponible_supervisor" | "asignado_operario" | "pendiente_bodega";
   asignacionId?: string | null;
   ultimaActualizacion?: string | null;
   saldoBodega: number | null;
   custodios: {
+    pendienteBodega?: boolean;
     asignacionId: string;
     cantidad: number;
     obra: ObraInventario;
@@ -193,6 +195,7 @@ export async function devolverInventarioABodega(input: {
   itemId: string;
   cantidad: number;
   motivo?: string;
+  requestId?: string;
 }) {
   return request<{ ids: string[]; cantidad: number }>(
     "/api/inventario-beck/supervisor/devoluciones-bodega",

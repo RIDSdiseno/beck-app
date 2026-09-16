@@ -71,6 +71,7 @@ export default function RootLayout() {
                   <Stack.Screen name="auth" />
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="(firemat)" />
+                  <Stack.Screen name="bodega-beck" />
                   <Stack.Screen name="inventario-beck/escanear" />
                   <Stack.Screen
                     name="modal"

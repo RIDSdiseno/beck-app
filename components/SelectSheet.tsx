@@ -2,12 +2,14 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   FlatList,
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export type SelectSheetOption = {
   value: string;
@@ -23,6 +25,7 @@ type SelectSheetProps = {
   includeAllOption?: { label: string };
   accentColor?: string;
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  variant?: "beck" | "firemat";
 };
 
 const BRAND = "#f97316";
@@ -36,8 +39,11 @@ export function SelectSheet({
   includeAllOption,
   accentColor = BRAND,
   icon = "format-list-bulleted",
+  variant = "beck",
 }: SelectSheetProps) {
   const [open, setOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const isFiremat = variant === "firemat";
 
   const selectedLabel =
     value === null
@@ -54,26 +60,28 @@ export function SelectSheet({
   };
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, isFiremat && firematStyles.wrapper]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityState={{ expanded: open }}
         style={({ pressed }) => [
           styles.pickerButton,
+          isFiremat && firematStyles.pickerButton,
           pressed && styles.pickerButtonPressed,
         ]}
-        onPress={() => setOpen(true)}
+        onPress={() => { Keyboard.dismiss(); setOpen(true); }}
       >
-        <View style={styles.iconBox}>
-          <MaterialCommunityIcons name={icon} size={18} color="#c2410c" />
+        <View style={[styles.iconBox, isFiremat && firematStyles.iconBox]}>
+          <MaterialCommunityIcons name={icon} size={18} color={isFiremat ? "#f87171" : "#c2410c"} />
         </View>
         <View style={styles.textGroup}>
-          <Text style={styles.fieldLabel}>{label}</Text>
-          <Text style={styles.pickerButtonText} numberOfLines={1}>
+          <Text style={[styles.fieldLabel, isFiremat && firematStyles.muted]}>{label}</Text>
+          <Text style={[styles.pickerButtonText, isFiremat && firematStyles.text]} numberOfLines={1}>
             {selectedLabel}
           </Text>
         </View>
-        <MaterialCommunityIcons name="chevron-down" size={21} color="#64748b" />
+        <MaterialCommunityIcons name="chevron-down" size={21} color={isFiremat ? "#a3a3a3" : "#64748b"} />
       </Pressable>
 
       <Modal
@@ -83,9 +91,16 @@ export function SelectSheet({
         onRequestClose={() => setOpen(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable style={[styles.modalSheet, isFiremat && firematStyles.modalSheet, isFiremat && { paddingBottom: Math.max(insets.bottom, 16) }]} onPress={() => {}}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.modalTitle}>{label}</Text>
+            <View style={isFiremat ? firematStyles.sheetHeader : undefined}>
+              <Text style={[styles.modalTitle, isFiremat && firematStyles.title]}>{label}</Text>
+              {isFiremat ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Cerrar opciones" onPress={() => setOpen(false)} style={firematStyles.closeButton}>
+                  <MaterialCommunityIcons name="close" size={22} color="#ffffff" />
+                </Pressable>
+              ) : null}
+            </View>
             <FlatList
               data={data}
               keyExtractor={(item) => item.value ?? "__all__"}
@@ -97,25 +112,32 @@ export function SelectSheet({
                     style={[
                       styles.modalOption,
                       active && styles.modalOptionSelected,
+                      isFiremat && firematStyles.modalOption,
+                      isFiremat && active && firematStyles.selected,
                     ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
                     onPress={() => handleSelect(item.value)}
                   >
                     <View
                       style={[
                         styles.optionIcon,
                         active && styles.optionIconSelected,
+                        isFiremat && firematStyles.iconBox,
+                        isFiremat && active && firematStyles.activeIcon,
                       ]}
                     >
                       <MaterialCommunityIcons
                         name={item.value === null ? "view-grid-outline" : icon}
                         size={18}
-                        color={active ? "#0f172a" : "#64748b"}
+                        color={isFiremat ? (active ? "#ffffff" : "#f87171") : (active ? "#0f172a" : "#64748b")}
                       />
                     </View>
                     <Text
                       style={[
                         styles.modalOptionText,
                         active && styles.modalOptionTextSelected,
+                        isFiremat && firematStyles.text,
                       ]}
                       numberOfLines={2}
                     >
@@ -125,7 +147,7 @@ export function SelectSheet({
                       <MaterialCommunityIcons
                         name="check-circle"
                         size={20}
-                        color={accentColor}
+                        color={isFiremat ? "#f87171" : accentColor}
                       />
                     ) : null}
                   </Pressable>
@@ -249,4 +271,19 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontWeight: "900",
   },
+});
+
+const firematStyles = StyleSheet.create({
+  wrapper: { marginBottom: 0 },
+  pickerButton: { backgroundColor: "#171717", borderColor: "#525252", minHeight: 60, paddingHorizontal: 14, paddingVertical: 10 },
+  iconBox: { backgroundColor: "#3b191b" },
+  text: { color: "#fafafa" },
+  muted: { color: "#a3a3a3" },
+  modalSheet: { backgroundColor: "#111111", borderWidth: 1, borderColor: "#404040" },
+  sheetHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  title: { flex: 1, color: "#ffffff", marginBottom: 0 },
+  closeButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#262626", alignItems: "center", justifyContent: "center" },
+  modalOption: { backgroundColor: "#1c1c1c", borderColor: "#404040" },
+  selected: { backgroundColor: "#361517", borderColor: "#ef4444" },
+  activeIcon: { backgroundColor: "#dc2626" },
 });
