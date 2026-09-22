@@ -443,8 +443,10 @@ export default function PerfilScreen() {
   const isSupervisorProfile = user?.rol === "jefeobra";
   const isEngineeringProfile = user?.rol === "ingenieria";
   const isAdminProfile = user?.rol === "administrador";
+  const isClientProfile = user?.rol === "cliente";
   const isBeckFieldProfile =
-    isTerrenoProfile || isSupervisorProfile || isEngineeringProfile || isAdminProfile;
+    isTerrenoProfile || isSupervisorProfile || isEngineeringProfile ||
+    isAdminProfile || isClientProfile;
 
   return (
     <SafeAreaView
@@ -463,7 +465,9 @@ export default function PerfilScreen() {
                     ? "Perfil · Ingeniería"
                     : isAdminProfile
                       ? "Perfil · Administración"
-                    : "Perfil · BECK"
+                      : isClientProfile
+                        ? "Perfil · Cliente"
+                        : "Perfil · BECK"
             }
           />
           {!isBeckFieldProfile ? (

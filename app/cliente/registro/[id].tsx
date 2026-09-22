@@ -13,7 +13,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Image,
   Modal,
   PanResponder,
   ScrollView,
@@ -21,10 +20,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ActivityIndicator, Button, Chip, Text } from "react-native-paper";
+import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { BrandHeader } from "../../../components/BrandHeader";
+import { ExpandableImage } from "../../../components/ExpandableImage";
 import { getAislacionLabel, getAplicacionLabel } from "../../../utils/factoresRegistro";
 import { formatDateOnly } from "../../../utils/dateTime";
 
@@ -34,8 +34,18 @@ function formatDate(value?: string | null) {
   return formatDateOnly(value, { day: "2-digit", month: "long", year: "numeric" });
 }
 
-function SectionTitle({ title }: { title: string }) {
-  return <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{title}</Text></View>;
+function SectionTitle({ title, icon }: {
+  title: string;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionIcon}>
+        <MaterialCommunityIcons name={icon} size={19} color="#0f172a" />
+      </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
 }
 
 function FieldRow({ label, value }: { label: string; value?: string | number | null }) {
@@ -158,15 +168,15 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
           ) : null}
         </Svg>
         {isEmpty ? (
-          <View style={styles.signaturePlaceholder}>
-            <MaterialCommunityIcons name="draw-pen" size={28} color="#cbd5e1" />
+          <View pointerEvents="none" style={styles.signaturePlaceholder}>
+            <MaterialCommunityIcons name="draw-pen" size={28} color="#94a3b8" />
             <Text style={styles.signaturePlaceholderText}>Firme aquí con el dedo</Text>
           </View>
         ) : null}
       </View>
 
       {!isEmpty ? (
-        <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar firma" style={styles.clearBtn} onPress={handleClear}>
           <MaterialCommunityIcons name="eraser" size={16} color="#64748b" />
           <Text style={styles.clearBtnText}>Limpiar firma</Text>
         </TouchableOpacity>
@@ -227,9 +237,19 @@ export default function ClienteRegistroScreen() {
   const [pdfDisponible, setPdfDisponible] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  // Galería de fotos
-  const [fotoIdx, setFotoIdx] = useState(0);
-  const [showFotos, setShowFotos] = useState(false);
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/cliente");
+  };
+
+  const openSignature = () => {
+    // El lienzo se monta vacío cada vez que se abre el modal.
+    setPathData("");
+    setCanvasWidth(0);
+    setCanvasHeight(0);
+    setScrollLocked(false);
+    setShowSignModal(true);
+  };
 
   useEffect(() => {
     if (!id || !obraId) return;
@@ -277,11 +297,11 @@ export default function ClienteRegistroScreen() {
   const campoVisible = (campo: CampoConfiguracionRegistro) =>
     camposConfigurables[campo] ?? true;
 
-  const handleSignatureChange = (path: string, w: number, h: number) => {
+  const handleSignatureChange = useCallback((path: string, w: number, h: number) => {
     setPathData(path);
     setCanvasWidth(w);
     setCanvasHeight(h);
-  };
+  }, []);
 
   const handleConfirmSign = async () => {
     if (!registro || !pathData.trim()) {
@@ -345,7 +365,7 @@ export default function ClienteRegistroScreen() {
       <SafeAreaView style={[styles.container, { paddingTop: 14 }]} edges={["top"]}>
         <View style={styles.errorState}>
           <Text style={styles.errorText}>Faltan parámetros de navegación</Text>
-          <Button mode="contained" onPress={() => router.back()}>Volver</Button>
+          <Button mode="contained" buttonColor="#0f172a" onPress={goBack}>Volver</Button>
         </View>
       </SafeAreaView>
     );
@@ -364,7 +384,7 @@ export default function ClienteRegistroScreen() {
       <SafeAreaView style={[styles.container, { paddingTop: 14 }]} edges={["top"]}>
         <View style={styles.errorState}>
           <Text style={styles.errorText}>{error || "Registro no encontrado"}</Text>
-          <Button mode="contained" onPress={() => router.back()}>Volver</Button>
+          <Button mode="contained" buttonColor="#0f172a" onPress={goBack}>Volver</Button>
         </View>
       </SafeAreaView>
     );
@@ -373,6 +393,8 @@ export default function ClienteRegistroScreen() {
   const isJunta     = registro.tipoRegistro === "junta_lineal_espuma";
   const fotos       = registro.fotos || [];
   const codigoBeck  = registro.codigoBeck || `REG-${registro.id.slice(0, 6).toUpperCase()}`;
+  const registroCodigo = `REG-${registro.id.slice(0, 6).toUpperCase()}`;
+  const firmado = registro.validadoCliente || validado;
 
   return (
     <>
@@ -380,37 +402,41 @@ export default function ClienteRegistroScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <BrandHeader subtitle="Detalle · BECK" />
-            <Button mode="text" onPress={() => router.back()} compact>Volver</Button>
+            <View style={styles.brand}><BrandHeader subtitle="Detalle · Cliente" /></View>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a registros" onPress={goBack} style={styles.backButton}>
+              <MaterialCommunityIcons name="arrow-left" size={18} color="#ea580c" />
+              <Text style={styles.backText}>Volver</Text>
+            </TouchableOpacity>
           </View>
-          <Text variant="titleMedium" style={styles.title}>{codigoBeck}</Text>
-          <Text style={styles.subtitle}>{isJunta ? "Junta Lineal Espuma" : "Sello Cortafuego"} · {formatDate(registro.fecha)}</Text>
         </View>
 
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: firmado ? insets.bottom + 24 : 24 }]}>
 
-          {/* Badge estado validación */}
-          <View style={styles.badgeRow}>
-            <Chip
-              style={styles.validadoBadge}
-              icon="check-decagram"
-              textStyle={styles.validadoBadgeText}
-            >
-              Validado por Ingeniería
-            </Chip>
-            {registro.validadoCliente ? (
-              <Chip
-                style={styles.clienteBadge}
-                icon="draw-pen"
-                textStyle={styles.clienteBadgeText}
-              >
-                Firmado por cliente
-              </Chip>
-            ) : null}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeading}>
+              <View style={styles.summaryIcon}>
+                <MaterialCommunityIcons name={isJunta ? "ruler" : "fire"} size={26} color="#0f172a" />
+              </View>
+              <View style={styles.summaryCopy}>
+                <Text style={styles.eyebrow}>{registroCodigo}</Text>
+                <Text style={styles.title}>{isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
+              </View>
+            </View>
+            <View style={styles.badgeRow}>
+              <View style={styles.validadoBadge}>
+                <MaterialCommunityIcons name="check-decagram" size={15} color="#15803d" />
+                <Text style={styles.validadoBadgeText}>Validado por Ingeniería</Text>
+              </View>
+              <View style={[styles.clienteBadge, firmado && styles.signedBadge]}>
+                <MaterialCommunityIcons name={firmado ? "check-circle-outline" : "draw-pen"} size={15} color="#0f172a" />
+                <Text style={styles.clienteBadgeText}>{firmado ? "Firmado por cliente" : "Pendiente de tu firma"}</Text>
+              </View>
+            </View>
+            <Text style={styles.summaryHint}>{firmado ? "Registro firmado. Puedes consultar sus datos y compartir el PDF disponible." : "Revisa los datos y las fotografías antes de confirmar con tu firma."}</Text>
           </View>
 
           {/* Información general */}
-          <SectionTitle title="INFORMACIÓN GENERAL" />
+          <SectionTitle title="Información del registro" icon="clipboard-text-outline" />
           <View style={styles.section}>
             <FieldRow label="Código BECK"   value={campoVisible("codigoBeck") ? codigoBeck : null} />
             <FieldRow label="Fecha"         value={campoVisible("fechaEjecucionSello") ? formatDate(registro.fecha) : null} />
@@ -420,7 +446,7 @@ export default function ClienteRegistroScreen() {
           </View>
 
           {/* Datos técnicos */}
-          <SectionTitle title="DATOS TÉCNICOS" />
+          <SectionTitle title="Ubicación y trabajo realizado" icon="map-marker-outline" />
           <View style={styles.section}>
             <FieldRow label="Material"        value={campoVisible("itemizadoBeck") ? registro.descripcionMaterial : null} />
             <FieldRow label="Recinto"         value={campoVisible("recinto") ? registro.recinto : null} />
@@ -449,7 +475,11 @@ export default function ClienteRegistroScreen() {
             {registro.cantidadFinal != null && campoVisible("cantidadFinal") && (
               <FieldRow label="Cantidad final" value={registro.cantidadFinal} />
             )}
-            <FieldRow label="Sellador"        value={campoVisible("nombreSellador") ? registro.nombreSellador : null} />
+            <FieldRow label="Responsable" value={campoVisible("nombreSellador") ? registro.nombreSellador || registro.sellador : null} />
+          </View>
+
+          <SectionTitle title="Factores y cantidades" icon="calculator-variant-outline" />
+          <View style={styles.section}>
             <FieldRow label="Holgura (cm)"    value={campoVisible("holgura") ? registro.holgura : null} />
             <FieldRow label="Factor holgura"  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
             <FieldRow label="Accesibilidad"   value={campoVisible("cieloModular") ? registro.accesibilidad : null} />
@@ -457,6 +487,10 @@ export default function ClienteRegistroScreen() {
             <FieldRow label="Aislación" value={campoVisible("aislacion") ? getAislacionLabel(registro) : null} />
             <FieldRow label="Sellos aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />
             <FieldRow label="Reparación tabique" value={campoVisible("reparacionTabique") ? getAplicacionLabel(registro.reparacionTabique) : null} />
+          </View>
+
+          <SectionTitle title="Itemizado y dimensiones" icon="format-list-bulleted" />
+          <View style={styles.section}>
             <FieldRow label="Itemizado BECK"     value={campoVisible("itemizadoBeck") ? registro.itemizadoBeck : null} />
             <FieldRow label="Dimensiones" value={campoVisible("dimensiones") ? registro.dimensiones : null} />
             <FieldRow label="Itemizado mandante" value={campoVisible("itemizadoMandante") ? registro.itemizadoMandante : null} />
@@ -465,7 +499,8 @@ export default function ClienteRegistroScreen() {
           {/* Fotografías */}
           {campoVisible("foto") && fotos.length > 0 ? (
             <>
-              <SectionTitle title={`FOTOGRAFÍAS (${fotos.length})`} />
+              <SectionTitle title={`Evidencia fotográfica · ${fotos.length}`} icon="camera-outline" />
+              <Text style={styles.photoHint}>Toca una foto para ampliarla y hacer zoom con los dedos.</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -473,12 +508,13 @@ export default function ClienteRegistroScreen() {
                 contentContainerStyle={styles.fotosContainer}
               >
                 {fotos.map((foto, idx) => (
-                  <TouchableOpacity
-                    key={foto.id}
-                    onPress={() => { setFotoIdx(idx); setShowFotos(true); }}
-                  >
-                    <Image source={{ uri: foto.url }} style={styles.fotoThumb} />
-                  </TouchableOpacity>
+                  <View key={foto.id} style={styles.photoCard}>
+                    <ExpandableImage uri={foto.url} style={styles.fotoThumb} accessibilityLabel={`Ampliar fotografía ${idx + 1} del registro`} />
+                    <View style={styles.photoCaption}>
+                      <Text style={styles.photoCaptionText}>Fotografía {idx + 1}</Text>
+                      <MaterialCommunityIcons name="magnify-plus-outline" size={19} color="#ea580c" />
+                    </View>
+                  </View>
                 ))}
               </ScrollView>
             </>
@@ -525,7 +561,7 @@ export default function ClienteRegistroScreen() {
             <Button
               mode="contained"
               icon="draw-pen"
-              onPress={() => setShowSignModal(true)}
+              onPress={openSignature}
               loading={validando}
               disabled={validando}
               style={styles.signBtn}
@@ -547,8 +583,11 @@ export default function ClienteRegistroScreen() {
       >
         <SafeAreaView style={styles.modalContainer} edges={["top", "left", "right", "bottom"]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Firma digital</Text>
-            <TouchableOpacity onPress={() => setShowSignModal(false)} style={styles.modalClose}>
+            <View style={styles.modalHeading}>
+              <Text style={styles.eyebrow}>CONFIRMACIÓN DEL CLIENTE</Text>
+              <Text style={styles.modalTitle}>Firma del registro</Text>
+            </View>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar firma" onPress={() => setShowSignModal(false)} style={styles.modalClose}>
               <MaterialCommunityIcons name="close" size={24} color="#0f172a" />
             </TouchableOpacity>
           </View>
@@ -558,10 +597,13 @@ export default function ClienteRegistroScreen() {
             scrollEnabled={!scrollLocked}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.modalSubtitle}>
-              Dibuja tu firma en el recuadro con el dedo para validar el registro{" "}
-              <Text style={{ fontWeight: "900" }}>{codigoBeck}</Text>.
-            </Text>
+            <View style={styles.signatureSummary}>
+              <MaterialCommunityIcons name={isJunta ? "ruler" : "fire"} size={24} color="#ea580c" />
+              <View style={styles.summaryCopy}>
+                <Text style={styles.signatureRecord}>{registroCodigo}</Text>
+                <Text style={styles.summaryHint}>{isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
+              </View>
+            </View>
 
             {/* Warning en el modal también */}
             <View style={styles.warningBox}>
@@ -574,10 +616,12 @@ export default function ClienteRegistroScreen() {
               </View>
             </View>
 
-            <SignatureCanvas
+            <SectionTitle title="Tu firma" icon="draw-pen" />
+            <Text style={styles.modalSubtitle}>Dibuja con el dedo dentro del recuadro. Puedes limpiar la firma y volver a intentarlo antes de confirmar.</Text>
+            {showSignModal && <SignatureCanvas
               onPathChange={handleSignatureChange}
               onScrollLock={setScrollLocked}
-            />
+            />}
 
             <Button
               mode="contained"
@@ -595,39 +639,6 @@ export default function ClienteRegistroScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Modal galería de fotos */}
-      <Modal
-        visible={showFotos}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowFotos(false)}
-      >
-        <TouchableOpacity style={styles.fotoModal} activeOpacity={1} onPress={() => setShowFotos(false)}>
-          {fotos[fotoIdx] ? (
-            <Image source={{ uri: fotos[fotoIdx].url }} style={styles.fotoFull} resizeMode="contain" />
-          ) : null}
-          <TouchableOpacity style={styles.fotoModalClose} onPress={() => setShowFotos(false)}>
-            <MaterialCommunityIcons name="close-circle" size={34} color="#ffffff" />
-          </TouchableOpacity>
-          {fotos.length > 1 ? (
-            <View style={styles.fotoNav}>
-              <TouchableOpacity
-                onPress={() => setFotoIdx((i) => Math.max(0, i - 1))}
-                disabled={fotoIdx === 0}
-              >
-                <MaterialCommunityIcons name="chevron-left" size={36} color={fotoIdx === 0 ? "#64748b" : "#ffffff"} />
-              </TouchableOpacity>
-              <Text style={styles.fotoNavText}>{fotoIdx + 1} / {fotos.length}</Text>
-              <TouchableOpacity
-                onPress={() => setFotoIdx((i) => Math.min(fotos.length - 1, i + 1))}
-                disabled={fotoIdx === fotos.length - 1}
-              >
-                <MaterialCommunityIcons name="chevron-right" size={36} color={fotoIdx === fotos.length - 1 ? "#64748b" : "#ffffff"} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </TouchableOpacity>
-      </Modal>
     </>
   );
 }
@@ -635,30 +646,44 @@ export default function ClienteRegistroScreen() {
 const styles = StyleSheet.create({
   container:      { flex: 1, backgroundColor: "#f5f7fb" },
   center:         { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f5f7fb" },
-  header:         { backgroundColor: "#f5f7fb", paddingBottom: 8, paddingHorizontal: 16 },
-  headerRow:      { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" },
-  title:          { color: "#0f172a", fontWeight: "900", marginBottom: 2 },
-  subtitle:       { color: "#64748b", fontSize: 13, marginBottom: 8 },
+  header:         { backgroundColor: "#f5f7fb", paddingBottom: 4, paddingHorizontal: 16 },
+  headerRow:      { alignItems: "center", flexDirection: "row", gap: 8 },
+  brand:          { flex: 1, minWidth: 0 },
+  backButton:     { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 4 },
+  backText:       { color: "#ea580c", fontWeight: "700", fontSize: 13 },
+  title:          { color: "#0f172a", fontWeight: "900", fontSize: 20, lineHeight: 25 },
+  eyebrow:        { color: "#b45309", fontWeight: "800", fontSize: 11, letterSpacing: 0.8, marginBottom: 4 },
   content:        { paddingHorizontal: 16, paddingTop: 4 },
-  badgeRow:       { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
-  validadoBadge:  { backgroundColor: "#dcfce7", borderRadius: 10 },
-  validadoBadgeText: { color: "#16a34a", fontSize: 11, fontWeight: "800" },
-  clienteBadge:   { backgroundColor: "#dbeafe", borderRadius: 10 },
-  clienteBadgeText: { color: "#2563eb", fontSize: 11, fontWeight: "800" },
-  sectionHeader:  { backgroundColor: "#0f172a", borderRadius: 8, marginBottom: 8, marginTop: 12, paddingHorizontal: 10, paddingVertical: 6 },
-  sectionTitle:   { color: "#ffffff", fontSize: 11, fontWeight: "800", letterSpacing: 0.6, textTransform: "uppercase" },
-  section:        { backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  fieldRow:       { borderBottomColor: "#f1f5f9", borderBottomWidth: 1, flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10 },
-  fieldLabel:     { color: "#64748b", flex: 1, fontSize: 13, fontWeight: "700" },
-  fieldValue:     { color: "#0f172a", flex: 2, fontSize: 13 },
-  fotosScroll:    { marginTop: 8 },
-  fotosContainer: { gap: 8, paddingRight: 16 },
-  fotoThumb:      { borderRadius: 10, height: 120, width: 160 },
+  summaryCard:    { backgroundColor: "#fffaf0", borderWidth: 1, borderColor: "#FDC10B", borderLeftWidth: 4, borderLeftColor: "#f97316", borderRadius: 20, padding: 16, gap: 12 },
+  summaryHeading: { flexDirection: "row", alignItems: "center", gap: 12 },
+  summaryIcon:    { width: 48, height: 48, borderRadius: 15, backgroundColor: "#FDC10B", alignItems: "center", justifyContent: "center" },
+  summaryCopy:    { flex: 1, minWidth: 0 },
+  summaryHint:    { color: "#64748b", fontSize: 13, lineHeight: 19 },
+  badgeRow:       { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  validadoBadge:  { backgroundColor: "#dcfce7", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 5, maxWidth: "100%" },
+  validadoBadgeText: { color: "#15803d", fontSize: 11, fontWeight: "800", flexShrink: 1 },
+  clienteBadge:   { backgroundColor: "#fef3c7", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 5, maxWidth: "100%" },
+  signedBadge:    { backgroundColor: "#e2e8f0" },
+  clienteBadgeText: { color: "#0f172a", fontSize: 11, fontWeight: "800", flexShrink: 1 },
+  sectionHeader:  { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 10, marginTop: 22 },
+  sectionIcon:    { width: 32, height: 32, borderRadius: 10, backgroundColor: "#fff0bd", alignItems: "center", justifyContent: "center" },
+  sectionTitle:   { color: "#0f172a", fontSize: 16, fontWeight: "800", flex: 1 },
+  section:        { backgroundColor: "#ffffff", borderColor: "#f8df8b", borderRadius: 18, borderWidth: 1, overflow: "hidden" },
+  fieldRow:       { borderBottomColor: "#f1f5f9", borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 11, gap: 4 },
+  fieldLabel:     { color: "#64748b", fontSize: 12, fontWeight: "600" },
+  fieldValue:     { color: "#0f172a", fontSize: 14, fontWeight: "700", lineHeight: 20 },
+  fotosScroll:    { marginTop: 10 },
+  fotosContainer: { gap: 12 },
+  photoCard:      { backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1, borderColor: "#f8df8b", padding: 8 },
+  fotoThumb:      { borderRadius: 12, height: 170, width: 240 },
+  photoHint:      { color: "#64748b", fontSize: 13, lineHeight: 19 },
+  photoCaption:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 3 },
+  photoCaptionText: { color: "#475569", fontSize: 12, fontWeight: "700" },
   warningBox:     {
     alignItems: "flex-start",
     backgroundColor: "#fffbeb",
     borderColor: "#fcd34d",
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -681,18 +706,14 @@ const styles = StyleSheet.create({
   },
   pdfText: { color: "#166534", flex: 1, fontWeight: "700" },
   bottomBar: {
-    backgroundColor: "#f5f7fb",
+    backgroundColor: "#ffffff",
     borderTopColor: "#e2e8f0",
     borderTopWidth: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
-  signBtn:        { backgroundColor: "#0f172a", borderRadius: 14 },
-  signBtnContent: { minHeight: 50 },
+  signBtn:        { backgroundColor: "#0f172a", borderRadius: 28 },
+  signBtnContent: { minHeight: 54 },
   signBtnLabel:   { color: "#ffffff", fontSize: 15, fontWeight: "900" },
   errorState:     { alignItems: "center", flex: 1, justifyContent: "center", padding: 24, gap: 16 },
   errorText:      { color: "#dc2626", fontSize: 15, fontWeight: "700", textAlign: "center" },
@@ -709,18 +730,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     backgroundColor: "#ffffff",
   },
-  modalTitle:     { color: "#0f172a", fontSize: 18, fontWeight: "900" },
-  modalClose:     { padding: 4 },
-  modalContent:   { padding: 16, paddingBottom: 40 },
-  modalSubtitle:  { color: "#475569", fontSize: 14, lineHeight: 22, marginBottom: 16 },
+  modalHeading:   { flex: 1, minWidth: 0, paddingRight: 10 },
+  modalTitle:     { color: "#0f172a", fontSize: 21, fontWeight: "900" },
+  modalClose:     { width: 44, height: 44, borderRadius: 22, backgroundColor: "#e2e8f0", alignItems: "center", justifyContent: "center" },
+  modalContent:   { padding: 16, paddingBottom: 24 },
+  modalSubtitle:  { color: "#475569", fontSize: 13, lineHeight: 20, marginBottom: 8 },
+  signatureSummary: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: "#FDC10B", backgroundColor: "#fffaf0" },
+  signatureRecord: { color: "#0f172a", fontWeight: "800", fontSize: 16, marginBottom: 4 },
 
   // Canvas de firma
   signatureBox: {
     backgroundColor: "#ffffff",
-    borderColor: "#cbd5e1",
-    borderRadius: 16,
+    borderColor: "#FDC10B",
+    borderRadius: 20,
     borderWidth: 1.5,
-    height: 200,
+    height: 220,
     overflow: "hidden",
     marginTop: 8,
   },
@@ -730,32 +754,17 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center",
   },
-  signaturePlaceholderText: { color: "#cbd5e1", fontSize: 14 },
+  signaturePlaceholderText: { color: "#64748b", fontSize: 14 },
   clearBtn: {
     alignItems: "center",
     alignSelf: "flex-end",
     flexDirection: "row",
     gap: 6,
     marginTop: 8,
-    paddingVertical: 6,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    backgroundColor: "#e2e8f0",
   },
   clearBtnText:   { color: "#64748b", fontSize: 13, fontWeight: "700" },
-
-  // Galería de fotos
-  fotoModal: {
-    backgroundColor: "rgba(0,0,0,0.95)",
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fotoFull:       { width: "100%", height: "70%" },
-  fotoModalClose: { position: "absolute", top: 52, right: 16 },
-  fotoNav: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 20,
-    position: "absolute",
-    bottom: 52,
-  },
-  fotoNavText:    { color: "#ffffff", fontSize: 14, fontWeight: "700" },
 });

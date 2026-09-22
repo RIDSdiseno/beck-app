@@ -2,12 +2,14 @@ import type { RegistroCliente } from "@/services/api/clienteApi";
 import { getConfiguracionRegistro } from "@/services/api/obrasApi";
 import type { RegistroHistorialApi } from "@/services/api/registrosApi";
 import { getSession } from "@/services/auth/session";
+import { cargarVisibilidadCliente } from "@/services/api/clienteVisibilidad";
+import { campoVisibleCliente, type ClienteVisibilidad } from "@/utils/clienteVisibilidad";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { getAislacionLabel, getAplicacionLabel } from "@/utils/factoresRegistro";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Text } from "react-native-paper";
+import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ExpandableImage } from "./ExpandableImage";
 
@@ -80,8 +82,8 @@ function getHistorialPhotos(registro: RegistroHistorialApi): DetailPhoto[] {
   });
 }
 
-function DetailField({ label, value }: { label: string; value?: string | number | null }) {
-  if (value === undefined || value === null || value === "") return null;
+function DetailField({ label, value, visible = true }: { label: string; value?: string | number | null; visible?: boolean }) {
+  if (!visible || value === undefined || value === null || value === "") return null;
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -96,6 +98,13 @@ export function RegistroHistoryDetailModal({
   footer,
 }: RegistroHistoryDetailModalProps) {
   const [dimensionesVisible, setDimensionesVisible] = useState(true);
+  const [clienteConfig, setClienteConfig] = useState<{ registro: RegistroCliente; visibility: ClienteVisibilidad } | null>(null);
+  const [configError, setConfigError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const isCliente = Boolean(registro && !isRegistroHistorial(registro));
+  const clienteConfigReady = clienteConfig?.registro === registro;
+  const visible = (campo: Parameters<typeof campoVisibleCliente>[1]) =>
+    !isCliente || campoVisibleCliente(clienteConfigReady ? clienteConfig?.visibility : undefined, campo);
 
   useEffect(() => {
     let active = true;
@@ -103,12 +112,24 @@ export function RegistroHistoryDetailModal({
     async function loadVisibility() {
       if (!registro) {
         setDimensionesVisible(true);
+        setClienteConfig(null);
+        setConfigError("");
         return;
       }
 
-      const obraId = isRegistroHistorial(registro)
-        ? registro.obras?.id
-        : registro.obraId;
+      if (!isRegistroHistorial(registro)) {
+        setClienteConfig(null);
+        setConfigError("");
+        try {
+          const configs = await cargarVisibilidadCliente([registro.obraId]);
+          if (active) setClienteConfig({ registro, visibility: configs[registro.obraId] });
+        } catch {
+          if (active) setConfigError("No se pudieron comprobar los campos visibles de esta obra. Intenta nuevamente.");
+        }
+        return;
+      }
+
+      const obraId = registro.obras?.id;
 
       if (!obraId) {
         setDimensionesVisible(true);
@@ -140,7 +161,7 @@ export function RegistroHistoryDetailModal({
     return () => {
       active = false;
     };
-  }, [registro]);
+  }, [registro, retry]);
 
   const detail = useMemo(() => {
     if (!registro) return null;
@@ -245,7 +266,11 @@ export function RegistroHistoryDetailModal({
           </TouchableOpacity>
         </View>
 
-        {detail ? (
+        {isCliente && !clienteConfigReady ? (
+          <View style={{ padding: 24, gap: 12 }}>
+            {configError ? <><Text>{configError}</Text><Button onPress={() => setRetry((value) => value + 1)}>Reintentar</Button></> : <><ActivityIndicator color="#f97316" /><Text>Consultando campos visibles…</Text></>}
+          </View>
+        ) : detail ? (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.hero}>
               <View style={styles.heroAccent} />
@@ -271,16 +296,20 @@ export function RegistroHistoryDetailModal({
               </View>
 
               <View style={styles.heroSummary}>
-                <View style={styles.summaryRow}>
+                {(visible("piso") || visible("ejeNumerico") || visible("ejeAlfabetico")) && <View style={styles.summaryRow}>
                   <MaterialCommunityIcons name="map-marker-outline" size={17} color="#f97316" />
                   <Text style={styles.summaryText} numberOfLines={1}>
-                    Piso {detail.piso || "—"} · Eje {detail.ejeNumerico || "N/A"}-{detail.ejeAlfabetico || "No aplica"}
+                    {!isCliente ? `Piso ${detail.piso || "—"} · Eje ${detail.ejeNumerico || "N/A"}-${detail.ejeAlfabetico || "No aplica"}` : [
+                      visible("piso") ? `Piso ${detail.piso || "—"}` : null,
+                      visible("ejeNumerico") ? `Eje num. ${detail.ejeNumerico || "N/A"}` : null,
+                      visible("ejeAlfabetico") ? `Eje alf. ${detail.ejeAlfabetico || "No aplica"}` : null,
+                    ].filter(Boolean).join(" · ")}
                   </Text>
-                </View>
+                </View>}
                 <View style={styles.summaryRow}>
                   <MaterialCommunityIcons name="calendar-outline" size={17} color="#f97316" />
                   <Text style={styles.summaryText} numberOfLines={1}>
-                    {formatDate(detail.fecha)} · {formatTime24WithPeriod(detail.createdAt)} · {isJunta ? "Junta lineal" : `Sello ${detail.numeroSello || "N/A"}`}
+                    {visible("fechaEjecucionSello") ? `${formatDate(detail.fecha)} · ${formatTime24WithPeriod(detail.createdAt)} · ` : ""}{isJunta ? "Junta lineal" : `Sello ${detail.numeroSello || "N/A"}`}
                   </Text>
                 </View>
               </View>
@@ -292,43 +321,44 @@ export function RegistroHistoryDetailModal({
                 <Text style={styles.sectionTitle}>Datos del registro</Text>
               </View>
               <View style={styles.grid}>
-                <DetailField label="Fecha de ejecución" value={formatDate(detail.fecha)} />
-                <DetailField label="Día" value={detail.diaSemana} />
-                <DetailField label="Responsable" value={detail.responsable} />
-                <DetailField label="Itemizado Beck" value={detail.itemizadoBeck} />
-                {dimensionesVisible ? (
+                <DetailField visible={visible("fechaEjecucionSello")} label="Fecha de ejecución" value={formatDate(detail.fecha)} />
+                <DetailField visible={visible("diaSemana")} label="Día" value={detail.diaSemana} />
+                <DetailField visible={visible("nombreSellador")} label="Responsable" value={detail.responsable} />
+                <DetailField visible={visible("itemizadoBeck")} label="Itemizado Beck" value={detail.itemizadoBeck} />
+                {visible("dimensiones") && (isCliente || dimensionesVisible) ? (
                   <DetailField label="Dimensiones" value={detail.dimensiones} />
                 ) : null}
-                <DetailField label="Código Beck" value={detail.codigoBeck} />
-                <DetailField label="Itemizado mandante" value={detail.itemizadoMandante} />
-                <DetailField label="Recinto" value={detail.recinto} />
-                <DetailField label="Módulo o edificio" value={detail.modulo} />
-                <DetailField label="Piso" value={detail.piso} />
-                <DetailField label="Eje alfabético" value={detail.ejeAlfabetico} />
-                <DetailField label="Eje numérico" value={detail.ejeNumerico} />
+                <DetailField visible={visible("codigoBeck")} label="Código Beck" value={detail.codigoBeck} />
+                <DetailField visible={visible("itemizadoMandante")} label="Itemizado mandante" value={detail.itemizadoMandante} />
+                <DetailField visible={visible("recinto")} label="Recinto" value={detail.recinto} />
+                <DetailField visible={visible("modulo")} label="Módulo o edificio" value={detail.modulo} />
+                <DetailField visible={visible("piso")} label="Piso" value={detail.piso} />
+                <DetailField visible={visible("ejeAlfabetico")} label="Eje alfabético" value={detail.ejeAlfabetico} />
+                <DetailField visible={visible("ejeNumerico")} label="Eje numérico" value={detail.ejeNumerico} />
                 {isJunta ? (
-                  <DetailField label="Metros lineales" value={detail.metrosLineales} />
+                  <DetailField visible={visible("metrosLineales")} label="Metros lineales" value={detail.metrosLineales} />
                 ) : (
                   <>
                     <DetailField label="N° del sello" value={detail.numeroSello} />
-                    <DetailField label="Cantidad de sellos" value={detail.cantidadSellos} />
-                    <DetailField label="Holgura" value={detail.holgura} />
-                    <DetailField label="Factor por holguras" value={detail.factorHolguras} />
-                    <DetailField label="Accesibilidad" value={detail.accesibilidad} />
-                    <DetailField label="Sellos con factores" value={detail.cantidadConFactores} />
+                    <DetailField visible={visible("cantidadSellos")} label="Cantidad de sellos" value={detail.cantidadSellos} />
+                    <DetailField visible={visible("holgura")} label="Holgura" value={detail.holgura} />
+                    <DetailField visible={visible("factorPorHolguras")} label="Factor por holguras" value={detail.factorHolguras} />
+                    <DetailField visible={visible("cieloModular")} label="Accesibilidad" value={detail.accesibilidad} />
+                    <DetailField visible={visible("cantidadSellosConFactores")} label="Sellos con factores" value={detail.cantidadConFactores} />
                     <DetailField
                       label="Aislación"
+                      visible={visible("aislacion")}
                       value={getAislacionLabel({
                         aislacion: detail.aislacion,
                         aislacionAplica: detail.aislacionAplica,
                       })}
                     />
-                    <DetailField label="Sellos por aislación" value={detail.cantidadAislacion} />
-                    <DetailField label="Reparación de tabique" value={getAplicacionLabel(detail.reparacionTabique)} />
-                    <DetailField label="Cantidad final" value={detail.cantidadFinal} />
+                    <DetailField visible={visible("cantidadSellosAislacion")} label="Sellos por aislación" value={detail.cantidadAislacion} />
+                    <DetailField visible={visible("reparacionTabique")} label="Reparación de tabique" value={getAplicacionLabel(detail.reparacionTabique)} />
+                    <DetailField visible={visible("cantidadFinal")} label="Cantidad final" value={detail.cantidadFinal} />
                   </>
                 )}
-                <DetailField label="Folio" value={detail.folio} />
+                <DetailField visible={visible("folio")} label="Folio" value={detail.folio} />
               </View>
               {detail.observaciones ? (
                 <View style={styles.observation}>
@@ -344,7 +374,7 @@ export function RegistroHistoryDetailModal({
               ) : null}
             </View>
 
-            <View style={styles.section}>
+            {visible("foto") && <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="camera-outline" size={19} color="#c2410c" />
                 <Text style={styles.sectionTitle}>Fotografías enviadas</Text>
@@ -368,7 +398,7 @@ export function RegistroHistoryDetailModal({
                   <Text style={styles.noPhotosText}>Este registro no tiene fotografías disponibles.</Text>
                 </View>
               )}
-            </View>
+            </View>}
 
             {footer ? <View style={styles.footer}>{footer}</View> : null}
           </ScrollView>

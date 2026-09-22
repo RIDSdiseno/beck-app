@@ -17,8 +17,10 @@ import {
   RegistroHistorialApi,
 } from "@/services/api/registrosApi";
 import { getSession, STORAGE_KEYS } from "@/services/auth/session";
+import { cargarVisibilidadCliente } from "@/services/api/clienteVisibilidad";
+import type { ClienteVisibilidad } from "@/utils/clienteVisibilidad";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
@@ -53,6 +55,7 @@ export default function HistorialScreen() {
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState<HistoryItem[]>([]);
+  const [clienteVisibility, setClienteVisibility] = useState<Record<string, ClienteVisibilidad>>({});
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -97,7 +100,14 @@ export default function HistorialScreen() {
       const page = role === "cliente"
         ? await getClienteHistorialPage(params)
         : await getHistorialRegistrosPage(params);
+      const configs = role === "cliente"
+        ? await cargarVisibilidadCliente([
+            ...(!reset ? items.filter(isClienteItem).map((item) => item.obraId) : []),
+            ...page.items.filter(isClienteItem).map((item) => item.obraId),
+          ])
+        : {};
       if (requestId !== requestIdRef.current) return;
+      if (role === "cliente") setClienteVisibility(configs);
       setItems((current) => {
         const combined = reset ? page.items : [...current, ...page.items];
         return [...new Map(combined.map((item) => [item.id, item])).values()];
@@ -108,7 +118,10 @@ export default function HistorialScreen() {
         setObraOptions(page.obras.map((obra) => ({ value: obra.id, label: obra.nombre })));
       }
     } catch (err: any) {
-      if (requestId === requestIdRef.current) setError(err?.message || "No se pudo cargar el historial");
+      if (requestId === requestIdRef.current) {
+        setError(err?.message || "No se pudo cargar el historial");
+        if (role === "cliente") { setItems([]); setClienteVisibility({}); setNextCursor(null); }
+      }
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);
@@ -116,13 +129,22 @@ export default function HistorialScreen() {
         setRefreshing(false);
       }
     }
-  }, [dateFilter, estadoFilter, nextCursor, obraFilter, ready, role, search]);
+  }, [dateFilter, estadoFilter, nextCursor, obraFilter, ready, role, search, items]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || role === "cliente") return;
     const timer = setTimeout(() => { void loadPage(true); }, 350);
     return () => clearTimeout(timer);
-  }, [ready, search, dateFilter, obraFilter, estadoFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, role, search, dateFilter, obraFilter, estadoFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Al volver al historial del cliente, consultar las opciones actuales del CRM.
+  useFocusEffect(useCallback(() => {
+    if (!ready || role !== "cliente") return;
+    setClienteVisibility({});
+    setLoading(true);
+    const timer = setTimeout(() => { void loadPage(true); }, 350);
+    return () => { clearTimeout(timer); requestIdRef.current += 1; };
+  }, [ready, role, search, dateFilter, obraFilter, estadoFilter])); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleItems = useMemo(
     () => items.filter((item) => item.estado !== "validado" || !hiddenValidatedIds.has(item.id)),
@@ -208,13 +230,13 @@ export default function HistorialScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadPage(true); }} />}
-            onEndReached={() => { if (!loadingMore && nextCursor) void loadPage(false); }}
+            onEndReached={() => { if (!loading && !refreshing && !loadingMore && nextCursor) void loadPage(false); }}
             onEndReachedThreshold={0.4}
             ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footerLoader} color="#f97316" /> : null}
             ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>{error ? "No se pudo cargar" : "Sin registros"}</Text><Text style={styles.helper}>{error || "No hay registros que coincidan con los filtros."}</Text>{error ? <Button onPress={() => void loadPage(true)}>Reintentar</Button> : null}</View>}
             renderItem={({ item }) => (
               <View>
-                <RegistroHistoryCard registro={item} onPress={() => void openDetail(item)} pdfDisponible={isClienteItem(item) && item.pdfDisponible} />
+                <RegistroHistoryCard registro={item} onPress={() => void openDetail(item)} pdfDisponible={isClienteItem(item) && item.pdfDisponible} clienteVisibility={isClienteItem(item) ? clienteVisibility[item.obraId] : undefined} />
                 {item.estado === "validado" && role !== "cliente" ? (
                   <Button mode="outlined" icon="trash-can-outline" onPress={() => void hideValidatedRegistro(item.id)} style={styles.removeButton} labelStyle={styles.removeLabel}>Borrar del historial</Button>
                 ) : null}

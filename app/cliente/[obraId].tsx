@@ -1,215 +1,323 @@
-import { getClienteRegistrosObra, RegistroCliente } from "@/services/api/clienteApi";
+import {
+  getClienteRegistrosObra,
+  type RegistroCliente,
+} from "@/services/api/clienteApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { ActivityIndicator, Button, Chip, Text } from "react-native-paper";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BrandHeader } from "../../components/BrandHeader";
-import { formatDateOnly, formatTime24WithPeriod } from "@/utils/dateTime";
+import { BrandHeader } from "@/components/BrandHeader";
+import { BeckSearchInput } from "@/components/BeckSearchInput";
+import { ClientePendingRegistroCard } from "@/components/ClientePendingRegistroCard";
+import { matchesClienteRegistro } from "@/utils/clienteRegistros";
+import { cargarVisibilidadCliente } from "@/services/api/clienteVisibilidad";
+import { campoVisibleCliente, type ClienteVisibilidad } from "@/utils/clienteVisibilidad";
 
-function formatDate(value?: string | null) {
-  return formatDateOnly(value, { day: "2-digit", month: "short", year: "numeric" });
-}
+const EMPTY_REGISTROS: RegistroCliente[] = [];
+const keyExtractor = (registro: RegistroCliente) => registro.id;
 
 export default function ClienteObraScreen() {
   const { obraId } = useLocalSearchParams<{ obraId: string }>();
-
-  const [registros, setRegistros] = useState<RegistroCliente[]>([]);
+  const [result, setResult] = useState<{
+    obraId: string;
+    items: RegistroCliente[];
+    visibility: ClienteVisibilidad;
+  } | null>(null);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const loadedObra = useRef<string | null>(null);
+  const generation = useRef(0);
+  const hasData = result?.obraId === obraId;
+  const registros = hasData ? result.items : EMPTY_REGISTROS;
 
-  const load = useCallback(async () => {
-    if (!obraId) return;
-    try {
+  const load = useCallback(
+    async (manual = false) => {
+      const ticket = ++generation.current;
+      setLoading(loadedObra.current !== obraId);
+      setRefreshing(manual);
       setError("");
-      const data = await getClienteRegistrosObra(obraId);
-      setRegistros(data);
-    } catch (err: any) {
-      setError(err?.message || "No se pudieron cargar los registros");
-    }
-  }, [obraId]);
+      try {
+        if (!obraId)
+          throw new Error(
+            "No se pudo identificar la obra. Vuelve a Mis obras e inténtalo nuevamente.",
+          );
+        const [data, configs] = await Promise.all([
+          getClienteRegistrosObra(obraId), cargarVisibilidadCliente([obraId]),
+        ]);
+        if (ticket !== generation.current) return;
+        setResult({ obraId, items: data, visibility: configs[obraId] });
+        loadedObra.current = obraId;
+      } catch (err) {
+        if (ticket === generation.current) {
+          setResult(null);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "No se pudieron cargar los registros",
+          );
+        }
+      } finally {
+        if (ticket === generation.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    },
+    [obraId],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      const init = async () => {
-        setLoading(true);
-        await load();
-        if (active) setLoading(false);
+      void load();
+      return () => {
+        generation.current += 1;
       };
-      init();
-      return () => { active = false; };
     }, [load]),
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#f97316" />
-      </View>
-    );
-  }
+  const onRefresh = useCallback(() => {
+    void load(true);
+  }, [load]);
+  const goBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/cliente");
+  }, []);
+  const onOpen = useCallback(
+    (id: string) => {
+      router.push({
+        pathname: "/cliente/registro/[id]",
+        params: { id, obraId },
+      });
+    },
+    [obraId],
+  );
+  const renderItem = useCallback(
+    ({ item }: { item: RegistroCliente }) => (
+      <ClientePendingRegistroCard registro={item} onOpen={onOpen} visibility={hasData ? result.visibility : undefined} />
+    ),
+    [onOpen, hasData, result],
+  );
+  const filteredRegistros = useMemo(
+    () =>
+      registros.filter((registro) => matchesClienteRegistro({
+        ...registro,
+        piso: campoVisibleCliente(result?.visibility, "piso") ? registro.piso : "",
+        nombreSellador: campoVisibleCliente(result?.visibility, "nombreSellador") ? registro.nombreSellador : "",
+        sellador: campoVisibleCliente(result?.visibility, "nombreSellador") ? registro.sellador : "",
+        folio: campoVisibleCliente(result?.visibility, "folio") ? registro.folio : null,
+      }, search)),
+    [registros, search, result],
+  );
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "left", "right", "bottom"]}
+    >
       <View style={styles.fixedHeader}>
         <View style={styles.headerRow}>
-          <BrandHeader subtitle="Registros pendientes · BECK" />
-          <Button mode="text" onPress={() => router.back()} compact>
+          <View style={styles.brand}>
+            <BrandHeader subtitle="Revisión · Cliente" />
+          </View>
+          <Button
+            mode="text"
+            onPress={goBack}
+            compact
+            textColor="#c2410c"
+            contentStyle={styles.backContent}
+            accessibilityLabel="Volver a mis obras"
+          >
             Volver
           </Button>
         </View>
-        <Text variant="titleLarge" style={styles.title}>
-          Registros pendientes
-        </Text>
-        <Text style={styles.subtitle}>
-          {registros.length === 0
-            ? "Esta obra no tiene registros validados por ingeniería disponibles para tu firma."
-            : `${registros.length} ${registros.length === 1 ? "registro validado por ingeniería requiere" : "registros validados por ingeniería requieren"} tu firma.`}
-        </Text>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Button mode="contained" onPress={load} style={styles.retryBtn}>Reintentar</Button>
+        <View style={styles.heading}>
+          <View style={styles.headingIcon}>
+            <MaterialCommunityIcons
+              name="clipboard-check-outline"
+              size={24}
+              color="#FDC10B"
+            />
           </View>
-        ) : null}
-
-        {registros.length === 0 && !error ? (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="clipboard-off-outline" size={52} color="#cbd5e1" />
-            <Text style={styles.emptyTitle}>Sin registros disponibles</Text>
-            <Text style={styles.emptyText}>
-              Ingeniería aún no ha validado registros en esta obra o todos ya fueron firmados por ti.
+          <View style={styles.headingInfo}>
+            <Text style={styles.title}>Registros pendientes</Text>
+            <Text style={styles.subtitle}>
+              Aprobados por Ingeniería · Pendientes de tu firma
             </Text>
           </View>
-        ) : null}
-
-        {registros.map((registro) => {
-          const isJunta = registro.tipoRegistro === "junta_lineal_espuma";
-          const unidades = isJunta
-            ? (registro.metrosLineales != null ? `${registro.metrosLineales} m` : "-")
-            : `${registro.cantidadSellos} sellos`;
-
-          return (
-            <Pressable
-              key={registro.id}
-              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-              onPress={() => router.push(`/cliente/registro/${registro.id}?obraId=${obraId}`)}
+          <View style={styles.countBadge}>
+            <Text
+              accessibilityLabel={
+                hasData
+                  ? `${registros.length} registros pendientes de firma`
+                  : "Cantidad aún no disponible"
+              }
+              style={styles.count}
             >
-              <View style={styles.cardHeader}>
-                <View style={styles.cardIconBox}>
-                  <MaterialCommunityIcons
-                    name={isJunta ? "ruler" : "shield-outline"}
-                    size={22}
-                    color="#f97316"
-                  />
-                </View>
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {registro.codigoBeck || `Registro ${registro.id.slice(0, 6).toUpperCase()}`}
-                  </Text>
-                  <Text style={styles.cardMeta}>
-                    {formatDate(registro.fecha)} · {formatTime24WithPeriod(registro.createdAt)}
-                  </Text>
-                </View>
-                <Chip
-                  compact
-                  style={styles.pendienteChip}
-                  textStyle={styles.pendienteChipText}
-                >
-                  Pendiente
-                </Chip>
+              {hasData ? registros.length : "—"}
+            </Text>
+          </View>
+        </View>
+        <BeckSearchInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Buscar registros"
+        />
+        {!!search.trim() && hasData && (
+          <Text style={styles.results}>
+            {filteredRegistros.length} de {registros.length} registros
+          </Text>
+        )}
+      </View>
+      <FlatList
+        data={filteredRegistros}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={styles.content}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListHeaderComponent={
+          error ? (
+            <View style={styles.errorBox} accessibilityRole="alert">
+              <Text style={styles.errorText}>{error}</Text>
+              {hasData && (
+                <Text style={styles.emptyText}>
+                  Se muestra la última información cargada.
+                </Text>
+              )}
+              <Button
+                onPress={onRefresh}
+                disabled={refreshing}
+                textColor="#c2410c"
+              >
+                Reintentar
+              </Button>
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color="#f97316" />
+              <Text style={styles.emptyText}>Cargando registros…</Text>
+            </View>
+          ) : !error ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <MaterialCommunityIcons
+                  name={
+                    registros.length ? "magnify" : "clipboard-check-outline"
+                  }
+                  size={30}
+                  color="#9a7100"
+                />
               </View>
-
-              <View style={styles.cardDetail}>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Tipo</Text>
-                  <Text style={styles.detailValue}>{isJunta ? "Junta Lineal" : "Sello Cortafuego"}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Piso</Text>
-                  <Text style={styles.detailValue}>{registro.piso}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Módulo</Text>
-                  <Text style={styles.detailValue}>{registro.modulo}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Unidades</Text>
-                  <Text style={styles.detailValue}>{unidades}</Text>
-                </View>
-              </View>
-
-              {registro.descripcionMaterial ? (
-                <Text style={styles.material} numberOfLines={1}>{registro.descripcionMaterial}</Text>
-              ) : null}
-
-              <View style={styles.signRow}>
-                <MaterialCommunityIcons name="draw-pen" size={14} color="#2563eb" />
-                <Text style={styles.signHint}>Toca para ver el detalle y firmar</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+              <Text style={styles.emptyTitle}>
+                {registros.length
+                  ? "Sin coincidencias"
+                  : "Sin registros pendientes"}
+              </Text>
+              <Text style={styles.emptyText}>
+                {registros.length
+                  ? "Prueba con otro número de sello, piso o responsable."
+                  : "Esta obra aún no tiene registros aprobados por Ingeniería para tu firma, o todos ya fueron firmados."}
+              </Text>
+              {registros.length > 0 && (
+                <Button onPress={() => setSearch("")} textColor="#c2410c">
+                  Limpiar búsqueda
+                </Button>
+              )}
+            </View>
+          ) : null
+        }
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: "#f5f7fb" },
-  fixedHeader: { backgroundColor: "#f5f7fb", paddingBottom: 8, paddingHorizontal: 16 },
-  headerRow:   { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" },
-  content:     { paddingHorizontal: 16, paddingBottom: 88, paddingTop: 4 },
-  center:      { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f5f7fb" },
-  title:       { color: "#0f172a", marginBottom: 4 },
-  subtitle:    { color: "#475569", lineHeight: 20, marginBottom: 14 },
-  errorBox:    { backgroundColor: "#fff7ed", borderColor: "#fed7aa", borderRadius: 14, borderWidth: 1, marginBottom: 12, padding: 14 },
-  errorText:   { color: "#dc2626", fontWeight: "700", marginBottom: 10 },
-  retryBtn:    { backgroundColor: "#f97316", borderRadius: 12 },
-  emptyState:  { alignItems: "center", paddingVertical: 48, gap: 8 },
-  emptyTitle:  { color: "#0f172a", fontSize: 18, fontWeight: "800" },
-  emptyText:   { color: "#64748b", fontSize: 14, textAlign: "center", lineHeight: 20 },
-  card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 18,
+  container: { flex: 1, backgroundColor: "#f5f7fb", paddingTop: 2 },
+  fixedHeader: { paddingHorizontal: 16, backgroundColor: "#f5f7fb" },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
+  brand: { flex: 1, minWidth: 0 },
+  backContent: { minHeight: 44 },
+  heading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: "#fffaf0",
     borderWidth: 1,
+    borderColor: "#FDC10B",
+    padding: 12,
     marginBottom: 12,
-    padding: 16,
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-    elevation: 3,
   },
-  pressed:         { opacity: 0.85 },
-  cardHeader:      { alignItems: "center", flexDirection: "row", gap: 12, marginBottom: 12 },
-  cardIconBox:     { alignItems: "center", backgroundColor: "#fff7ed", borderRadius: 12, height: 44, justifyContent: "center", width: 44 },
-  cardInfo:        { flex: 1 },
-  cardTitle:       { color: "#0f172a", fontSize: 15, fontWeight: "800" },
-  cardMeta:        { color: "#64748b", fontSize: 12, marginTop: 2 },
-  pendienteChip:   { backgroundColor: "#fef3c7", borderRadius: 10 },
-  pendienteChipText: { color: "#d97706", fontSize: 11, fontWeight: "800" },
-  cardDetail:      { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
-  detailItem:      { backgroundColor: "#f8fafc", borderRadius: 8, padding: 8, minWidth: "46%" },
-  detailLabel:     { color: "#94a3b8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
-  detailValue:     { color: "#0f172a", fontSize: 13, fontWeight: "800", marginTop: 2 },
-  material:        { color: "#475569", fontSize: 13, lineHeight: 18, marginBottom: 10 },
-  signRow:         { alignItems: "center", flexDirection: "row", gap: 6 },
-  signHint:        { color: "#2563eb", fontSize: 12, fontWeight: "700" },
+  headingIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#0f172a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headingInfo: { flex: 1, minWidth: 0 },
+  title: { color: "#0f172a", fontSize: 16, fontWeight: "900" },
+  subtitle: { color: "#64748b", fontSize: 11, lineHeight: 16, marginTop: 4 },
+  countBadge: {
+    borderRadius: 10,
+    backgroundColor: "#FDC10B",
+    minWidth: 36,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  count: {
+    color: "#0f172a",
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  results: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 24,
+    gap: 12,
+    flexGrow: 1,
+  },
+  errorBox: {
+    padding: 14,
+    gap: 8,
+    backgroundColor: "#fff1f2",
+    borderWidth: 1,
+    borderColor: "#fecdd3",
+    borderRadius: 16,
+  },
+  errorText: { color: "#b91c1c", fontWeight: "700" },
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 32,
+    gap: 10,
+  },
+  emptyIcon: { backgroundColor: "#fef3c7", padding: 16, borderRadius: 18 },
+  emptyTitle: { color: "#0f172a", fontSize: 17, fontWeight: "800" },
+  emptyText: {
+    color: "#64748b",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+  },
 });

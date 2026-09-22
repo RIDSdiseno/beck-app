@@ -5,11 +5,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
+import { campoVisibleCliente, type ClienteVisibilidad } from "@/utils/clienteVisibilidad";
 
 type Props = {
   registro: RegistroHistorialApi | RegistroCliente;
   onPress: () => void;
   pdfDisponible?: boolean;
+  clienteVisibility?: ClienteVisibilidad;
 };
 
 function isHistorial(
@@ -43,8 +45,9 @@ function statusStyle(value: string) {
   }
 }
 
-export function RegistroHistoryCard({ registro, onPress, pdfDisponible }: Props) {
+export function RegistroHistoryCard({ registro, onPress, pdfDisponible, clienteVisibility }: Props) {
   const historial = isHistorial(registro);
+  const visible = (campo: Parameters<typeof campoVisibleCliente>[1]) => historial || campoVisibleCliente(clienteVisibility, campo);
   const tipo = historial ? registro.tipo_registro : registro.tipoRegistro;
   const estado = registro.estado;
   const estadoVisible = !historial && registro.validadoCliente ? "firmado" : estado;
@@ -93,22 +96,22 @@ export function RegistroHistoryCard({ registro, onPress, pdfDisponible }: Props)
       </View>
 
       <View style={styles.summaryBox}>
-        <View style={styles.summaryRow}>
+        {visible("piso") && <View style={styles.summaryRow}>
           <MaterialCommunityIcons name="map-marker-outline" size={16} color="#f97316" />
           <Text style={styles.summaryText} numberOfLines={1}>
             Piso {piso}
           </Text>
-        </View>
-        <View style={styles.summaryRow}>
+        </View>}
+        {visible("nombreSellador") && <View style={styles.summaryRow}>
           <MaterialCommunityIcons name="account-outline" size={16} color="#f97316" />
           <Text style={styles.summaryText} numberOfLines={1}>
             Responsable: {responsable || "Sin responsable"}
           </Text>
-        </View>
+        </View>}
         <View style={styles.summaryRow}>
           <MaterialCommunityIcons name="calendar-outline" size={16} color="#f97316" />
           <Text style={styles.summaryText} numberOfLines={1}>
-            {formatDate(registro.fecha)} · {formatTime24WithPeriod(createdAt)} · Sello {numeroSello || "N/A"}
+            {visible("fechaEjecucionSello") ? `${formatDate(registro.fecha)} · ${formatTime24WithPeriod(createdAt)} · ` : ""}Sello {numeroSello || "N/A"}
           </Text>
         </View>
       </View>

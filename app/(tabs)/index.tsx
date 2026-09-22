@@ -7,7 +7,7 @@ import {
 import { getSession } from "@/services/auth/session";
 import { formatDateOnly, formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Redirect, router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   RefreshControl,
@@ -24,6 +24,8 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
+import { ClienteDashboard } from "@/components/ClienteDashboard";
+import { getClienteObras, type ObraCliente } from "@/services/api/clienteApi";
 import { AdminResumen, getAdminResumen } from "@/services/api/adminApi";
 import {
   getIngenieriaResumen,
@@ -80,6 +82,7 @@ export default function DashboardScreen() {
     "sello_cortafuego" | "junta_lineal_espuma"
   >("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
+  const [clienteObras, setClienteObras] = useState<ObraCliente[] | null>(null);
   const [adminSummary, setAdminSummary] = useState(EMPTY_ADMIN_SUMMARY);
   const [engineeringSummary, setEngineeringSummary] = useState(
     EMPTY_ENGINEERING_SUMMARY,
@@ -114,6 +117,9 @@ export default function DashboardScreen() {
           sello_cortafuego: sellos,
           junta_lineal_espuma: juntas,
         });
+        setRegistros([]);
+      } else if (session.user?.rol === "cliente") {
+        setClienteObras(await getClienteObras());
         setRegistros([]);
       } else {
         setRegistros(await getMisRegistros(forceRefresh));
@@ -209,7 +215,15 @@ export default function DashboardScreen() {
   }
 
   if (userRole === "cliente") {
-    return <Redirect href="/(tabs)/cliente" />;
+    return (
+      <ClienteDashboard
+        name={userName}
+        obras={clienteObras}
+        refreshing={refreshing}
+        error={error}
+        onRefresh={onRefresh}
+      />
+    );
   }
 
   if (userRole === "ingenieria") {
