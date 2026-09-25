@@ -20,11 +20,13 @@ export const ClientePendingRegistroCard = memo(
     const identificador = isJunta
       ? visible("folio") ? `Folio ${registro.folio || "—"}` : "Junta lineal"
       : `Sello ${registro.numeroSello || "—"}`;
-    const responsable =
-      registro.nombreSellador || registro.sellador || "Sin responsable";
     const ubicacion = [
       visible("piso") ? `Piso ${registro.piso || "—"}` : null,
-      visible("modulo") ? `Módulo ${registro.modulo || "—"}` : null,
+      visible("recinto") ? `Recinto: ${registro.recinto || "—"}` : null,
+    ].filter(Boolean).join(" · ");
+    const ejes = [
+      visible("ejeNumerico") ? `Eje numérico: ${registro.ejeNumerico || "—"}` : null,
+      visible("ejeAlfabetico") ? `Eje alfabético: ${registro.ejeAlfabetico || "—"}` : null,
     ].filter(Boolean).join(" · ");
 
     return (
@@ -60,18 +62,18 @@ export const ClientePendingRegistroCard = memo(
               size={16}
               color="#f97316"
             />
-            <Text style={styles.detailText} numberOfLines={2}>
+            <Text style={styles.detailText}>
               {ubicacion}
             </Text>
           </View>}
-          {visible("nombreSellador") && <View style={styles.detailRow}>
+          {!!ejes && <View style={styles.detailRow}>
             <MaterialCommunityIcons
-              name="account-outline"
+              name="axis-arrow"
               size={16}
               color="#f97316"
             />
-            <Text style={styles.detailText} numberOfLines={2}>
-              Responsable: {responsable}
+            <Text style={styles.detailText}>
+              {ejes}
             </Text>
           </View>}
           {visible("fechaEjecucionSello") && <View style={styles.detailRow}>
@@ -97,7 +99,7 @@ export const ClientePendingRegistroCard = memo(
           </View>
         </View>
         {visible("itemizadoBeck") && !!registro.descripcionMaterial && (
-          <Text style={styles.material} numberOfLines={1}>
+          <Text style={styles.material} numberOfLines={2} ellipsizeMode="tail">
             {registro.descripcionMaterial}
           </Text>
         )}
@@ -123,8 +125,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "#f97316",
     borderRadius: 16,
-    padding: 12,
-    gap: 9,
+    padding: 10,
+    gap: 6,
     shadowColor: "#0f172a",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
@@ -133,8 +135,8 @@ const styles = StyleSheet.create({
   },
   heading: { flexDirection: "row", alignItems: "center", gap: 9 },
   icon: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     backgroundColor: "#FDC10B",
     borderRadius: 10,
     justifyContent: "center",
@@ -160,8 +162,8 @@ const styles = StyleSheet.create({
     borderColor: "#fde68a",
     borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 5,
+    paddingVertical: 6,
+    gap: 3,
   },
   detailRow: { flexDirection: "row", gap: 6, alignItems: "center" },
   detailText: {
@@ -173,7 +175,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   seal: { color: "#0f172a", fontWeight: "800" },
-  material: { color: "#64748b", fontSize: 11, lineHeight: 16 },
+  material: { color: "#0f172a", fontSize: 11, lineHeight: 15, fontWeight: "700" },
   footer: { flexDirection: "row", alignItems: "center", gap: 6 },
   footerText: { flex: 1, color: "#c2410c", fontSize: 12, fontWeight: "800" },
   pressed: { opacity: 0.78 },

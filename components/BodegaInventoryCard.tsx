@@ -6,7 +6,7 @@ import type { ArticuloBodega, TipoBodega } from "@/services/api/bodegaBeckApi";
 
 type Icon = keyof typeof MaterialCommunityIcons.glyphMap;
 export type BodegaInventoryAction =
-  "editar" | "stock" | "asignar" | "sku" | "etiqueta" | "estado";
+  "editar" | "stock" | "asignar" | "sku" | "etiqueta" | "estado" | "consumo";
 type Props = {
   item: ArticuloBodega;
   tipo: TipoBodega;
@@ -120,6 +120,7 @@ export const BodegaInventoryCard = memo(function BodegaInventoryCard({
             </Pressable>
           }
         >
+          <Menu.Item leadingIcon="tune-variant" title="Configurar consumo" disabled={busy} onPress={() => selectAction("consumo")} />
           {item.sku ? (
             <Menu.Item
               leadingIcon="file-pdf-box"

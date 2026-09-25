@@ -1,5 +1,5 @@
 import type { ObraCliente } from "@/services/api/clienteApi";
-import { filtrarObrasCliente, resumirObrasCliente } from "../clienteObras";
+import { filtrarObrasCliente, resumirObrasCliente, sumarSellosCliente } from "../clienteObras";
 
 const obra = (overrides: Partial<ObraCliente>): ObraCliente => ({
   id: "1",
@@ -24,6 +24,17 @@ const obras = [
 ];
 
 describe("resumen y filtros del cliente", () => {
+  it("suma sellos y no cantidades de registros", () => {
+    expect(sumarSellosCliente([obra({ cantidadSellos: 20 }), obra({ cantidadSellos: 12 })])).toBe(32);
+  });
+  it("distingue cero sellos de un backend sin la nueva métrica", () => {
+    expect(sumarSellosCliente([])).toBe(0);
+    expect(sumarSellosCliente([obra({ cantidadSellos: 0 })])).toBe(0);
+    expect(sumarSellosCliente([obra({})])).toBeNull();
+    expect(sumarSellosCliente([obra({ cantidadSellos: 10 }), obra({})])).toBeNull();
+    expect(sumarSellosCliente([obra({ cantidadSellos: NaN })])).toBeNull();
+    expect(sumarSellosCliente([obra({ cantidadSellos: -1 })])).toBeNull();
+  });
   it("suma los conteos del servidor sin alterar su significado", () => {
     expect(resumirObrasCliente(obras)).toEqual({
       pendientes: 3,

@@ -11,6 +11,23 @@ export const ACCESIBILIDAD_OPTIONS = [
   { value: "0", label: "No aplica" },
 ];
 
+export function getAccesibilidadLabel(registro: {
+  accesibilidad?: number | null;
+  accesibilidadTexto?: string | null;
+}) {
+  if (registro.accesibilidadTexto) return registro.accesibilidadTexto;
+  if (registro.accesibilidad === null || registro.accesibilidad === undefined) return "—";
+  if (registro.accesibilidad === 0) return "No aplica - Factor 1.0";
+  const nombres: Record<number, string> = {
+    1: "Accesibilidad normal",
+    2: "Cielos Americanos o estructurado",
+    3: "Cielo duro y gateras",
+  };
+  const nombre = nombres[registro.accesibilidad];
+  // Con un backend anterior no asumir que el nivel equivale al factor de la obra.
+  return nombre ? `${nombre} - Factor no disponible` : "Accesibilidad no identificada";
+}
+
 export function getAislacionOption(registro: RegistroConAislacion) {
   const estadoExplicito = registro.aislacion_aplica ?? registro.aislacionAplica;
   if (estadoExplicito === true) return "1";

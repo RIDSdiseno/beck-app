@@ -25,7 +25,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import Svg, { Path } from "react-native-svg";
 import { BrandHeader } from "../../../components/BrandHeader";
 import { ExpandableImage } from "../../../components/ExpandableImage";
-import { getAislacionLabel, getAplicacionLabel } from "../../../utils/factoresRegistro";
+import { getAccesibilidadLabel, getAislacionLabel, getAplicacionLabel } from "../../../utils/factoresRegistro";
 import { formatDateOnly } from "../../../utils/dateTime";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
@@ -468,12 +468,12 @@ export default function ClienteRegistroScreen() {
             )}
             {campoVisible("cantidadSellos") && (
               <FieldRow
-                label={isJunta ? "Longitud (m)" : "Cant. sellos"}
+                label={isJunta ? "Longitud (m)" : "Cantidad de sellos (Sin Factor)"}
                 value={isJunta ? registro.metrosLineales : registro.cantidadSellos}
               />
             )}
             {registro.cantidadFinal != null && campoVisible("cantidadFinal") && (
-              <FieldRow label="Cantidad final" value={registro.cantidadFinal} />
+              <FieldRow label="Cantidad Final (Con Factor)" value={registro.cantidadFinal} />
             )}
             <FieldRow label="Responsable" value={campoVisible("nombreSellador") ? registro.nombreSellador || registro.sellador : null} />
           </View>
@@ -482,7 +482,7 @@ export default function ClienteRegistroScreen() {
           <View style={styles.section}>
             <FieldRow label="Holgura (cm)"    value={campoVisible("holgura") ? registro.holgura : null} />
             <FieldRow label="Factor holgura"  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
-            <FieldRow label="Accesibilidad"   value={campoVisible("cieloModular") ? registro.accesibilidad : null} />
+            <FieldRow label="Accesibilidad" value={campoVisible("cieloModular") ? getAccesibilidadLabel(registro) : null} />
             <FieldRow label="Sellos con factores" value={campoVisible("cantidadSellosConFactores") ? registro.cantidadSellosConFactores : null} />
             <FieldRow label="Aislación" value={campoVisible("aislacion") ? getAislacionLabel(registro) : null} />
             <FieldRow label="Sellos aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />

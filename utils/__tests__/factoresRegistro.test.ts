@@ -1,11 +1,22 @@
 import {
   ACCESIBILIDAD_OPTIONS,
+  getAccesibilidadLabel,
   getAislacionLabel,
   getAislacionOption,
   getAplicacionLabel,
 } from "../factoresRegistro";
 
 describe("factores de registro", () => {
+  it("muestra la accesibilidad resuelta por obra sin sustituirla por el nivel", () => {
+    expect(getAccesibilidadLabel({ accesibilidad: 2, accesibilidadTexto: "Cielos Americanos o estructurado - Factor 1.25" })).toBe("Cielos Americanos o estructurado - Factor 1.25");
+    expect(getAccesibilidadLabel({ accesibilidad: 1, accesibilidadTexto: "Accesibilidad normal - Factor 3.0" })).toBe("Accesibilidad normal - Factor 3.0");
+  });
+  it("no inventa el factor al recibir una respuesta de un backend anterior", () => {
+    expect(getAccesibilidadLabel({ accesibilidad: 2 })).toBe("Cielos Americanos o estructurado - Factor no disponible");
+    expect(getAccesibilidadLabel({ accesibilidad: 0 })).toBe("No aplica - Factor 1.0");
+    expect(getAccesibilidadLabel({ accesibilidad: null })).toBe("—");
+    expect(getAccesibilidadLabel({ accesibilidad: 8 })).toBe("Accesibilidad no identificada");
+  });
   it("permite los niveles válidos y la opción neutral No aplica", () => {
     expect(ACCESIBILIDAD_OPTIONS.map(({ value }) => value)).toEqual([
       "1",

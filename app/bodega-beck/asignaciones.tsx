@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { router } from "expo-router";
 import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SelectSheet } from "@/components/SelectSheet";
@@ -127,6 +128,7 @@ export default function AsignacionesBodega() {
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
       <BodegaHeader title="Asignaciones" />
+      <View style={{ paddingHorizontal: 16 }}><BodegaButton title="Consumos informados por operarios" onPress={() => router.push("/inventario-beck/consumos")} /></View>
       <View style={{ paddingHorizontal: 16, gap: 8 }}>
         <SelectSheet
           label="Estado"

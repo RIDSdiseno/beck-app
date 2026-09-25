@@ -283,9 +283,10 @@ export default function EscanearBodega() {
                 </Text>
               </View>
             )}
+            {item.consumidoPor && <Text>Consumo del operario {item.consumidoPor.nombre} · Supervisor {item.consumidoPor.supervisor} · {item.consumidoPor.obra}</Text>}
             {!item.custodios.length && (
               <Text style={styles.readOnlyText}>
-                Sin asignación activa para este código.
+                {item.estadoUnidad === "consumido" ? "Consumido: no corresponde devolución ni reasignación. Se conserva la trazabilidad." : "Sin asignación activa para este código."}
               </Text>
             )}
             {item.custodios.map((c) => (

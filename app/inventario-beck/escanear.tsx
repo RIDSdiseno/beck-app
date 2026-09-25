@@ -46,6 +46,7 @@ function tipoIcon(tipo: string): keyof typeof MaterialCommunityIcons.glyphMap {
 }
 
 function estadoUnidadLabel(estado?: ResultadoEscaneoInventario["estadoUnidad"]) {
+  if (estado === "consumido") return "Consumido · No corresponde devolución ni reasignación";
   if (estado === "pendiente_bodega") return "Pendiente de recepción en bodega";
   if (estado === "asignado_operario") return "Asignado a operario";
   if (estado === "disponible_supervisor") return "Disponible con supervisor";
@@ -279,7 +280,8 @@ export default function EscanearInventarioBeckScreen() {
                   {(item.saldoBodega ?? 0) > 0 ? (
                     <View style={styles.ownerRow}><MaterialCommunityIcons name="warehouse" size={18} color="#92400e" /><View style={styles.ownerText}><Text style={styles.ownerName}>Disponible en bodega · {item.saldoBodega} {item.saldoBodega === 1 ? "unidad" : "unidades"}</Text><Text style={styles.ownerMeta}>Aún no asignado a un supervisor</Text></View></View>
                   ) : null}
-                  {!item.custodios.length && !(item.saldoBodega ?? 0) ? (
+                  {item.consumidoPor && <Text style={styles.ownerMeta}>Consumo del operario {item.consumidoPor.nombre} · Supervisor {item.consumidoPor.supervisor} · {item.consumidoPor.obra}</Text>}
+                  {!item.custodios.length && !(item.saldoBodega ?? 0) && item.estadoUnidad !== "consumido" ? (
                     <View style={styles.ownerRow}><MaterialCommunityIcons name="account-question-outline" size={18} color={COLORS.muted} /><View style={styles.ownerText}><Text style={styles.ownerName}>Sin asignación activa</Text><Text style={styles.ownerMeta}>Este registro no tiene stock disponible ni custodio actual</Text></View></View>
                   ) : null}
                   {item.disponibleSupervisorPorObra.length ? <Text style={styles.availableText}>Tienes unidades disponibles para asignar</Text> : <Text style={styles.unavailableText}>No tienes unidades disponibles de este registro</Text>}

@@ -85,6 +85,8 @@ export function BodegaInput({
   value,
   onChangeText,
   numeric = false,
+  multiline = false,
+  maxLength,
   placeholder,
   icon,
 }: {
@@ -92,6 +94,8 @@ export function BodegaInput({
   value: string;
   onChangeText: (s: string) => void;
   numeric?: boolean;
+  multiline?: boolean;
+  maxLength?: number;
   placeholder?: string;
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
 }) {
@@ -111,7 +115,9 @@ export function BodegaInput({
         )}
         <TextInput
           accessibilityLabel={label}
-          style={bodegaStyles.input}
+          style={[bodegaStyles.input, multiline && { minHeight: 90, textAlignVertical: "top" }]}
+          multiline={multiline}
+          maxLength={maxLength}
           placeholder={placeholder}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

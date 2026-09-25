@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import type { ObraCliente } from "@/services/api/clienteApi";
 import {
   resumirObrasCliente,
+  sumarSellosCliente,
   type ClienteObraFiltro,
 } from "@/utils/clienteObras";
 
@@ -37,6 +38,7 @@ export function ClienteDashboard({
 }: Props) {
   const summary = resumirObrasCliente(obras || []);
   const available = obras !== null;
+  const cantidadSellos = obras === null ? null : sumarSellosCliente(obras);
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -116,6 +118,30 @@ export function ClienteDashboard({
             <Text style={styles.actionText}>Historial</Text>
           </Pressable>
         </View>
+        <View style={[styles.metric, styles.sealsMetric]}>
+          <View style={styles.sectionHeading}>
+            <View style={[styles.metricIcon, styles.sealsIcon]}>
+              <MaterialCommunityIcons name="fire" size={26} color="#7c3aed" />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.metricLabel}>Cantidad de sellos</Text>
+            </View>
+          </View>
+          <Text style={styles.metricValue} accessibilityLabel={cantidadSellos === null ? "Cantidad de sellos no disponible" : `${cantidadSellos} sellos aprobados por Ingeniería`}>
+            {cantidadSellos === null ? "—" : cantidadSellos.toLocaleString("es-CL")}
+          </Text>
+          {obras && obras.length > 0 && (
+            <Text style={styles.metricHint}>
+              {obras.length === 1
+                ? `Correspondientes de la obra "${obras[0].nombre}"`
+                : `Correspondientes de las obras ${obras.map((obra) => `"${obra.nombre}"`).join(", ")}`}
+            </Text>
+          )}
+          {available && cantidadSellos === null && (
+            <Text style={styles.metricHint}>Este indicador requiere la actualización del backend.</Text>
+          )}
+        </View>
+
         <View style={styles.metrics}>
           <Pressable
             accessibilityRole="button"
@@ -144,7 +170,7 @@ export function ClienteDashboard({
             <Text style={styles.metricValue}>
               {available ? summary.pendientes : "—"}
             </Text>
-            <Text style={styles.metricLabel}>Pendientes</Text>
+            <Text style={styles.metricLabel}>Registros Pendientes</Text>
             <Text style={styles.metricHint}>De validación del cliente</Text>
           </Pressable>
           <Pressable
@@ -318,6 +344,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   pendingMetric: { backgroundColor: "#fffaf0", borderColor: "#FDC10B" },
+  sealsMetric: { flex: 0, backgroundColor: "#faf5ff", borderColor: "#d8b4fe", borderTopColor: "#7c3aed" },
+  sealsIcon: { backgroundColor: "#ede9fe" },
   validatedMetric: {
     backgroundColor: "#f0fdf4",
     borderColor: "#86efac",

@@ -10,8 +10,9 @@ import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "@/components/BrandHeader";
 import { BeckSearchInput } from "@/components/BeckSearchInput";
+import { BeckDateFilter } from "@/components/BeckDateFilter";
 import { ClientePendingRegistroCard } from "@/components/ClientePendingRegistroCard";
-import { matchesClienteRegistro } from "@/utils/clienteRegistros";
+import { matchesClienteFecha, matchesClienteRegistro } from "@/utils/clienteRegistros";
 import { cargarVisibilidadCliente } from "@/services/api/clienteVisibilidad";
 import { campoVisibleCliente, type ClienteVisibilidad } from "@/utils/clienteVisibilidad";
 
@@ -26,6 +27,7 @@ export default function ClienteObraScreen() {
     visibility: ClienteVisibilidad;
   } | null>(null);
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -33,6 +35,7 @@ export default function ClienteObraScreen() {
   const generation = useRef(0);
   const hasData = result?.obraId === obraId;
   const registros = hasData ? result.items : EMPTY_REGISTROS;
+  const fechaVisible = hasData && campoVisibleCliente(result.visibility, "fechaEjecucionSello");
 
   const load = useCallback(
     async (manual = false) => {
@@ -106,11 +109,12 @@ export default function ClienteObraScreen() {
       registros.filter((registro) => matchesClienteRegistro({
         ...registro,
         piso: campoVisibleCliente(result?.visibility, "piso") ? registro.piso : "",
-        nombreSellador: campoVisibleCliente(result?.visibility, "nombreSellador") ? registro.nombreSellador : "",
-        sellador: campoVisibleCliente(result?.visibility, "nombreSellador") ? registro.sellador : "",
-        folio: campoVisibleCliente(result?.visibility, "folio") ? registro.folio : null,
-      }, search)),
-    [registros, search, result],
+        recinto: campoVisibleCliente(result?.visibility, "recinto") ? registro.recinto : null,
+        ejeNumerico: campoVisibleCliente(result?.visibility, "ejeNumerico") ? registro.ejeNumerico : "",
+        ejeAlfabetico: campoVisibleCliente(result?.visibility, "ejeAlfabetico") ? registro.ejeAlfabetico : "",
+        descripcionMaterial: campoVisibleCliente(result?.visibility, "itemizadoBeck") ? registro.descripcionMaterial : null,
+      }, search) && matchesClienteFecha(registro.fecha, fechaVisible ? dateFilter : "")),
+    [registros, search, result, fechaVisible, dateFilter],
   );
 
   return (
@@ -164,9 +168,12 @@ export default function ClienteObraScreen() {
         <BeckSearchInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Buscar registros"
+          placeholder="Buscar sello, piso, recinto, ejes o material"
         />
-        {!!search.trim() && hasData && (
+        {fechaVisible && (
+          <BeckDateFilter value={dateFilter} onChange={setDateFilter} compact />
+        )}
+        {(!!search.trim() || (fechaVisible && !!dateFilter)) && hasData && (
           <Text style={styles.results}>
             {filteredRegistros.length} de {registros.length} registros
           </Text>
@@ -227,12 +234,12 @@ export default function ClienteObraScreen() {
               </Text>
               <Text style={styles.emptyText}>
                 {registros.length
-                  ? "Prueba con otro número de sello, piso o responsable."
+                  ? "Prueba con otro sello, piso, recinto, eje o material, o cambia la fecha seleccionada."
                   : "Esta obra aún no tiene registros aprobados por Ingeniería para tu firma, o todos ya fueron firmados."}
               </Text>
               {registros.length > 0 && (
-                <Button onPress={() => setSearch("")} textColor="#c2410c">
-                  Limpiar búsqueda
+                <Button onPress={() => { setSearch(""); setDateFilter(""); }} textColor="#c2410c">
+                  Limpiar búsqueda y fecha
                 </Button>
               )}
             </View>

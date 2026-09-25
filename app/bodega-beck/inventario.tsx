@@ -117,7 +117,15 @@ export default function BodegaInventario() {
   const { refresh } = list;
   const handleAction = useCallback(
     (action: BodegaInventoryAction, row: ArticuloBodega) => {
-      if (action === "editar" || action === "stock" || action === "asignar") {
+      if (action === "consumo") {
+        void bodegaRequest<{ habilitado: boolean; consumible: boolean }>(`/articulos/${tipo}/${row.id}/consumo`).then(policy => {
+          if (!policy.habilitado) return Alert.alert("Función pendiente", "Primero debe aplicarse la migración coordinada del inventario.");
+          Alert.alert("Uso del artículo", `${row.nombre}\nActualmente: ${policy.consumible ? "consumible" : "retornable"}. Marcar como consumible permite al operario informar su consumo, sujeto a confirmación del supervisor.`, [
+            { text: "Cancelar", style: "cancel" },
+            { text: policy.consumible ? "Marcar retornable" : "Marcar consumible", onPress: () => { void mutate(`/articulos/${tipo}/${row.id}/consumo`, { consumible: !policy.consumible }, "PUT"); } },
+          ]);
+        }).catch(e => Alert.alert("No se pudo consultar", e.message));
+      } else if (action === "editar" || action === "stock" || action === "asignar") {
         open(action, row);
       } else if (action === "sku") {
         void mutate(`/articulos/${tipo}/${row.id}/sku`, {}).then((ok) => {

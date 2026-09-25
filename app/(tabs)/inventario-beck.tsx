@@ -20,6 +20,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { ConsumoSolicitudModal } from "@/components/ConsumoSolicitudModal";
 import { SelectSheet } from "@/components/SelectSheet";
 import { nuevaOperacionBodega } from "@/services/api/bodegaBeckApi";
 import {
@@ -70,6 +71,9 @@ function tipoIcon(tipo: string): keyof typeof MaterialCommunityIcons.glyphMap {
 
 function accionLabel(accion: string) {
   const labels: Record<string, string> = {
+    CONSUMO_SOLICITADO_OPERARIO: "Consumo informado por operario",
+    CONSUMO_CONFIRMADO_SUPERVISOR: "Consumo confirmado por supervisor",
+    CONSUMO_RECHAZADO_SUPERVISOR: "Consumo rechazado por supervisor",
     ASIGNADO_SUPERVISOR: "Asignado al supervisor",
     ASIGNADO_OPERARIO: "Entregado al operario",
     RECEPCION_CONFIRMADA_OPERARIO: "Recepción confirmada",
@@ -146,6 +150,7 @@ export default function InventarioBeckScreen() {
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [devolucionItem, setDevolucionItem] = useState<ItemMiEquipo | null>(null);
+  const [consumoItem, setConsumoItem] = useState<ItemMiEquipo | null>(null);
   const [devolucionMotivo, setDevolucionMotivo] = useState("");
   const [bodegaItem, setBodegaItem] = useState<ItemDisponible | null>(null);
   const [bodegaCantidad, setBodegaCantidad] = useState(1);
@@ -407,6 +412,9 @@ export default function InventarioBeckScreen() {
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <View style={styles.headerArea}>
         <BrandHeader subtitle={rol === "jefeobra" ? "Inventario del supervisor" : "Mi equipo asignado"} />
+        <Pressable style={styles.retryButton} onPress={() => router.push("/inventario-beck/consumos")}>
+          <Text style={styles.retryText}>{rol === "jefeobra" ? `Consumos informados · ${entregados.filter(i => i.consumoPendiente).length} pendientes en esta obra` : "Mis consumos informados"}</Text>
+        </Pressable>
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <MaterialCommunityIcons name={rol === "jefeobra" ? "toolbox-outline" : "account-hard-hat"} size={28} color={COLORS.navy} />
@@ -520,6 +528,7 @@ export default function InventarioBeckScreen() {
                         </Text>
                       </View>
                       {entrega.devolucionMotivo ? <Text style={styles.observation}>Motivo: {entrega.devolucionMotivo}</Text> : null}
+                      {entrega.consumoPendiente && <Text style={styles.observation}>Consumo pendiente de confirmar: {entrega.consumoPendiente.cantidad} unidades. Revisa «Consumos informados».</Text>}
                       {entrega.observacion ? <Text style={styles.observation}>{entrega.observacion}</Text> : null}
                       <View style={styles.cardActions}>
                         <Pressable style={styles.secondaryAction} onPress={() => void abrirTrazabilidad({ asignacionId: entrega.id })}>
@@ -599,10 +608,16 @@ export default function InventarioBeckScreen() {
                       {actionId === item.id ? <ActivityIndicator size="small" color="#fff" /> : <MaterialCommunityIcons name="check" size={17} color="#fff" />}
                       <Text style={styles.primarySmallActionText}>Confirmar recepción</Text>
                     </Pressable>
-                  ) : !item.devolucionSolicitadaAt ? (
+                  ) : !item.devolucionSolicitadaAt && !item.consumoPendiente ? (
                     <Pressable style={styles.warehouseAction} onPress={() => { setDevolucionItem(item); setDevolucionMotivo(""); }}>
                       <MaterialCommunityIcons name="keyboard-return" size={17} color="#b91c1c" />
                       <Text style={styles.warehouseActionText}>Solicitar devolución</Text>
+                    </Pressable>
+                  ) : null}
+                  {item.consumoPendiente ? <Text style={styles.observation}>Consumo informado: {item.consumoPendiente.cantidad} unidades. Esperando confirmación del supervisor.</Text> : item.consumible && item.recepcionConfirmadaAt && !item.devolucionSolicitadaAt ? (
+                    <Pressable style={styles.warehouseAction} onPress={() => setConsumoItem(item)}>
+                      <MaterialCommunityIcons name="check-decagram-outline" size={17} color="#b45309" />
+                      <Text style={styles.warehouseActionText}>Informar consumo</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -655,6 +670,7 @@ export default function InventarioBeckScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {consumoItem && <ConsumoSolicitudModal item={consumoItem} onClose={() => setConsumoItem(null)} onDone={() => { setConsumoItem(null); void load(true); }} />}
       <Modal visible={Boolean(devolucionItem)} animationType="slide" transparent onRequestClose={() => !saving && setDevolucionItem(null)}>
         <KeyboardAvoidingView style={styles.keyboardAvoider} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <Pressable style={styles.modalOverlay} onPress={() => !saving && setDevolucionItem(null)}>

@@ -6,6 +6,7 @@ import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import { campoVisibleCliente, type ClienteVisibilidad } from "@/utils/clienteVisibilidad";
+import { resumenTarjetaCliente } from "@/utils/clienteHistorialTarjeta";
 
 type Props = {
   registro: RegistroHistorialApi | RegistroCliente;
@@ -60,6 +61,8 @@ export function RegistroHistoryCard({ registro, onPress, pdfDisponible, clienteV
     : registro.nombreSellador || registro.sellador;
   const createdAt = historial ? registro.created_at : registro.createdAt;
   const isJunta = tipo === "junta_lineal_espuma";
+  const resumenCliente = historial ? null : resumenTarjetaCliente(registro, clienteVisibility);
+  const ubicacion = resumenCliente ? resumenCliente.ubicacion : `Piso ${piso}`;
 
   return (
     <Pressable
@@ -96,13 +99,17 @@ export function RegistroHistoryCard({ registro, onPress, pdfDisponible, clienteV
       </View>
 
       <View style={styles.summaryBox}>
-        {visible("piso") && <View style={styles.summaryRow}>
+        {!!ubicacion && <View style={styles.summaryRow}>
           <MaterialCommunityIcons name="map-marker-outline" size={16} color="#f97316" />
-          <Text style={styles.summaryText} numberOfLines={1}>
-            Piso {piso}
+          <Text style={styles.summaryText} numberOfLines={historial ? 1 : undefined}>
+            {ubicacion}
           </Text>
         </View>}
-        {visible("nombreSellador") && <View style={styles.summaryRow}>
+        {!!resumenCliente?.ejes && <View style={styles.summaryRow}>
+          <MaterialCommunityIcons name="axis-arrow" size={16} color="#f97316" />
+          <Text style={styles.summaryText}>{resumenCliente.ejes}</Text>
+        </View>}
+        {historial && <View style={styles.summaryRow}>
           <MaterialCommunityIcons name="account-outline" size={16} color="#f97316" />
           <Text style={styles.summaryText} numberOfLines={1}>
             Responsable: {responsable || "Sin responsable"}
@@ -114,7 +121,16 @@ export function RegistroHistoryCard({ registro, onPress, pdfDisponible, clienteV
             {visible("fechaEjecucionSello") ? `${formatDate(registro.fecha)} · ${formatTime24WithPeriod(createdAt)} · ` : ""}Sello {numeroSello || "N/A"}
           </Text>
         </View>
+        {!!resumenCliente?.cantidad && <View style={styles.summaryRow}>
+          <MaterialCommunityIcons name={isJunta ? "ruler" : "tag-outline"} size={16} color="#f97316" />
+          <Text style={styles.summaryText}>Cantidad: {resumenCliente.cantidad}</Text>
+        </View>}
       </View>
+      {!!resumenCliente?.material && (
+        <Text style={styles.material} numberOfLines={2} ellipsizeMode="tail">
+          {resumenCliente.material}
+        </Text>
+      )}
 
       <View style={styles.footer}>
         <View style={styles.footerTextGroup}>
@@ -159,6 +175,7 @@ const styles = StyleSheet.create({
   summaryBox: { backgroundColor: "#fffdf8", borderColor: "#fed7aa", borderRadius: 11, borderWidth: 1, gap: 4, marginTop: 9, paddingHorizontal: 10, paddingVertical: 7 },
   summaryRow: { alignItems: "center", flexDirection: "row", gap: 6 },
   summaryText: { color: "#475569", flex: 1, fontSize: 11, fontWeight: "600" },
+  material: { color: "#0f172a", fontSize: 11, lineHeight: 15, fontWeight: "700", marginTop: 6 },
   footer: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 1, paddingTop: 8 },
   footerTextGroup: { alignItems: "center", flexDirection: "row", gap: 5 },
   footerText: { color: "#c2410c", fontSize: 11, fontWeight: "800" },

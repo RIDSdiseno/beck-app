@@ -18,6 +18,9 @@ export type PersonaInventario = {
 };
 
 export type ItemInventario = {
+  consumible?: boolean;
+  consumosHabilitados?: boolean;
+  consumoPendiente?: { id: string; cantidad: number; observacion: string | null } | null;
   itemId: string;
   tipoItem: TipoInventarioBeck;
   nombre: string;
@@ -87,7 +90,8 @@ export type ResultadoEscaneoInventario = ItemInventario & {
   pendienteBodega?: boolean;
   subSku?: string | null;
   tipoConsulta?: "sku" | "unidad";
-  estadoUnidad?: "en_bodega" | "disponible_supervisor" | "asignado_operario" | "pendiente_bodega";
+  estadoUnidad?: "en_bodega" | "disponible_supervisor" | "asignado_operario" | "pendiente_bodega" | "consumido";
+  consumidoPor?: { nombre: string; supervisor: string; obra: string } | null;
   asignacionId?: string | null;
   ultimaActualizacion?: string | null;
   saldoBodega: number | null;
@@ -106,7 +110,7 @@ export type ResultadoEscaneoInventario = ItemInventario & {
   }[];
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function inventarioBeckRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const session = await getSession();
   if (!session.token) throw new Error("No hay sesión activa");
 
@@ -124,6 +128,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return result.data as T;
 }
+const request = inventarioBeckRequest;
 
 export async function getObrasInventarioSupervisor() {
   const data = await request<unknown>("/api/inventario-beck/supervisor/obras");

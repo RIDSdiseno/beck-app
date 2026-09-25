@@ -189,7 +189,11 @@ export default function HistorialScreen() {
         subtitle="Registros realizados · BECK"
         onBack={() => router.replace("/perfil")}
       />
-      <RegistroHistorySearch value={search} onChangeText={setSearch} />
+      <RegistroHistorySearch
+        value={search}
+        onChangeText={setSearch}
+        placeholder={role === "cliente" ? "Buscar sello, piso, recinto, ejes o material" : undefined}
+      />
       <View style={styles.filters}>
         <BeckDateFilter value={dateFilter} onChange={setDateFilter} compact containerStyle={styles.filter} />
         <BeckOptionFilter

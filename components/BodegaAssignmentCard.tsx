@@ -42,7 +42,9 @@ export const BodegaAssignmentCard = memo(function BodegaAssignmentCard({
   const [showCodes, setShowCodes] = useState(false);
   const returned = item.estado === "devuelto";
   const pending = item.pendienteBodega;
-  const status = pending
+  const status = item.estado === "consumido"
+    ? { label: "Consumido · No se devuelve", color: "#7c3aed", bg: "#f5f3ff", border: "#a78bfa", icon: "check-decagram-outline" as const }
+    : pending
     ? {
         label: "Por recibir en bodega",
         color: "#9a3412",

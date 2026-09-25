@@ -2,7 +2,7 @@ import type { RegistroCliente } from "@/services/api/clienteApi";
 
 type RegistroBuscable = Pick<
   RegistroCliente,
-  "numeroSello" | "piso" | "nombreSellador" | "sellador" | "folio"
+  "numeroSello" | "piso" | "recinto" | "ejeNumerico" | "ejeAlfabetico" | "descripcionMaterial"
 >;
 
 function normalize(value: string | null | undefined) {
@@ -25,8 +25,15 @@ export function matchesClienteRegistro(
       `sello ${registro.numeroSello || ""}`,
       registro.piso,
       `piso ${registro.piso || ""}`,
-      registro.nombreSellador || registro.sellador,
-      registro.folio,
+      registro.recinto,
+      registro.ejeNumerico,
+      registro.ejeAlfabetico,
+      registro.descripcionMaterial,
     ].some((value) => normalize(value).includes(term))
   );
+}
+
+export function matchesClienteFecha(fecha: string | null | undefined, filtro: string) {
+  // La fecha de ejecución es un día calendario, no un instante a convertir a hora local.
+  return !filtro || fecha?.slice(0, 10) === filtro;
 }

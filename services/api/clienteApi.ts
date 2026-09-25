@@ -13,6 +13,8 @@ export type ObraCliente = {
   estado: string | null;
   registrosPendientes: number;
   registrosValidados: number;
+  // Opcional para mantener compatibilidad mientras se despliega el backend.
+  cantidadSellos?: number;
 };
 
 export type FotoCliente = {
@@ -49,6 +51,8 @@ export type RegistroCliente = {
   holgura: number | null;
   factorPorHolguras: number | null;
   accesibilidad: number | null;
+  /** Nombre del nivel y factor vigente de la obra, resueltos por el backend. */
+  accesibilidadTexto?: string | null;
   cantidadSellosConFactores: number | null;
   aislacion: number | null;
   aislacionAplica?: boolean | null;

@@ -2,6 +2,12 @@ import type { ObraCliente } from "@/services/api/clienteApi";
 
 export type ClienteObraFiltro = "todas" | "pendientes" | "validadas";
 
+export function sumarSellosCliente(obras: ObraCliente[]): number | null {
+  // Un backend anterior no entrega esta métrica: no confundir ausencia con cero.
+  if (obras.some((obra) => typeof obra.cantidadSellos !== "number" || !Number.isFinite(obra.cantidadSellos) || obra.cantidadSellos < 0)) return null;
+  return obras.reduce((total, obra) => total + (obra.cantidadSellos ?? 0), 0);
+}
+
 export function resumirObrasCliente(obras: ObraCliente[]) {
   const pendientes = obras.reduce(
     (sum, obra) => sum + obra.registrosPendientes,

@@ -5,7 +5,7 @@ import { getSession } from "@/services/auth/session";
 import { cargarVisibilidadCliente } from "@/services/api/clienteVisibilidad";
 import { campoVisibleCliente, type ClienteVisibilidad } from "@/utils/clienteVisibilidad";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
-import { getAislacionLabel, getAplicacionLabel } from "@/utils/factoresRegistro";
+import { getAccesibilidadLabel, getAislacionLabel, getAplicacionLabel } from "@/utils/factoresRegistro";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -226,7 +226,7 @@ export function RegistroHistoryDetailModal({
       metrosLineales: registro.metrosLineales,
       holgura: registro.holgura,
       factorHolguras: registro.factorPorHolguras,
-      accesibilidad: registro.accesibilidad,
+      accesibilidad: getAccesibilidadLabel(registro),
       cantidadConFactores: registro.cantidadSellosConFactores,
       aislacion: registro.aislacion,
       aislacionAplica: registro.aislacionAplica,
@@ -340,7 +340,7 @@ export function RegistroHistoryDetailModal({
                 ) : (
                   <>
                     <DetailField label="N° del sello" value={detail.numeroSello} />
-                    <DetailField visible={visible("cantidadSellos")} label="Cantidad de sellos" value={detail.cantidadSellos} />
+                    <DetailField visible={visible("cantidadSellos")} label={isCliente ? "Cantidad de sellos (Sin Factor)" : "Cantidad de sellos"} value={detail.cantidadSellos} />
                     <DetailField visible={visible("holgura")} label="Holgura" value={detail.holgura} />
                     <DetailField visible={visible("factorPorHolguras")} label="Factor por holguras" value={detail.factorHolguras} />
                     <DetailField visible={visible("cieloModular")} label="Accesibilidad" value={detail.accesibilidad} />
@@ -355,7 +355,7 @@ export function RegistroHistoryDetailModal({
                     />
                     <DetailField visible={visible("cantidadSellosAislacion")} label="Sellos por aislación" value={detail.cantidadAislacion} />
                     <DetailField visible={visible("reparacionTabique")} label="Reparación de tabique" value={getAplicacionLabel(detail.reparacionTabique)} />
-                    <DetailField visible={visible("cantidadFinal")} label="Cantidad final" value={detail.cantidadFinal} />
+                    <DetailField visible={visible("cantidadFinal")} label={isCliente ? "Cantidad Final (Con Factor)" : "Cantidad final"} value={detail.cantidadFinal} />
                   </>
                 )}
                 <DetailField visible={visible("folio")} label="Folio" value={detail.folio} />
