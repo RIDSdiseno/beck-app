@@ -412,9 +412,6 @@ export default function InventarioBeckScreen() {
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <View style={styles.headerArea}>
         <BrandHeader subtitle={rol === "jefeobra" ? "Inventario del supervisor" : "Mi equipo asignado"} />
-        <Pressable style={styles.retryButton} onPress={() => router.push("/inventario-beck/consumos")}>
-          <Text style={styles.retryText}>{rol === "jefeobra" ? `Consumos informados · ${entregados.filter(i => i.consumoPendiente).length} pendientes en esta obra` : "Mis consumos informados"}</Text>
-        </Pressable>
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <MaterialCommunityIcons name={rol === "jefeobra" ? "toolbox-outline" : "account-hard-hat"} size={28} color={COLORS.navy} />
@@ -424,6 +421,9 @@ export default function InventarioBeckScreen() {
             <Text style={styles.heroTitle}>{rol === "jefeobra" ? "Inventario" : "Mi equipo"}</Text>
           </View>
         </View>
+        <Pressable style={styles.retryButton} onPress={() => router.push("/inventario-beck/consumos")}>
+          <Text style={styles.retryText}>{rol === "jefeobra" ? `Consumos informados · ${entregados.filter(i => i.consumoPendiente).length} pendientes en esta obra` : "Mis consumos informados"}</Text>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -766,7 +766,7 @@ export default function InventarioBeckScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   headerArea: { paddingHorizontal: 14, paddingTop: 8 },
-  hero: { alignItems: "center", backgroundColor: COLORS.navy, borderColor: COLORS.yellow, borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 13, padding: 16 },
+  hero: { alignItems: "center", backgroundColor: COLORS.navy, borderColor: COLORS.yellow, borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 13, marginTop: 16, padding: 16 },
   heroIcon: { alignItems: "center", backgroundColor: COLORS.yellow, borderRadius: 14, height: 50, justifyContent: "center", width: 50 },
   heroText: { flex: 1 },
   heroEyebrow: { color: COLORS.yellow, fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },

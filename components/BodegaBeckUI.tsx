@@ -137,12 +137,14 @@ export function BodegaModal({
   children,
   busy,
   footer,
+  brand = "BECK · BODEGA CENTRAL",
 }: React.PropsWithChildren<{
   title: string;
   open: boolean;
   onClose: () => void;
   busy?: boolean;
   footer?: React.ReactNode;
+  brand?: string;
 }>) {
   const insets = useSafeAreaInsets();
   return (
@@ -170,7 +172,7 @@ export function BodegaModal({
         >
           <View style={bodegaStyles.modalHeader}>
             <View style={{ flex: 1, gap: 3 }}>
-              <Text style={bodegaStyles.modalBrand}>BECK · BODEGA CENTRAL</Text>
+              <Text style={bodegaStyles.modalBrand}>{brand}</Text>
               <Text style={bodegaStyles.title}>{title}</Text>
             </View>
             <Pressable

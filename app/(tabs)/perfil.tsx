@@ -30,6 +30,7 @@ type ProfileUser = {
   nombre: string;
   email: string;
   rol: string;
+  empresa?: "beck" | "firemat";
 };
 
 function getRoleLabel(role?: string) {
@@ -566,6 +567,14 @@ export default function PerfilScreen() {
               icon="shield-account-outline"
               label="Mi actividad administrativa"
               onPress={() => router.push("/(tabs)/actividad-admin" as any)}
+              beckStyle
+            />
+          ) : null}
+          {isAdminProfile && user?.empresa === "beck" ? (
+            <ProfileAction
+              icon="warehouse"
+              label="Inventario Beck"
+              onPress={() => router.push("/inventario-beck/administracion")}
               beckStyle
             />
           ) : null}

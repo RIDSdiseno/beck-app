@@ -27,6 +27,7 @@ import { BrandHeader } from "../../../components/BrandHeader";
 import { ExpandableImage } from "../../../components/ExpandableImage";
 import { getAccesibilidadLabel, getAislacionLabel, getAplicacionLabel } from "../../../utils/factoresRegistro";
 import { formatDateOnly } from "../../../utils/dateTime";
+import { createSignatureStroke, type SignatureTouch } from "../../../utils/signatureStroke";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,9 @@ type SignatureCanvasProps = {
 function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
   const [completedPaths, setCompletedPaths] = useState<string[]>([]);
   const [currentPath, setCurrentPath] = useState<string>("");
+  const [stroke] = useState(createSignatureStroke);
   const currentPathRef = useRef<string>("");
+  const frameRef = useRef<number | null>(null);
   const completedPathsRef = useRef<string[]>([]);
   const dimensionsRef = useRef({ width: 0, height: 0 });
   const isDrawing = useRef(false);
@@ -78,6 +81,27 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
     onPathChange(combined, w, h);
   }, [onPathChange]);
 
+  const finishStroke = useCallback((touches: readonly SignatureTouch[] = []) => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+    const path = stroke.finish(touches);
+    if (path) {
+      const paths = [...completedPathsRef.current, path];
+      completedPathsRef.current = paths;
+      setCompletedPaths(paths);
+      notifyChange(paths, dimensionsRef.current.width, dimensionsRef.current.height);
+    }
+    currentPathRef.current = "";
+    setCurrentPath("");
+    isDrawing.current = false;
+    onScrollLock?.(false);
+  }, [stroke, notifyChange, onScrollLock]);
+
+  useEffect(() => () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    onScrollLock?.(false);
+  }, [onScrollLock]);
+
   // PanResponder conserva estos callbacks y solo accede a los refs durante los gestos.
   // eslint-disable-next-line react-hooks/refs
   const panResponder = useMemo(() => PanResponder.create({
@@ -85,46 +109,39 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
     onMoveShouldSetPanResponder:        () => true,
     onStartShouldSetPanResponderCapture: () => true,
     onMoveShouldSetPanResponderCapture:  () => true,
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
     onPanResponderGrant: (evt) => {
       onScrollLock?.(true);
-      const { locationX, locationY } = evt.nativeEvent;
-      currentPathRef.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+      const touch = evt.nativeEvent.changedTouches[0] ?? evt.nativeEvent;
+      currentPathRef.current = stroke.start(touch);
       setCurrentPath(currentPathRef.current);
       isDrawing.current = true;
     },
     onPanResponderMove: (evt) => {
       if (!isDrawing.current) return;
-      const { locationX, locationY } = evt.nativeEvent;
-      currentPathRef.current += ` L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
-      setCurrentPath(currentPathRef.current);
+      currentPathRef.current = stroke.move(evt.nativeEvent.touches);
+      // Conserva todos los puntos, pero redibuja como máximo una vez por frame.
+      if (frameRef.current === null) frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        setCurrentPath(currentPathRef.current);
+      });
     },
-    onPanResponderRelease: () => {
-      onScrollLock?.(false);
-      if (currentPathRef.current) {
-        const newPaths = [...completedPathsRef.current, currentPathRef.current];
-        completedPathsRef.current = newPaths;
-        setCompletedPaths(newPaths);
-        notifyChange(newPaths, dimensionsRef.current.width, dimensionsRef.current.height);
+    onPanResponderEnd: (evt) => {
+      if (isDrawing.current && !stroke.hasActiveTouch(evt.nativeEvent.touches)) {
+        finishStroke(evt.nativeEvent.changedTouches);
       }
-      currentPathRef.current = "";
-      setCurrentPath("");
-      isDrawing.current = false;
     },
-    onPanResponderTerminate: () => {
-      onScrollLock?.(false);
-      if (currentPathRef.current) {
-        const newPaths = [...completedPathsRef.current, currentPathRef.current];
-        completedPathsRef.current = newPaths;
-        setCompletedPaths(newPaths);
-        notifyChange(newPaths, dimensionsRef.current.width, dimensionsRef.current.height);
-      }
-      currentPathRef.current = "";
-      setCurrentPath("");
-      isDrawing.current = false;
-    },
-  }), [notifyChange, onScrollLock]);
+    onPanResponderRelease: (evt) => finishStroke(evt.nativeEvent.changedTouches),
+    onPanResponderTerminate: () => finishStroke(),
+  }), [stroke, finishStroke, onScrollLock]);
 
   const handleClear = () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+    stroke.clear();
+    isDrawing.current = false;
+    onScrollLock?.(false);
     completedPathsRef.current = [];
     setCompletedPaths([]);
     setCurrentPath("");
@@ -138,13 +155,14 @@ function SignatureCanvas({ onPathChange, onScrollLock }: SignatureCanvasProps) {
     <View>
       <View
         style={styles.signatureBox}
+        collapsable={false}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
           dimensionsRef.current = { width, height };
         }}
         {...panResponder.panHandlers}
       >
-        <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
           {completedPaths.map((d, i) => (
             <Path
               key={i}
@@ -328,11 +346,12 @@ export default function ClienteRegistroScreen() {
               });
               setValidado(true);
               setPdfDisponible(updated.pdfDisponible);
-              Alert.alert(
-                "¡Registro validado!",
-                "El registro fue firmado y el PDF final fue generado. Puedes compartirlo desde esta pantalla.",
-                [{ text: "Entendido" }],
-              );
+              // Regresa a la lista existente (o la abre si no está en la pila).
+              // Al recuperar el foco, la lista recarga los pendientes de la obra.
+              router.dismissTo({
+                pathname: "/cliente/[obraId]",
+                params: { obraId: registro.obraId || obraId },
+              });
             } catch (err: any) {
               Alert.alert("Error", err?.message || "No se pudo validar el registro");
             } finally {
@@ -452,17 +471,8 @@ export default function ClienteRegistroScreen() {
             <FieldRow label="Recinto"         value={campoVisible("recinto") ? registro.recinto : null} />
             <FieldRow label="Módulo"          value={campoVisible("modulo") ? registro.modulo : null} />
             <FieldRow label="Piso"            value={campoVisible("piso") ? registro.piso : null} />
-            <FieldRow
-              label="Eje"
-              value={
-                campoVisible("ejeAlfabetico") || campoVisible("ejeNumerico")
-                  ? [
-                      campoVisible("ejeAlfabetico") ? registro.ejeAlfabetico : null,
-                      campoVisible("ejeNumerico") ? registro.ejeNumerico : null,
-                    ].filter(Boolean).join("-")
-                  : null
-              }
-            />
+            <FieldRow label="Eje numérico" value={campoVisible("ejeNumerico") ? registro.ejeNumerico : null} />
+            <FieldRow label="Eje alfabético" value={campoVisible("ejeAlfabetico") ? registro.ejeAlfabetico : null} />
             {!isJunta && campoVisible("numeroSello") && (
               <FieldRow label="N° de sello" value={registro.numeroSello} />
             )}
@@ -578,7 +588,7 @@ export default function ClienteRegistroScreen() {
       <Modal
         visible={showSignModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="fullScreen"
         onRequestClose={() => setShowSignModal(false)}
       >
         <SafeAreaView style={styles.modalContainer} edges={["top", "left", "right", "bottom"]}>
@@ -595,6 +605,8 @@ export default function ClienteRegistroScreen() {
           <ScrollView
             contentContainerStyle={styles.modalContent}
             scrollEnabled={!scrollLocked}
+            canCancelContentTouches={false}
+            bounces={false}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.signatureSummary}>
