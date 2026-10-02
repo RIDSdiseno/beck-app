@@ -89,35 +89,6 @@ export function ClienteDashboard({
             </Button>
           </View>
         )}
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => openObras()}
-            style={({ pressed }) => [
-              styles.quickAction,
-              styles.darkAction,
-              pressed && styles.pressed,
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="office-building-outline"
-              size={22}
-              color="#FDC10B"
-            />
-            <Text style={styles.whiteActionText}>Mis obras</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push("/(tabs)/historial")}
-            style={({ pressed }) => [
-              styles.quickAction,
-              pressed && styles.pressed,
-            ]}
-          >
-            <MaterialCommunityIcons name="history" size={22} color="#0f172a" />
-            <Text style={styles.actionText}>Historial</Text>
-          </Pressable>
-        </View>
         <View style={[styles.metric, styles.sealsMetric]}>
           <View style={styles.sectionHeading}>
             <View style={[styles.metricIcon, styles.sealsIcon]}>
@@ -263,8 +234,8 @@ export function ClienteDashboard({
                   {summary.pendientes
                     ? `Tienes registros pendientes en ${summary.obrasPendientes} ${summary.obrasPendientes === 1 ? "obra" : "obras"}. Revisa su información y fotografías antes de validar.`
                     : summary.obras === 0
-                      ? "Cuando te asignen una obra, podrás consultar sus registros desde Mis obras."
-                      : "No hay registros pendientes de tu validación. Puedes consultar los anteriores en el historial."}
+                      ? "Cuando te asignen una obra, podrás consultar sus registros desde la pestaña Mis Obras."
+                      : "No hay registros pendientes de tu validación. Puedes consultar los anteriores en Perfil › Historial de registros."}
                 </Text>
               </View>
             </View>
@@ -311,24 +282,6 @@ const styles = StyleSheet.create({
   },
   greeting: { color: "#fff", fontWeight: "900", fontSize: 21, marginTop: 3 },
   heroHint: { color: "#cbd5e1", fontSize: 12, lineHeight: 17, marginTop: 4 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  quickAction: {
-    flex: 1,
-    minWidth: 125,
-    minHeight: 48,
-    padding: 12,
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    backgroundColor: "#fffaf0",
-    borderWidth: 1,
-    borderColor: "#FDC10B",
-  },
-  darkAction: { backgroundColor: "#0f172a", borderColor: "#0f172a" },
-  actionText: { color: "#0f172a", fontWeight: "800", fontSize: 14 },
-  whiteActionText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   metric: {
     flex: 1,
