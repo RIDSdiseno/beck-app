@@ -1,3 +1,5 @@
+import type { RegistroTypeValue } from "@/components/RegistroTypeFilter";
+import { RegistroListFilters } from "@/components/RegistroListFilters";
 import {
   getClienteRegistrosObra,
   type RegistroCliente,
@@ -9,8 +11,6 @@ import { FlatList, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "@/components/BrandHeader";
-import { BeckSearchInput } from "@/components/BeckSearchInput";
-import { BeckDateFilter } from "@/components/BeckDateFilter";
 import { ClientePendingRegistroCard } from "@/components/ClientePendingRegistroCard";
 import { matchesClienteFecha, matchesClienteRegistro } from "@/utils/clienteRegistros";
 import { cargarVisibilidadCliente } from "@/services/api/clienteVisibilidad";
@@ -23,24 +23,26 @@ export default function ClienteObraScreen() {
   const { obraId } = useLocalSearchParams<{ obraId: string }>();
   const [result, setResult] = useState<{
     obraId: string;
+    tipoFiltro: RegistroTypeValue;
     items: RegistroCliente[];
     visibility: ClienteVisibilidad;
   } | null>(null);
   const [search, setSearch] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState<RegistroTypeValue>("todos");
   const [dateFilter, setDateFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const loadedObra = useRef<string | null>(null);
   const generation = useRef(0);
-  const hasData = result?.obraId === obraId;
+  const hasData = result?.obraId === obraId && result.tipoFiltro === tipoFiltro;
   const registros = hasData ? result.items : EMPTY_REGISTROS;
   const fechaVisible = hasData && campoVisibleCliente(result.visibility, "fechaEjecucionSello");
 
   const load = useCallback(
     async (manual = false) => {
       const ticket = ++generation.current;
-      setLoading(loadedObra.current !== obraId);
+      setLoading(loadedObra.current !== `${obraId}:${tipoFiltro}`);
       setRefreshing(manual);
       setError("");
       try {
@@ -49,11 +51,11 @@ export default function ClienteObraScreen() {
             "No se pudo identificar la obra. Vuelve a Mis obras e inténtalo nuevamente.",
           );
         const [data, configs] = await Promise.all([
-          getClienteRegistrosObra(obraId), cargarVisibilidadCliente([obraId]),
+          getClienteRegistrosObra(obraId, tipoFiltro), cargarVisibilidadCliente([obraId]),
         ]);
         if (ticket !== generation.current) return;
-        setResult({ obraId, items: data, visibility: configs[obraId] });
-        loadedObra.current = obraId;
+        setResult({ obraId, tipoFiltro, items: data, visibility: configs[obraId] });
+        loadedObra.current = `${obraId}:${tipoFiltro}`;
       } catch (err) {
         if (ticket === generation.current) {
           setResult(null);
@@ -70,7 +72,7 @@ export default function ClienteObraScreen() {
         }
       }
     },
-    [obraId],
+    [obraId, tipoFiltro],
   );
 
   useFocusEffect(
@@ -165,19 +167,22 @@ export default function ClienteObraScreen() {
             </Text>
           </View>
         </View>
-        <BeckSearchInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Buscar sello, piso, recinto, ejes o material"
+        <RegistroListFilters
+          search={search}
+          onSearch={setSearch}
+          searchPlaceholder="Buscar sello, piso, recinto, ejes o material"
+          tipo={tipoFiltro}
+          onTipo={setTipoFiltro}
+          fecha={fechaVisible ? dateFilter : ""}
+          onFecha={fechaVisible ? setDateFilter : undefined}
+          total={filteredRegistros.length}
+          loading={loading || refreshing}
+          onClear={() => {
+            setSearch("");
+            setTipoFiltro("todos");
+            setDateFilter("");
+          }}
         />
-        {fechaVisible && (
-          <BeckDateFilter value={dateFilter} onChange={setDateFilter} compact />
-        )}
-        {(!!search.trim() || (fechaVisible && !!dateFilter)) && hasData && (
-          <Text style={styles.results}>
-            {filteredRegistros.length} de {registros.length} registros
-          </Text>
-        )}
       </View>
       <FlatList
         data={filteredRegistros}
@@ -290,12 +295,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: "900",
     textAlign: "center",
-  },
-  results: {
-    color: "#64748b",
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 8,
   },
   content: {
     paddingHorizontal: 16,

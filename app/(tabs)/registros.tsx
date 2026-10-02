@@ -1,9 +1,13 @@
+import { SupervisorRegistroFilters } from "@/components/SupervisorRegistroFilters";
+import { RegistroListFilters } from "@/components/RegistroListFilters";
+import { type RegistroTypeValue } from "@/components/RegistroTypeFilter";
+import { useRegistrosOperario } from "@/hooks/useRegistrosOperario";
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import {
   createRegistro,
   deleteRegistroPendiente,
   enviarRegistroATecnico,
   enviarRegistroAIngenieria,
-  getMisRegistros,
   getRegistrosSupervisorPage,
   reenviarRegistroComoTecnico,
   RegistroHistorialApi,
@@ -12,6 +16,9 @@ import {
 import {
   CampoConfiguracionRegistro,
   getConfiguracionRegistro,
+  getTiposRegistroConfigurados,
+  getTramosRegistroConfigurados,
+  TramoHolguraObra,
   getMisObras,
   ObraApi,
 } from "@/services/api/obrasApi";
@@ -28,7 +35,7 @@ import {
   isCorreccionEditable,
   shouldShowRejectionContext,
 } from "@/utils/registroEstado";
-import { HOLGURA_OPTIONS } from "@/utils/holgura";
+import { HOLGURA_OPTIONS, JUNTA_SEPARACION_OPTIONS } from "@/utils/holgura";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import {
   ACCESIBILIDAD_OPTIONS,
@@ -46,6 +53,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  FlatList,
   ScrollView,
   StyleSheet,
   TouchableWithoutFeedback,
@@ -58,16 +66,16 @@ import {
   Checkbox,
   SegmentedButtons,
   Text,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
 import { BeckSearchInput } from "@/components/BeckSearchInput";
-import { BeckFilterPanel } from "@/components/BeckFilterPanel";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import { SelectSheet } from "@/components/SelectSheet";
 import { BrandHeader } from "../../components/BrandHeader";
 
-type TipoRegistro = "sello_cortafuego" | "junta_lineal_espuma";
+type TipoRegistro = "sello_cortafuego" | "junta_lineal_espuma" | "tabiqueria";
 type RegistroEstadoFiltro = "todos" | "pendiente" | "rechazado";
 
 const REGISTRO_ESTADO_FILTERS: {
@@ -447,15 +455,32 @@ export default function RegistrosScreen({
   });
   const jefeRegistrosQueryVersionRef = useRef(0);
   const [tecnicoRegistroSearch, setTecnicoRegistroSearch] = useState("");
+  const [tecnicoTipoFiltro, setTecnicoTipoFiltro] = useState<RegistroTypeValue>("todos");
+  const [jefeFechaFiltro, setJefeFechaFiltro] = useState("");
+  const [jefeTipoFiltro, setJefeTipoFiltro] = useState<RegistroTypeValue>("todos");
   const [tecnicoEstadoFiltro, setTecnicoEstadoFiltro] =
     useState<RegistroEstadoFiltro>("todos");
   const [selectedJefeObraId, setSelectedJefeObraId] = useState<string | null>(null);
-  const [tecnicoRegistros, setTecnicoRegistros] = useState<RegistroHistorialApi[]>([]);
+  const tecnicoPage = useRegistrosOperario(userRole === "terreno", tecnicoRegistroSearch, tecnicoEstadoFiltro, tecnicoTipoFiltro);
   const [selectedTecnicoRegistro, setSelectedTecnicoRegistro] =
     useState<RegistroHistorialApi | null>(null);
   const [editingRegistro, setEditingRegistro] =
     useState<RegistroHistorialApi | null>(null);
 
+  const [tramosPorTipo, setTramosPorTipo] = useState<Partial<Record<TipoRegistro, TramoHolguraObra[]>>>({});
+  const [tiposPermitidos, setTiposPermitidos] = useState<TipoRegistro[]>(["sello_cortafuego", "junta_lineal_espuma", "tabiqueria"]);
+  const theme = useTheme();
+  // SegmentedButtons trata a su primer botón como un segmento abierto hacia la
+  // derecha (sin esquinas ni borde derecho). Si la obra solo habilita un tipo,
+  // ese botón es también el último: se le devuelven las esquinas y el borde.
+  const estiloSegmentoUnico = useMemo(() => {
+    const radio = (theme.isV3 ? 5 : 1) * theme.roundness;
+    return {
+      borderTopRightRadius: radio,
+      borderBottomRightRadius: radio,
+      borderEndWidth: theme.isV3 ? 1 : StyleSheet.hairlineWidth,
+    };
+  }, [theme.isV3, theme.roundness]);
   const [tipoRegistro, setTipoRegistro] =
     useState<TipoRegistro>("sello_cortafuego");
   const [fecha, setFecha] = useState(formatDate(new Date()));
@@ -525,14 +550,26 @@ export default function RegistrosScreen({
   );
 
   const isJuntaLineal = tipoRegistro === "junta_lineal_espuma";
+  const opcionesHolgura = useMemo(() => {
+    const tramos = tramosPorTipo[tipoRegistro];
+    if (!tramos?.length) return isJuntaLineal ? JUNTA_SEPARACION_OPTIONS : HOLGURA_OPTIONS;
+    const ordenados = [...tramos].sort((a, b) => a.holguraMax - b.holguraMax);
+    return [
+      ...ordenados.map((tramo, index) => ({
+        value: String(tramo.holguraMax),
+        label: (index ? String(ordenados[index - 1].holguraMax) + " < " : "") + (isJuntaLineal ? "Separación" : "H") + " ≤ " + tramo.holguraMax + " cm",
+      })),
+      { value: "0", label: "No aplica" },
+    ];
+  }, [isJuntaLineal, tipoRegistro, tramosPorTipo]);
   const isFormMode = mode === "form";
   const campoConfiguradoVisible = (campo: CampoConfiguracionRegistro) =>
     camposConfigurablesRegistro[campo];
 
   const tipoRegistroLabel = useMemo(
     () =>
-      isJuntaLineal ? "Junta Lineal Espuma" : "Sello Cortafuego",
-    [isJuntaLineal],
+      isJuntaLineal ? "Junta Lineal Espuma" : tipoRegistro === "tabiqueria" ? "Tabiquería" : "Sello Cortafuego",
+    [isJuntaLineal, tipoRegistro],
   );
   const isTerrenoRegistroList =
     userRole === "terreno" && !isFormMode && !editingRegistro;
@@ -606,85 +643,22 @@ export default function RegistrosScreen({
     );
   }, [jefeEstadoFiltro, jefeRegistroSearchDebounced, jefeRegistrosPorObra]);
 
-  const tecnicoRegistrosSinDuplicar = useMemo(
-    () => preferirCopiasCorreccion(tecnicoRegistros),
-    [tecnicoRegistros],
-  );
-
-  const tecnicoRechazados = useMemo(
-    () => tecnicoRegistrosSinDuplicar.filter((registro) => registro.estado === "rechazado"),
-    [tecnicoRegistrosSinDuplicar],
-  );
-
-  const tecnicoPendientes = useMemo(
-    () => tecnicoRegistrosSinDuplicar.filter((registro) => registro.estado === "pendiente"),
-    [tecnicoRegistrosSinDuplicar],
-  );
-
-  const filteredTecnicoRegistros = useMemo(() => {
-    const term = tecnicoRegistroSearch.trim().toLowerCase();
-    const visibles = [...tecnicoRechazados, ...tecnicoPendientes].filter((registro) => {
-      const isCorreccion = isCorreccionEditable(registro);
-
-      return (
-        tecnicoEstadoFiltro === "todos" ||
-        registro.estado === tecnicoEstadoFiltro ||
-        (tecnicoEstadoFiltro === "rechazado" && isCorreccion)
-      );
-    });
-    if (!term) return visibles;
-
-    return visibles.filter((registro) =>
-      `${registro.obras?.nombre || ""} ${registro.obras?.codigo || ""} ${registro.piso || ""} ${registro.numero_sello || ""}`
-        .toLowerCase()
-        .includes(term),
-    );
-  }, [
-    tecnicoEstadoFiltro,
-    tecnicoPendientes,
-    tecnicoRechazados,
-    tecnicoRegistroSearch,
-  ]);
-
-  const tecnicoFilterCounts = useMemo(() => {
-    const term = tecnicoRegistroSearch.trim().toLowerCase();
-    const visibles = [...tecnicoRechazados, ...tecnicoPendientes];
-    const matchingSearch = term
-      ? visibles.filter((registro) =>
-          `${registro.obras?.nombre || ""} ${registro.obras?.codigo || ""} ${registro.piso || ""} ${registro.numero_sello || ""}`
-            .toLowerCase()
-            .includes(term),
-        )
-      : visibles;
-
-    return {
-      todos: matchingSearch.length,
-      pendiente: matchingSearch.filter(
-        (registro) => registro.estado === "pendiente",
-      ).length,
-      rechazado: matchingSearch.filter(
-        (registro) =>
-          registro.estado === "rechazado" || isCorreccionEditable(registro),
-      ).length,
-    };
-  }, [tecnicoPendientes, tecnicoRechazados, tecnicoRegistroSearch]);
+  const filteredTecnicoRegistros = tecnicoPage.items;
+  const tecnicoFilterCounts = tecnicoPage.counts;
+  const reloadTecnicoRegistros = tecnicoPage.reload;
 
   const refreshTecnicoRegistros = useCallback(async () => {
     try {
       setRefreshingTecnicoRegistros(true);
       setError("");
       clearSuccessMessage();
-      const registros = await getMisRegistros(true, {
-        scope: "registro",
-        vista: isAdminSession ? "operario" : undefined,
-      });
-      setTecnicoRegistros(registros);
+      await reloadTecnicoRegistros();
     } catch (err: any) {
       setError(err?.message || "No se pudieron obtener los registros");
     } finally {
       setRefreshingTecnicoRegistros(false);
     }
-  }, [clearSuccessMessage, isAdminSession]);
+  }, [clearSuccessMessage, reloadTecnicoRegistros]);
 
   const refreshJefeObraData = useCallback(async () => {
     try {
@@ -700,6 +674,8 @@ export default function RegistrosScreen({
               limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
               search: jefeRegistroSearchDebounced,
               estado: jefeEstadoFiltro,
+              tipoRegistro: jefeTipoFiltro,
+              fecha: jefeFechaFiltro,
               vista: isAdminSession ? "supervisor" : undefined,
             })
           : Promise.resolve(null),
@@ -720,6 +696,8 @@ export default function RegistrosScreen({
     clearSuccessMessage,
     isAdminSession,
     jefeEstadoFiltro,
+    jefeTipoFiltro,
+    jefeFechaFiltro,
     jefeRegistroSearchDebounced,
     selectedJefeObraId,
   ]);
@@ -733,12 +711,15 @@ export default function RegistrosScreen({
       setLoadingJefeRegistros(true);
       setError("");
       setJefeRegistrosNextCursor(null);
+      setJefeRegistros([]);
       try {
         const page = await getRegistrosSupervisorPage({
           obraId: selectedJefeObraId,
           limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
           search: jefeRegistroSearchDebounced,
           estado: jefeEstadoFiltro,
+          tipoRegistro: jefeTipoFiltro,
+        fecha: jefeFechaFiltro,
           vista: isAdminSession ? "supervisor" : undefined,
         });
         if (active && jefeRegistrosQueryVersionRef.current === queryVersion) {
@@ -763,6 +744,8 @@ export default function RegistrosScreen({
   }, [
     isAdminSession,
     jefeEstadoFiltro,
+    jefeTipoFiltro,
+    jefeFechaFiltro,
     jefeRegistroSearchDebounced,
     selectedJefeObraId,
     userRole,
@@ -786,6 +769,8 @@ export default function RegistrosScreen({
         limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
         search: jefeRegistroSearchDebounced,
         estado: jefeEstadoFiltro,
+        tipoRegistro: jefeTipoFiltro,
+          fecha: jefeFechaFiltro,
         vista: isAdminSession ? "supervisor" : undefined,
       });
       if (jefeRegistrosQueryVersionRef.current !== queryVersion) return;
@@ -809,6 +794,8 @@ export default function RegistrosScreen({
   }, [
     isAdminSession,
     jefeEstadoFiltro,
+    jefeTipoFiltro,
+    jefeFechaFiltro,
     jefeRegistroSearchDebounced,
     jefeRegistrosNextCursor,
     loadingJefeRegistros,
@@ -832,6 +819,8 @@ export default function RegistrosScreen({
         rolConfiguracion,
         true,
       );
+      setTiposPermitidos(getTiposRegistroConfigurados(obraId));
+      setTramosPorTipo(getTramosRegistroConfigurados(obraId));
       setCamposConfigurablesRegistro({
         ...DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO,
         ...Object.fromEntries(
@@ -874,6 +863,12 @@ export default function RegistrosScreen({
         );
         if (!active) return;
 
+        const tipos = getTiposRegistroConfigurados(obraIdConfiguracion);
+        setTiposPermitidos(tipos);
+        setTramosPorTipo(getTramosRegistroConfigurados(obraIdConfiguracion));
+        if (!editingRegistro) {
+          setTipoRegistro((actual) => tipos.includes(actual) ? actual : tipos[0] ?? "sello_cortafuego");
+        }
         setCamposConfigurablesRegistro({
           ...DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO,
           ...Object.fromEntries(
@@ -934,14 +929,6 @@ export default function RegistrosScreen({
           return;
         }
 
-        if (effectiveRole === "terreno") {
-          const registros = await getMisRegistros(false, {
-            scope: "registro",
-            vista: role === "administrador" ? "operario" : undefined,
-          });
-          setTecnicoRegistros(registros);
-        }
-
         const currentObra = initialObra ?? (await getSelectedObra());
 
         if (currentObra) {
@@ -977,7 +964,7 @@ export default function RegistrosScreen({
   );
 
   const resetForm = () => {
-    setTipoRegistro("sello_cortafuego");
+    setTipoRegistro(tiposPermitidos[0] ?? "sello_cortafuego");
     setFecha(formatDate(new Date()));
     setCalendarMonth(new Date());
     setItemizadoBeck("");
@@ -1163,9 +1150,7 @@ export default function RegistrosScreen({
 
   const fillFormFromRegistro = (registro: RegistroHistorialApi) => {
     const nextTipo =
-      registro.tipo_registro === "junta_lineal_espuma"
-        ? "junta_lineal_espuma"
-        : "sello_cortafuego";
+      registro.tipo_registro as TipoRegistro;
 
     setEditingRegistro(registro);
     if (userRole === "jefeobra" || userRole === "terreno") {
@@ -1209,6 +1194,7 @@ export default function RegistrosScreen({
   };
 
   const validateForm = () => {
+    if (!tiposPermitidos.includes(tipoRegistro)) return "El tipo de registro no está habilitado para esta obra.";
     if (!obra) return "Debes seleccionar una obra antes de enviar.";
 
     const commonMissing =
@@ -1229,12 +1215,13 @@ export default function RegistrosScreen({
       if (!Number.isFinite(toApiNumber(metrosLineales)) || toApiNumber(metrosLineales) <= 0) {
         return "La longitud debe ser mayor a 0.";
       }
-    } else {
+    }
+    {
       if (
         (campoConfiguradoVisible("itemizadoBeck") && !itemizadoBeck.trim()) ||
         (campoConfiguradoVisible("dimensiones") && !dimensiones.trim()) ||
         (campoConfiguradoVisible("numeroSello") && !numeroSello.trim()) ||
-        (campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
+        (!isJuntaLineal && campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
         (campoConfiguradoVisible("holgura") && !holgura.trim()) ||
         (campoConfiguradoVisible("cieloModular") && !accesibilidad.trim()) ||
         (campoConfiguradoVisible("aislacion") && !aislacion.trim()) ||
@@ -1272,13 +1259,14 @@ export default function RegistrosScreen({
       if (!Number.isFinite(toApiNumber(metrosLineales)) || toApiNumber(metrosLineales) <= 0) {
         return "La longitud debe ser mayor a 0.";
       }
-    } else if (
+    }
+    if (
       (campoConfiguradoVisible("itemizadoBeck") && !itemizadoBeck.trim()) ||
       (userRole === "terreno" &&
         campoConfiguradoVisible("dimensiones") &&
         !dimensiones.trim()) ||
       (campoConfiguradoVisible("numeroSello") && !numeroSello.trim()) ||
-      (campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
+      (!isJuntaLineal && campoConfiguradoVisible("cantidadSellos") && !cantidadSellos.trim()) ||
       (campoConfiguradoVisible("holgura") && !holgura.trim()) ||
       (campoConfiguradoVisible("cieloModular") && !accesibilidad.trim()) ||
       (campoConfiguradoVisible("aislacion") && !aislacion.trim()) ||
@@ -1322,45 +1310,42 @@ export default function RegistrosScreen({
       const registro = await createRegistro({
         obraId: obra.id,
         ...getPayloadCommonFields(),
-        descripcionMaterial: isJuntaLineal
-          ? "Junta Lineal Espuma"
-          : campoConfiguradoVisible("itemizadoBeck")
+        descripcionMaterial: campoConfiguradoVisible("itemizadoBeck")
             ? itemizadoBeck
             : "No aplica",
         itemizadoBeck:
-          isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
+          !campoConfiguradoVisible("itemizadoBeck")
             ? undefined
             : itemizadoBeck,
         dimensiones:
-          !isJuntaLineal && campoConfiguradoVisible("dimensiones")
+          campoConfiguradoVisible("dimensiones")
             ? dimensiones.trim()
             : undefined,
         numeroSello:
-          isJuntaLineal || !campoConfiguradoVisible("numeroSello")
+          !campoConfiguradoVisible("numeroSello")
             ? "No aplica"
             : numeroSello,
         cantidadSellos:
-          isJuntaLineal || !campoConfiguradoVisible("cantidadSellos")
+          isJuntaLineal ? 0 : !campoConfiguradoVisible("cantidadSellos")
             ? 1
             : toApiNumber(cantidadSellos),
         holgura:
-          isJuntaLineal || !campoConfiguradoVisible("holgura")
+          !campoConfiguradoVisible("holgura")
             ? undefined
             : toApiNumber(holgura),
         accesibilidad:
-          isJuntaLineal || !campoConfiguradoVisible("cieloModular")
+          !campoConfiguradoVisible("cieloModular")
             ? undefined
             : toApiNumber(accesibilidad),
         cieloModular:
-          !isJuntaLineal && campoConfiguradoVisible("cieloModular")
+          campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
             : undefined,
         aislacion:
-          !isJuntaLineal && campoConfiguradoVisible("aislacion") && aislacion.trim()
+          campoConfiguradoVisible("aislacion") && aislacion.trim()
             ? toApiNumber(aislacion)
             : undefined,
         reparacionTabique:
-          !isJuntaLineal &&
           campoConfiguradoVisible("reparacionTabique") &&
           reparacionTabique.trim()
             ? toApiNumber(reparacionTabique)
@@ -1369,7 +1354,7 @@ export default function RegistrosScreen({
           ? observaciones
           : undefined,
         itemizadoSacyr:
-          isJuntaLineal || !campoConfiguradoVisible("itemizadoMandante")
+          !campoConfiguradoVisible("itemizadoMandante")
             ? undefined
             : itemizadoSacyr,
         tipoRegistro,
@@ -1381,11 +1366,7 @@ export default function RegistrosScreen({
 
       await uploadRegistroFotos(registro.id, fotos);
 
-      const registros = await getMisRegistros(true, {
-        scope: "registro",
-        vista: isAdminSession ? "operario" : undefined,
-      });
-      setTecnicoRegistros(registros);
+      await reloadTecnicoRegistros();
       showSuccessMessage("Registro y fotos enviados correctamente.");
       await clearSelectedObra();
       setObra(null);
@@ -1438,45 +1419,42 @@ export default function RegistrosScreen({
       await enviarRegistroAIngenieria(editingRegistro.id, {
         obraId: editingRegistro.obras?.id || editingRegistro.id,
         ...getPayloadCommonFields(),
-        descripcionMaterial: isJuntaLineal
-          ? "Junta Lineal Espuma"
-          : campoConfiguradoVisible("itemizadoBeck")
+        descripcionMaterial: campoConfiguradoVisible("itemizadoBeck")
             ? itemizadoBeck
             : "No aplica",
         codigoBeck:
-          isJuntaLineal || !campoConfiguradoVisible("codigoBeck")
+          !campoConfiguradoVisible("codigoBeck")
             ? undefined
             : itemizadoCodigoBeck,
         itemizadoBeck:
-          isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
+          !campoConfiguradoVisible("itemizadoBeck")
             ? undefined
             : itemizadoBeck,
         numeroSello:
-          isJuntaLineal || !campoConfiguradoVisible("numeroSello")
+          !campoConfiguradoVisible("numeroSello")
             ? "No aplica"
             : numeroSello,
         cantidadSellos:
-          isJuntaLineal || !campoConfiguradoVisible("cantidadSellos")
+          isJuntaLineal ? 0 : !campoConfiguradoVisible("cantidadSellos")
             ? 1
             : toApiNumber(cantidadSellos),
         holgura:
-          isJuntaLineal || !campoConfiguradoVisible("holgura")
+          !campoConfiguradoVisible("holgura")
             ? undefined
             : toApiNumber(holgura),
         accesibilidad:
-          isJuntaLineal || !campoConfiguradoVisible("cieloModular")
+          !campoConfiguradoVisible("cieloModular")
             ? undefined
             : toApiNumber(accesibilidad),
         cieloModular:
-          !isJuntaLineal && campoConfiguradoVisible("cieloModular")
+          campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
             : undefined,
         aislacion:
-          !isJuntaLineal && campoConfiguradoVisible("aislacion") && aislacion.trim()
+          campoConfiguradoVisible("aislacion") && aislacion.trim()
             ? toApiNumber(aislacion)
             : undefined,
         reparacionTabique:
-          !isJuntaLineal &&
           campoConfiguradoVisible("reparacionTabique") &&
           reparacionTabique.trim()
             ? toApiNumber(reparacionTabique)
@@ -1486,7 +1464,7 @@ export default function RegistrosScreen({
           ? observaciones
           : undefined,
         itemizadoSacyr:
-          isJuntaLineal || !campoConfiguradoVisible("itemizadoMandante")
+          !campoConfiguradoVisible("itemizadoMandante")
             ? undefined
             : itemizadoSacyr,
         tipoRegistro,
@@ -1502,6 +1480,8 @@ export default function RegistrosScreen({
           limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
           search: jefeRegistroSearchDebounced,
           estado: jefeEstadoFiltro,
+          tipoRegistro: jefeTipoFiltro,
+          fecha: jefeFechaFiltro,
           vista: isAdminSession ? "supervisor" : undefined,
         });
         if (jefeRegistrosQueryVersionRef.current === queryVersion) {
@@ -1545,45 +1525,42 @@ export default function RegistrosScreen({
       await reenviarRegistroComoTecnico(editingRegistro.id, {
         obraId: obra.id,
         ...getPayloadCommonFields(),
-        descripcionMaterial: isJuntaLineal
-          ? "Junta Lineal Espuma"
-          : campoConfiguradoVisible("itemizadoBeck")
+        descripcionMaterial: campoConfiguradoVisible("itemizadoBeck")
             ? itemizadoBeck
             : "No aplica",
         itemizadoBeck:
-          isJuntaLineal || !campoConfiguradoVisible("itemizadoBeck")
+          !campoConfiguradoVisible("itemizadoBeck")
             ? undefined
             : itemizadoBeck,
         dimensiones:
-          !isJuntaLineal && campoConfiguradoVisible("dimensiones")
+          campoConfiguradoVisible("dimensiones")
             ? dimensiones.trim()
             : undefined,
         numeroSello:
-          isJuntaLineal || !campoConfiguradoVisible("numeroSello")
+          !campoConfiguradoVisible("numeroSello")
             ? "No aplica"
             : numeroSello,
         cantidadSellos:
-          isJuntaLineal || !campoConfiguradoVisible("cantidadSellos")
+          isJuntaLineal ? 0 : !campoConfiguradoVisible("cantidadSellos")
             ? 1
             : toApiNumber(cantidadSellos),
         holgura:
-          isJuntaLineal || !campoConfiguradoVisible("holgura")
+          !campoConfiguradoVisible("holgura")
             ? undefined
             : toApiNumber(holgura),
         accesibilidad:
-          isJuntaLineal || !campoConfiguradoVisible("cieloModular")
+          !campoConfiguradoVisible("cieloModular")
             ? undefined
             : toApiNumber(accesibilidad),
         cieloModular:
-          !isJuntaLineal && campoConfiguradoVisible("cieloModular")
+          campoConfiguradoVisible("cieloModular")
             ? toApiNumber(accesibilidad)
             : undefined,
         aislacion:
-          !isJuntaLineal && campoConfiguradoVisible("aislacion") && aislacion.trim()
+          campoConfiguradoVisible("aislacion") && aislacion.trim()
             ? toApiNumber(aislacion)
             : undefined,
         reparacionTabique:
-          !isJuntaLineal &&
           campoConfiguradoVisible("reparacionTabique") &&
           reparacionTabique.trim()
             ? toApiNumber(reparacionTabique)
@@ -1592,7 +1569,7 @@ export default function RegistrosScreen({
           ? observaciones
           : undefined,
         itemizadoSacyr:
-          isJuntaLineal || !campoConfiguradoVisible("itemizadoMandante")
+          !campoConfiguradoVisible("itemizadoMandante")
             ? undefined
             : itemizadoSacyr,
         tipoRegistro,
@@ -1601,11 +1578,7 @@ export default function RegistrosScreen({
           : undefined,
       });
 
-      const registros = await getMisRegistros(true, {
-        scope: "registro",
-        vista: isAdminSession ? "operario" : undefined,
-      });
-      setTecnicoRegistros(registros);
+      await reloadTecnicoRegistros();
       setEditingRegistro(null);
       resetForm();
       showSuccessMessage("Registro corregido y enviado al Supervisor.");
@@ -1630,6 +1603,8 @@ export default function RegistrosScreen({
           limit: SUPERVISOR_REGISTROS_PAGE_SIZE,
           search: jefeRegistroSearchDebounced,
           estado: jefeEstadoFiltro,
+          tipoRegistro: jefeTipoFiltro,
+          fecha: jefeFechaFiltro,
           vista: isAdminSession ? "supervisor" : undefined,
         });
         if (jefeRegistrosQueryVersionRef.current === queryVersion) {
@@ -1695,7 +1670,7 @@ export default function RegistrosScreen({
         label="Itemizado Básico"
         value={otroItemizado ? null : itemizadoBeck || null}
         placeholder="Seleccionar itemizado"
-        options={ITEMIZADO_BECK_OPTIONS.map((itemizado) => ({
+        options={(isJuntaLineal ? ["Junta lineal espuma"] : tipoRegistro === "tabiqueria" ? ["Tabiquería"] : ITEMIZADO_BECK_OPTIONS).map((itemizado) => ({
           value: itemizado,
           label: itemizado,
         }))}
@@ -2037,6 +2012,24 @@ export default function RegistrosScreen({
     );
   };
 
+  const renderSupervisorFilters = () => (
+    <SupervisorRegistroFilters
+      search={jefeRegistroSearch} onSearch={setJefeRegistroSearch}
+      tipo={jefeTipoFiltro} onTipo={setJefeTipoFiltro}
+      fecha={jefeFechaFiltro} onFecha={setJefeFechaFiltro}
+      estado={jefeEstadoFiltro} onEstado={setJefeEstadoFiltro}
+      counts={jefeFilterCounts} total={jefeRegistrosTotal}
+      loading={loadingJefeRegistros || refreshingJefeRegistros}
+      onClear={() => {
+        setJefeRegistroSearch("");
+        setJefeRegistroSearchDebounced("");
+        setJefeTipoFiltro("todos");
+        setJefeFechaFiltro("");
+        setJefeEstadoFiltro("todos");
+      }}
+    />
+  );
+
   if (userRole === "jefeobra") {
     return (
       <SafeAreaView
@@ -2089,22 +2082,7 @@ export default function RegistrosScreen({
             </View>
             <Text style={styles.sectionTitle}>{selectedJefeObra.nombre}</Text>
 
-            <BeckSearchInput
-              placeholder="Buscar por registro, operario, sello, piso o eje"
-              value={jefeRegistroSearch}
-              onChangeText={setJefeRegistroSearch}
-            />
-
-            <BeckFilterPanel
-              title="Filtrar registros"
-              resultCount={jefeRegistrosTotal}
-              options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
-                ...filter,
-                count: jefeFilterCounts[filter.value],
-              }))}
-              value={jefeEstadoFiltro}
-              onChange={setJefeEstadoFiltro}
-            />
+            {renderSupervisorFilters()}
           </View>
         ) : null}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -2171,7 +2149,7 @@ export default function RegistrosScreen({
                 <View style={styles.jefeEditHeader}>
                   <View style={styles.jefeEditHeaderIcon}>
                     <MaterialCommunityIcons
-                      name={isJuntaLineal ? "ruler" : "fire"}
+                      name={tipoRegistroIcon(tipoRegistro)}
                       size={24}
                       color="#0f172a"
                     />
@@ -2223,17 +2201,18 @@ export default function RegistrosScreen({
                     <Text style={styles.fieldLabel}>Tipo de registro</Text>
                     <SegmentedButtons
                       value={tipoRegistro}
-                      onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
+                      onValueChange={(value) => { if (!editingRegistro) setTipoRegistro(value as TipoRegistro); }}
                       style={styles.segmented}
                       buttons={[
                         { value: "sello_cortafuego", label: "Sello" },
                         { value: "junta_lineal_espuma", label: "Junta" },
+                        { value: "tabiqueria", label: "Tabiquería" },
                       ]}
                     />
                   </>
                 ) : null}
 
-                {!isJuntaLineal && campoConfiguradoVisible("itemizadoBeck") ? (
+                {campoConfiguradoVisible("itemizadoBeck") ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Itemizado Básico"
@@ -2260,7 +2239,7 @@ export default function RegistrosScreen({
                   </Pressable>
                 ) : null}
 
-                {!isJuntaLineal && campoConfiguradoVisible("dimensiones") ? (
+                {campoConfiguradoVisible("dimensiones") ? (
                   <TextInput
                     label="Dimensiones"
                     value={dimensiones || "Sin información"}
@@ -2270,7 +2249,7 @@ export default function RegistrosScreen({
                   />
                 ) : null}
 
-                {!isJuntaLineal && campoConfiguradoVisible("codigoBeck") ? (
+                {campoConfiguradoVisible("codigoBeck") ? (
                   <TextInput
                     label="Código BECK"
                     value={itemizadoCodigoBeck}
@@ -2280,7 +2259,7 @@ export default function RegistrosScreen({
                   />
                 ) : null}
 
-                {!isJuntaLineal && campoConfiguradoVisible("itemizadoMandante") ? (
+                {campoConfiguradoVisible("itemizadoMandante") ? (
                   <TextInput
                     label="Itemizado Mandante"
                     value={itemizadoSacyr}
@@ -2354,16 +2333,6 @@ export default function RegistrosScreen({
                   />
                 ) : null}
 
-                {isJuntaLineal && campoConfiguradoVisible("metrosLineales") ? (
-                  <TextInput
-                    label="Longitud (m)"
-                    value={metrosLineales}
-                    onChangeText={setMetrosLineales}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                  />
-                ) : null}
 
                 {renderFotos({
                   existingFotos: getRegistroFotos(editingRegistro),
@@ -2395,7 +2364,7 @@ export default function RegistrosScreen({
                   />
                 ) : null}
 
-                {!isJuntaLineal ? (
+                {(
                   <>
                     {campoConfiguradoVisible("numeroSello") ? (
                       <TextInput
@@ -2406,27 +2375,27 @@ export default function RegistrosScreen({
                         style={styles.input}
                       />
                     ) : null}
-                    {campoConfiguradoVisible("cantidadSellos") ? (
+                    {(isJuntaLineal ? campoConfiguradoVisible("metrosLineales") : campoConfiguradoVisible("cantidadSellos")) ? (
                       <TextInput
-                        label="Cantidad de Sellos"
-                        value={cantidadSellos}
-                        onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                        label={isJuntaLineal ? "Cantidad de ml" : tipoRegistro === "tabiqueria" ? "Cantidad" : "Cantidad de Sellos"}
+                        value={isJuntaLineal ? metrosLineales : cantidadSellos}
+                        onChangeText={(value) => isJuntaLineal ? setMetrosLineales(value) : setCantidadSellos(onlyDigits(value))}
                         mode="outlined"
-                        keyboardType="numeric"
+                        keyboardType="decimal-pad"
                         style={styles.input}
                       />
                     ) : null}
                     {campoConfiguradoVisible("holgura")
                       ? renderMenuField(
-                          "Holgura (cm)",
+                          isJuntaLineal ? "Separación (cm)" : "Holgura (cm)",
                           holgura,
                           setHolgura,
-                          HOLGURA_OPTIONS,
+                          opcionesHolgura,
                         )
                       : null}
                     {campoConfiguradoVisible("factorPorHolguras") ? (
                       <TextInput
-                        label="Factor por Holguras (calculado al guardar)"
+                        label={isJuntaLineal ? "Factor por separación (calculado al guardar)" : "Factor por Holguras (calculado al guardar)"}
                         value={String(editingRegistro.factor_por_holguras ?? "")}
                         mode="outlined"
                         editable={false}
@@ -2462,7 +2431,7 @@ export default function RegistrosScreen({
                     ) : null}
                     {campoConfiguradoVisible("cantidadSellosAislacion") ? (
                       <TextInput
-                        label="Cantidad de Sellos Aislación"
+                        label="Factor de aislación"
                         value={String(editingRegistro.cantidad_sellos_aislacion ?? "")}
                         mode="outlined"
                         editable={false}
@@ -2496,7 +2465,7 @@ export default function RegistrosScreen({
                       />
                     ) : null}
                   </>
-                ) : null}
+                )}
 
                 {campoConfiguradoVisible("observaciones") ? (
                   <>
@@ -2552,22 +2521,7 @@ export default function RegistrosScreen({
                     </Button>
                   </View>
 
-                  <BeckSearchInput
-                    placeholder="Buscar por registro, operario, sello, piso o eje"
-                    value={jefeRegistroSearch}
-                    onChangeText={setJefeRegistroSearch}
-                  />
-
-                    <BeckFilterPanel
-                      title="Filtrar registros"
-                      resultCount={jefeRegistrosTotal}
-                    options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
-                      ...filter,
-                      count: jefeFilterCounts[filter.value],
-                    }))}
-                    value={jefeEstadoFiltro}
-                    onChange={setJefeEstadoFiltro}
-                  />
+                  {renderSupervisorFilters()}
                 </>
               ) : null}
               {filteredJefeRegistros.length ? (
@@ -2598,9 +2552,7 @@ export default function RegistrosScreen({
                         </View>
                         <View style={styles.recordInfo}>
                           <Text style={[styles.recordTitle, styles.jefeRecordTitle]}>
-                            {registro.tipo_registro === "junta_lineal_espuma"
-                              ? "Junta lineal espuma"
-                              : "Sello cortafuego"}
+                            {nombreTipoRegistro(registro.tipo_registro)}
                           </Text>
                           <Text style={[styles.recordMeta, styles.jefeRecordMeta]}>
                             Piso {registro.piso} · Eje {registro.eje_alfabetico}-{registro.eje_numerico}
@@ -2763,6 +2715,113 @@ export default function RegistrosScreen({
     );
   }
 
+  const renderTecnicoRegistro = ({ item: registro }: { item: RegistroHistorialApi }) => {
+    const canEditCorrection =
+      registro.estado === "rechazado" ||
+      isCorreccionEditable(registro);
+
+    return (
+      <Card
+        key={registro.id}
+        style={[styles.historyCard, styles.terrenoPendingCard]}
+        onPress={() => setSelectedTecnicoRegistro(registro)}
+        accessibilityLabel={`Ver detalle del registro ${registro.numero_sello || registro.id}`}
+      >
+        <View style={styles.terrenoPendingClip}>
+        <View
+          style={[
+            styles.terrenoPendingAccent,
+            registro.estado === "rechazado" &&
+              styles.terrenoPendingAccentRejected,
+          ]}
+        />
+        <Card.Content style={styles.terrenoPendingContent}>
+          <View style={styles.terrenoPendingHeader}>
+            <View style={styles.terrenoPendingIcon}>
+              <MaterialCommunityIcons
+                name={
+                  registro.tipo_registro === "junta_lineal_espuma"
+                    ? "ruler"
+                    : "fire"
+                }
+                size={20}
+                color="#0f172a"
+              />
+            </View>
+            <View style={styles.recordInfo}>
+              <Text style={styles.terrenoPendingType}>
+                {nombreTipoRegistro(registro.tipo_registro)}
+              </Text>
+              <Text style={styles.terrenoPendingObra} numberOfLines={1}>
+                {registro.obras?.nombre || "Sin obra"} · {registro.obras?.codigo || "Sin código"}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.statusPill,
+                styles.terrenoPendingStatus,
+                registro.estado === "rechazado" && styles.statusRechazado,
+              ]}
+            >
+              {getRegistroEstadoLabel(registro.estado)}
+            </Text>
+          </View>
+
+          <View style={styles.terrenoPendingDetails}>
+            <View style={styles.terrenoPendingDetailRow}>
+              <MaterialCommunityIcons
+                name="map-marker-outline"
+                size={14}
+                color="#c2410c"
+              />
+              <Text style={styles.terrenoPendingDetailValue}>
+                Piso {registro.piso || "—"} · Eje {registro.eje_alfabetico || "—"}-{registro.eje_numerico || "—"}
+              </Text>
+            </View>
+            <View style={styles.terrenoPendingDetailRow}>
+              <MaterialCommunityIcons
+                name="calendar-outline"
+                size={14}
+                color="#c2410c"
+              />
+              <Text style={styles.terrenoPendingDetailValue}>
+                {formatExecutionDate(registro.fecha)} · {formatTime24WithPeriod(registro.created_at)}
+                {registro.tipo_registro !== "junta_lineal_espuma"
+                  ? ` · Sello ${registro.numero_sello || "Sin número"}`
+                  : ""}
+              </Text>
+            </View>
+          </View>
+
+          <RegistroContextBox registro={registro} />
+          <View style={styles.terrenoPendingOpenHint}>
+            <MaterialCommunityIcons name="eye-outline" size={14} color="#c2410c" />
+            <Text style={styles.terrenoPendingOpenHintText}>
+              Ver registro completo y fotografías
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={16} color="#c2410c" />
+          </View>
+          {canEditCorrection ? (
+            <Button
+              mode="contained"
+              icon="file-document-edit-outline"
+              onPress={(event) => {
+                event.stopPropagation();
+                fillFormFromRegistro(registro);
+              }}
+              style={styles.terrenoCorrectionButton}
+              contentStyle={styles.terrenoCorrectionButtonContent}
+              labelStyle={styles.terrenoCorrectionButtonLabel}
+            >
+              Corregir registro
+            </Button>
+          ) : null}
+        </Card.Content>
+        </View>
+      </Card>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: 2 }]}
@@ -2780,23 +2839,46 @@ export default function RegistrosScreen({
               </Button>
             ) : null}
           </View>
-          <BeckSearchInput
-            placeholder="Buscar por obra, piso o N° de sello"
-            value={tecnicoRegistroSearch}
-            onChangeText={setTecnicoRegistroSearch}
-          />
-          <BeckFilterPanel
-            title="Filtrar registros"
-            resultCount={filteredTecnicoRegistros.length}
-            options={REGISTRO_ESTADO_FILTERS.map((filter) => ({
-              ...filter,
-              count: tecnicoFilterCounts[filter.value],
-            }))}
-            value={tecnicoEstadoFiltro}
-            onChange={setTecnicoEstadoFiltro}
+          <RegistroListFilters<RegistroEstadoFiltro>
+            searchPlaceholder="Buscar por obra, piso o N° de sello"
+            search={tecnicoRegistroSearch} onSearch={setTecnicoRegistroSearch}
+            tipo={tecnicoTipoFiltro} onTipo={setTecnicoTipoFiltro}
+            estado={tecnicoEstadoFiltro} onEstado={setTecnicoEstadoFiltro}
+            states={REGISTRO_ESTADO_FILTERS} allState="todos"
+            counts={tecnicoFilterCounts} total={tecnicoPage.total}
+            loading={tecnicoPage.loading || refreshingTecnicoRegistros}
+            onClear={() => {
+              setTecnicoRegistroSearch("");
+              setTecnicoTipoFiltro("todos");
+              setTecnicoEstadoFiltro("todos");
+            }}
           />
         </View>
       ) : null}
+      {isTerrenoRegistroList ? (
+        <FlatList
+          data={filteredTecnicoRegistros}
+          keyExtractor={(registro) => registro.id}
+          renderItem={renderTecnicoRegistro}
+          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          initialNumToRender={10}
+          windowSize={7}
+          onEndReached={() => { if (!tecnicoPage.error) void tecnicoPage.loadMore(); }}
+          onEndReachedThreshold={0.4}
+          refreshControl={<RefreshControl refreshing={refreshingTecnicoRegistros} onRefresh={refreshTecnicoRegistros} />}
+          ListHeaderComponent={<Text style={styles.sectionTitle}>Registros pendientes</Text>}
+          ListEmptyComponent={!tecnicoPage.loading ? <Text style={styles.emptyText}>No hay registros que coincidan con los filtros seleccionados.</Text> : null}
+          ListFooterComponent={<View>
+            {tecnicoPage.loading || tecnicoPage.loadingMore ? <ActivityIndicator color="#f97316" /> : null}
+            {tecnicoPage.error ? <Text style={styles.emptyText}>{tecnicoPage.error}</Text> : null}
+            {tecnicoPage.nextCursor
+              ? <Button disabled={tecnicoPage.loading || tecnicoPage.loadingMore} onPress={tecnicoPage.loadMore}>Cargar más registros</Button>
+              : tecnicoPage.error ? <Button onPress={refreshTecnicoRegistros}>Reintentar</Button> : null}
+          </View>}
+        />
+      ) : (
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <ScrollView
         contentContainerStyle={[
@@ -2821,129 +2903,6 @@ export default function RegistrosScreen({
       >
         {!isTerrenoRegistroList ? (
           <BrandHeader subtitle="Registro de operario · BECK" />
-        ) : null}
-
-        {userRole === "terreno" && !isFormMode && !editingRegistro ? (
-          <>
-            <Text style={styles.sectionTitle}>Registros pendientes</Text>
-            {filteredTecnicoRegistros.map((registro) => {
-              const canEditCorrection =
-                registro.estado === "rechazado" ||
-                isCorreccionEditable(registro);
-
-              return (
-                <Card
-                  key={registro.id}
-                  style={[styles.historyCard, styles.terrenoPendingCard]}
-                  onPress={() => setSelectedTecnicoRegistro(registro)}
-                  accessibilityLabel={`Ver detalle del registro ${registro.numero_sello || registro.id}`}
-                >
-                  <View style={styles.terrenoPendingClip}>
-                  <View
-                    style={[
-                      styles.terrenoPendingAccent,
-                      registro.estado === "rechazado" &&
-                        styles.terrenoPendingAccentRejected,
-                    ]}
-                  />
-                  <Card.Content style={styles.terrenoPendingContent}>
-                    <View style={styles.terrenoPendingHeader}>
-                      <View style={styles.terrenoPendingIcon}>
-                        <MaterialCommunityIcons
-                          name={
-                            registro.tipo_registro === "junta_lineal_espuma"
-                              ? "ruler"
-                              : "fire"
-                          }
-                          size={20}
-                          color="#0f172a"
-                        />
-                      </View>
-                      <View style={styles.recordInfo}>
-                        <Text style={styles.terrenoPendingType}>
-                          {registro.tipo_registro === "junta_lineal_espuma"
-                            ? "Junta lineal espuma"
-                            : "Sello cortafuego"}
-                        </Text>
-                        <Text style={styles.terrenoPendingObra} numberOfLines={1}>
-                          {registro.obras?.nombre || "Sin obra"} · {registro.obras?.codigo || "Sin código"}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.statusPill,
-                          styles.terrenoPendingStatus,
-                          registro.estado === "rechazado" && styles.statusRechazado,
-                        ]}
-                      >
-                        {getRegistroEstadoLabel(registro.estado)}
-                      </Text>
-                    </View>
-
-                    <View style={styles.terrenoPendingDetails}>
-                      <View style={styles.terrenoPendingDetailRow}>
-                        <MaterialCommunityIcons
-                          name="map-marker-outline"
-                          size={14}
-                          color="#c2410c"
-                        />
-                        <Text style={styles.terrenoPendingDetailValue}>
-                          Piso {registro.piso || "—"} · Eje {registro.eje_alfabetico || "—"}-{registro.eje_numerico || "—"}
-                        </Text>
-                      </View>
-                      <View style={styles.terrenoPendingDetailRow}>
-                        <MaterialCommunityIcons
-                          name="calendar-outline"
-                          size={14}
-                          color="#c2410c"
-                        />
-                        <Text style={styles.terrenoPendingDetailValue}>
-                          {formatExecutionDate(registro.fecha)} · {formatTime24WithPeriod(registro.created_at)}
-                          {registro.tipo_registro !== "junta_lineal_espuma"
-                            ? ` · Sello ${registro.numero_sello || "Sin número"}`
-                            : ""}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <RegistroContextBox registro={registro} />
-                    <View style={styles.terrenoPendingOpenHint}>
-                      <MaterialCommunityIcons name="eye-outline" size={14} color="#c2410c" />
-                      <Text style={styles.terrenoPendingOpenHintText}>
-                        Ver registro completo y fotografías
-                      </Text>
-                      <MaterialCommunityIcons name="chevron-right" size={16} color="#c2410c" />
-                    </View>
-                    {canEditCorrection ? (
-                      <Button
-                        mode="contained"
-                        icon="file-document-edit-outline"
-                        onPress={(event) => {
-                          event.stopPropagation();
-                          fillFormFromRegistro(registro);
-                        }}
-                        style={styles.terrenoCorrectionButton}
-                        contentStyle={styles.terrenoCorrectionButtonContent}
-                        labelStyle={styles.terrenoCorrectionButtonLabel}
-                      >
-                        Corregir registro
-                      </Button>
-                    ) : null}
-                  </Card.Content>
-                  </View>
-                </Card>
-              );
-            })}
-            {!filteredTecnicoRegistros.length ? (
-              <Card style={styles.card}>
-                <Card.Content>
-                  <Text style={styles.emptyText}>
-                    No tienes registros pendientes ni correcciones habilitadas.
-                  </Text>
-                </Card.Content>
-              </Card>
-            ) : null}
-          </>
         ) : null}
 
         {editingRegistro && userRole === "terreno" && loadingConfiguracionRegistro ? (
@@ -2996,17 +2955,18 @@ export default function RegistrosScreen({
                   </View>
                   <SegmentedButtons
                     value={tipoRegistro}
-                    onValueChange={(value) => setTipoRegistro(value as TipoRegistro)}
+                    onValueChange={(value) => { if (!editingRegistro) setTipoRegistro(value as TipoRegistro); }}
                     style={styles.segmented}
                     buttons={[
                       { value: "sello_cortafuego", label: "Sello Cortafuego" },
                       { value: "junta_lineal_espuma", label: "Junta Lineal Espuma" },
+                        { value: "tabiqueria", label: "Tabiquería" },
                     ]}
                   />
                 </>
               ) : null}
 
-              {!isJuntaLineal ? renderItemizadoTerreno() : null}
+              {renderItemizadoTerreno()}
 
               <View style={styles.terrenoSectionHeader}>
                 <View style={styles.terrenoSectionIcon}>
@@ -3083,31 +3043,7 @@ export default function RegistrosScreen({
                 />
               ) : null}
 
-              {isJuntaLineal ? (
-                <>
-                  {campoConfiguradoVisible("metrosLineales") ? (
-                    <TextInput
-                      label="Longitud (m)"
-                      value={metrosLineales}
-                      onChangeText={setMetrosLineales}
-                      mode="outlined"
-                      keyboardType="decimal-pad"
-                      style={styles.input}
-                    />
-                  ) : null}
-                  {campoConfiguradoVisible("observaciones") ? (
-                    <TextInput
-                      label="Observaciones"
-                      value={observaciones}
-                      onChangeText={setObservaciones}
-                      mode="outlined"
-                      multiline
-                      numberOfLines={6}
-                      style={[styles.input, styles.observacionesInput]}
-                    />
-                  ) : null}
-                </>
-              ) : (
+{(
                 <>
                   {campoConfiguradoVisible("recinto") ? (
                     <TextInput
@@ -3136,22 +3072,22 @@ export default function RegistrosScreen({
                       style={styles.input}
                     />
                   ) : null}
-                  {campoConfiguradoVisible("cantidadSellos") ? (
+                  {(isJuntaLineal ? campoConfiguradoVisible("metrosLineales") : campoConfiguradoVisible("cantidadSellos")) ? (
                     <TextInput
-                      label="Cantidad de Sellos"
-                      value={cantidadSellos}
-                      onChangeText={(value) => setCantidadSellos(onlyDigits(value))}
+                      label={isJuntaLineal ? "Cantidad de ml" : tipoRegistro === "tabiqueria" ? "Cantidad" : "Cantidad de Sellos"}
+                      value={isJuntaLineal ? metrosLineales : cantidadSellos}
+                      onChangeText={(value) => isJuntaLineal ? setMetrosLineales(value) : setCantidadSellos(onlyDigits(value))}
                       mode="outlined"
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       style={styles.input}
                     />
                   ) : null}
                   {campoConfiguradoVisible("holgura")
                     ? renderMenuField(
-                        "Holgura (cm)",
+                        isJuntaLineal ? "Separación (cm)" : "Holgura (cm)",
                         holgura,
                         setHolgura,
-                        HOLGURA_OPTIONS,
+                        opcionesHolgura,
                       )
                     : null}
                   {campoConfiguradoVisible("cieloModular") ? (
@@ -3329,6 +3265,9 @@ export default function RegistrosScreen({
                       value={tipoRegistro}
                       onValueChange={(value) => {
                         setTipoRegistro(value as TipoRegistro);
+                        setHolgura("");
+                        setItemizadoBeck("");
+                        setOtroItemizado(false);
                         setError("");
                         setSuccess("");
                       }}
@@ -3336,18 +3275,23 @@ export default function RegistrosScreen({
                       buttons={[
                         {
                           value: "sello_cortafuego",
-                          label: "Sello Cortafuego",
+                          label: "Sellos",
                         },
                         {
                           value: "junta_lineal_espuma",
-                          label: "Junta Lineal Espuma",
+                          label: "Juntas",
                         },
-                      ]}
+                        { value: "tabiqueria", label: "Tabiquería" },
+                      ]
+                        .filter((opcion) => tiposPermitidos.includes(opcion.value as TipoRegistro))
+                        .map((opcion, _, opciones) =>
+                          opciones.length === 1 ? { ...opcion, style: estiloSegmentoUnico } : opcion,
+                        )}
                     />
                   </>
                 ) : null}
 
-                {!isJuntaLineal ? renderItemizadoTerreno() : null}
+                {renderItemizadoTerreno()}
 
                 <View style={styles.terrenoSectionHeader}>
                   <View style={styles.terrenoSectionIcon}>
@@ -3424,31 +3368,7 @@ export default function RegistrosScreen({
                   />
                 ) : null}
 
-                {isJuntaLineal ? (
-                  campoConfiguradoVisible("metrosLineales") ? (
-                    <>
-                      <TextInput
-                        label="Longitud (m)"
-                        value={metrosLineales}
-                        onChangeText={setMetrosLineales}
-                        mode="outlined"
-                        keyboardType="decimal-pad"
-                        style={styles.input}
-                      />
-                      {campoConfiguradoVisible("observaciones") ? (
-                        <TextInput
-                          label="Observaciones"
-                          value={observaciones}
-                          onChangeText={setObservaciones}
-                          mode="outlined"
-                          multiline
-                          numberOfLines={6}
-                          style={[styles.input, styles.observacionesInput]}
-                        />
-                      ) : null}
-                    </>
-                  ) : null
-                ) : (
+  {(
                   <>
                     {campoConfiguradoVisible("recinto") ? (
                       <TextInput
@@ -3480,25 +3400,25 @@ export default function RegistrosScreen({
                       />
                     ) : null}
 
-                    {campoConfiguradoVisible("cantidadSellos") ? (
+                    {(isJuntaLineal ? campoConfiguradoVisible("metrosLineales") : campoConfiguradoVisible("cantidadSellos")) ? (
                       <TextInput
-                        label="Cantidad de Sellos"
-                        value={cantidadSellos}
+                        label={isJuntaLineal ? "Cantidad de ml" : tipoRegistro === "tabiqueria" ? "Cantidad" : "Cantidad de Sellos"}
+                        value={isJuntaLineal ? metrosLineales : cantidadSellos}
                         onChangeText={(value) =>
-                          setCantidadSellos(onlyDigits(value))
+                          isJuntaLineal ? setMetrosLineales(value) : setCantidadSellos(onlyDigits(value))
                         }
                         mode="outlined"
-                        keyboardType="numeric"
+                        keyboardType="decimal-pad"
                         style={styles.input}
                       />
                     ) : null}
 
                     {campoConfiguradoVisible("holgura")
                       ? renderMenuField(
-                          "Holgura (cm)",
+                          isJuntaLineal ? "Separación (cm)" : "Holgura (cm)",
                           holgura,
                           setHolgura,
-                          HOLGURA_OPTIONS,
+                          opcionesHolgura,
                         )
                       : null}
 
@@ -3570,6 +3490,7 @@ export default function RegistrosScreen({
         ) : null}
       </ScrollView>
       </TouchableWithoutFeedback>
+      )}
 
       <Modal
         visible={selectedTecnicoRegistro !== null}
@@ -3638,9 +3559,7 @@ export default function RegistrosScreen({
                     </Text>
                   </View>
                   <Text style={styles.terrenoDetailType}>
-                    {selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma"
-                      ? "Junta lineal espuma"
-                      : "Sello cortafuego"}
+                    {nombreTipoRegistro(selectedTecnicoRegistro.tipo_registro)}
                   </Text>
                 </View>
 
@@ -3664,22 +3583,18 @@ export default function RegistrosScreen({
                     <RegistroDetailField label="Piso" value={selectedTecnicoRegistro.piso} />
                     <RegistroDetailField label="Eje alfabético" value={selectedTecnicoRegistro.eje_alfabetico} />
                     <RegistroDetailField label="Eje numérico" value={selectedTecnicoRegistro.eje_numerico} />
-                    {selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma" ? (
-                      <RegistroDetailField label="Metros lineales" value={selectedTecnicoRegistro.metros_lineales} />
-                    ) : (
                       <>
                         <RegistroDetailField label="N° del sello" value={selectedTecnicoRegistro.numero_sello} />
-                        <RegistroDetailField label="Cantidad de sellos" value={selectedTecnicoRegistro.cantidad_sellos} />
-                        <RegistroDetailField label="Holgura" value={selectedTecnicoRegistro.holgura} />
-                        <RegistroDetailField label="Factor por holguras" value={selectedTecnicoRegistro.factor_por_holguras} />
+                        <RegistroDetailField label={selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma" ? "Cantidad de ml" : "Cantidad"} value={selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma" ? selectedTecnicoRegistro.metros_lineales : selectedTecnicoRegistro.cantidad_sellos} />
+                        <RegistroDetailField label={selectedTecnicoRegistro.tipo_registro === "junta_lineal_espuma" ? "Separación (cm)" : "Holgura (cm)"} value={selectedTecnicoRegistro.holgura} />
+                        <RegistroDetailField label="Factor por holgura / separación" value={selectedTecnicoRegistro.factor_por_holguras} />
                         <RegistroDetailField label="Accesibilidad" value={selectedTecnicoRegistro.accesibilidad} />
-                        <RegistroDetailField label="Sellos con factores" value={selectedTecnicoRegistro.cantidad_sellos_con_factores} />
+                        <RegistroDetailField label="Cantidad con factores" value={selectedTecnicoRegistro.cantidad_sellos_con_factores} />
                         <RegistroDetailField label="Aislación" value={getAislacionLabel(selectedTecnicoRegistro)} />
-                        <RegistroDetailField label="Sellos por aislación" value={selectedTecnicoRegistro.cantidad_sellos_aislacion} />
+                        <RegistroDetailField label="Factor de aislación" value={selectedTecnicoRegistro.cantidad_sellos_aislacion} />
                         <RegistroDetailField label="Reparación de tabique" value={getAplicacionLabel(selectedTecnicoRegistro.reparacion_tabique)} />
                         <RegistroDetailField label="Cantidad final" value={selectedTecnicoRegistro.cantidad_final} />
                       </>
-                    )}
                   </View>
                   {selectedTecnicoRegistro.observaciones ? (
                     <View style={styles.terrenoDetailObservation}>

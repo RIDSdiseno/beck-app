@@ -16,8 +16,7 @@ import {
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BeckSearchInput } from "@/components/BeckSearchInput";
-import { BeckFilterPanel } from "@/components/BeckFilterPanel";
+import { RegistroListFilters } from "@/components/RegistroListFilters";
 import { BrandHeader } from "../../components/BrandHeader";
 import RegistrosScreen from "./registros";
 
@@ -200,20 +199,18 @@ export default function MisObrasScreen() {
           </Button>
         </View>
       ) : null}
-      <BeckSearchInput
-        placeholder="Buscar por nombre o código"
-        value={search}
-        onChangeText={setSearch}
-      />
-      <BeckFilterPanel
-        title="Filtrar obras"
-        resultCount={filteredObras.length}
-        options={OBRA_FILTERS.map((filter) => ({
-          ...filter,
-          count: filterCounts[filter.value],
-        }))}
-        value={estadoFiltro}
-        onChange={setEstadoFiltro}
+      <RegistroListFilters<EstadoFiltro>
+        resultKind="obras"
+        searchPlaceholder="Buscar por nombre o código"
+        search={search} onSearch={setSearch}
+        estado={estadoFiltro} onEstado={setEstadoFiltro}
+        states={OBRA_FILTERS} allState="todas"
+        counts={filterCounts} total={filteredObras.length}
+        loading={loading || refreshing}
+        onClear={() => {
+          setSearch("");
+          setEstadoFiltro("todas");
+        }}
       />
     </>
   );

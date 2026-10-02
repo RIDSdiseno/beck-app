@@ -1,3 +1,4 @@
+import type { TipoRegistro } from "@/utils/tipoRegistro";
 import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
@@ -27,7 +28,7 @@ export type CreateRegistroPayload = {
   folio?: string;
   observaciones?: string;
   itemizadoSacyr?: string;
-  tipoRegistro?: "sello_cortafuego" | "junta_lineal_espuma";
+  tipoRegistro?: "sello_cortafuego" | "junta_lineal_espuma" | "tabiqueria";
   metrosLineales?: number;
 };
 
@@ -79,7 +80,7 @@ export type RegistroHistorialApi = {
   registro_origen_id?: string | null;
   itemizado_sacyr?: string | null;
   metros_lineales?: number | null;
-  tipo_registro: "sello_cortafuego" | "junta_lineal_espuma" | string;
+  tipo_registro: "sello_cortafuego" | "junta_lineal_espuma" | "tabiqueria" | string;
   created_at: string;
   updated_at: string;
   obras?: {
@@ -155,6 +156,7 @@ export type HistorialRegistrosPage = {
 };
 
 export type HistorialRegistrosParams = {
+  tipoRegistro?: TipoRegistro | "todos";
   cursor?: string | null;
   limit?: number;
   search?: string;
@@ -175,12 +177,14 @@ export type SupervisorRegistrosPage = {
 };
 
 export type SupervisorRegistrosParams = {
-  obraId: string;
+  fecha?: string;
+  tipoRegistro?: TipoRegistro | "todos";
+  obraId?: string;
   cursor?: string | null;
   limit?: number;
   search?: string;
   estado?: "pendiente" | "rechazado" | "todos";
-  vista?: "supervisor";
+  vista?: "supervisor" | "operario";
 };
 
 function getRegistrosCacheKey(userId: string, params?: GetMisRegistrosParams) {
@@ -248,6 +252,38 @@ export async function deleteRegistroPendiente(registroId: string) {
 export function clearMisRegistrosCache() {
   registrosCache.clear();
   supervisorSummaryCache.clear();
+  operarioSummaryCache.clear();
+}
+
+export type ResumenOperarioApi = {
+  metrics: { registrosRealizados: number; pendientes: number; enRevision: number; validados: number; correccionesRecibidas: number; total: number; avance: number; obraPrincipal: string };
+  recientes: Pick<RegistroHistorialApi, "id" | "tipo_registro" | "fecha" | "created_at" | "numero_sello" | "estado" | "obras">[];
+  obras: { id: string; nombre: string; codigo: string }[];
+};
+const operarioSummaryCache = new Map<string, { data: ResumenOperarioApi; timestamp: number }>();
+
+export async function getResumenOperario(
+  params: { tipoRegistro?: string; obraId?: string } = {}, forceRefresh = false,
+): Promise<ResumenOperarioApi> {
+  const session = await getSession();
+  if (!session.token) throw new Error("No hay sesión activa");
+  const query = new URLSearchParams();
+  if (params.tipoRegistro && params.tipoRegistro !== "todos") query.set("tipoRegistro", params.tipoRegistro);
+  if (params.obraId && params.obraId !== "todas") query.set("obraId", params.obraId);
+  const key = `${session.user?.id || session.token}:${query.toString()}`;
+  const cached = operarioSummaryCache.get(key);
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < 30000) return cached.data;
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/registros/resumen-operario?${query.toString()}`, {
+    method: "GET", headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
+  });
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) throw new Error(result?.error || "No se pudo cargar el resumen del operario");
+  const data = result.data as ResumenOperarioApi;
+  if (!data?.metrics || !Array.isArray(data.obras) || !Array.isArray(data.recientes)) {
+    throw new Error("El backend no devolvió el resumen del operario. Verifica que esté actualizado.");
+  }
+  operarioSummaryCache.set(key, { data, timestamp: Date.now() });
+  return data;
 }
 
 export async function getMisRegistros(
@@ -303,17 +339,19 @@ export async function getRegistrosSupervisorPage(
   if (!session.token) throw new Error("No hay sesión activa");
 
   const query = new URLSearchParams({
-    obraId: params.obraId,
     scope: "registro",
     paginated: "true",
   });
+  if (params.tipoRegistro && params.tipoRegistro !== "todos") query.set("tipoRegistro", params.tipoRegistro);
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.limit) query.set("limit", String(params.limit));
   if (params.search?.trim()) query.set("search", params.search.trim());
   if (params.estado && params.estado !== "todos") {
     query.set("estado", params.estado);
   }
+  if (params.fecha) query.set("fecha", params.fecha);
   if (params.vista) query.set("vista", params.vista);
+  if (params.obraId) query.set("obraId", params.obraId);
 
   const response = await authenticatedFetch(
     `${API_BASE_URL}/api/registros/mis-registros?${query.toString()}`,
@@ -330,7 +368,14 @@ export async function getRegistrosSupervisorPage(
     throw new Error(result?.error || "No se pudieron obtener los registros");
   }
 
+  if (!Array.isArray(result?.data?.items) || !result.data.counts) {
+    throw new Error("El backend no devolvió el listado paginado. Verifica que beck-mobile-backend esté actualizado.");
+  }
   return result.data as SupervisorRegistrosPage;
+}
+
+export function getRegistrosOperarioPage(params: Omit<SupervisorRegistrosParams, "vista"> = {}) {
+  return getRegistrosSupervisorPage({ ...params, vista: "operario" });
 }
 
 export async function getHistorialRegistrosPage(
@@ -339,6 +384,7 @@ export async function getHistorialRegistrosPage(
   const session = await getSession();
   if (!session.token) throw new Error("No hay sesión activa");
   const query = new URLSearchParams();
+  if (params.tipoRegistro && params.tipoRegistro !== "todos") query.set("tipoRegistro", params.tipoRegistro);
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.limit) query.set("limit", String(params.limit));
   if (params.search?.trim()) query.set("search", params.search.trim());
@@ -373,7 +419,7 @@ export async function getHistorialRegistroDetalle(
 }
 
 export async function getResumenSupervisor(
-  tipoRegistro: "sello_cortafuego" | "junta_lineal_espuma",
+  tipoRegistro: "sello_cortafuego" | "junta_lineal_espuma" | "tabiqueria",
   forceRefresh = false,
 ): Promise<ResumenSupervisorApi> {
   const session = await getSession();

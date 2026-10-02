@@ -8,6 +8,7 @@ type Props = {
   onChange: (value: string) => void;
   compact?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
+  label?: string;
 };
 
 const MONTHS = [
@@ -41,7 +42,7 @@ function displayDate(value: string) {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : "Todas las fechas";
 }
 
-export function BeckDateFilter({ value, onChange, compact = false, containerStyle }: Props) {
+export function BeckDateFilter({ value, onChange, compact = false, containerStyle, label = "Filtrar por fecha" }: Props) {
   const [visible, setVisible] = useState(false);
   const [month, setMonth] = useState(() => parseLocalDate(value));
 
@@ -68,7 +69,7 @@ export function BeckDateFilter({ value, onChange, compact = false, containerStyl
       <View style={[styles.filterBox, containerStyle]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Seleccionar fecha del historial"
+          accessibilityLabel={label}
           onPress={() => {
             setMonth(parseLocalDate(value));
             setVisible(true);
@@ -81,7 +82,7 @@ export function BeckDateFilter({ value, onChange, compact = false, containerStyl
             </View>
           ) : null}
           <View style={styles.textGroup}>
-            <Text style={styles.label}>Filtrar por fecha</Text>
+            <Text style={styles.label}>{label}</Text>
             <Text style={styles.value} numberOfLines={1}>
               {value ? displayDate(value) : "Todas las fechas"}
             </Text>

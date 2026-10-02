@@ -1,3 +1,4 @@
+import { RegistroTypeFilter, type RegistroTypeValue } from "@/components/RegistroTypeFilter";
 import { ControlCorreccion, getControlesPendientesCorreccion } from "@/services/api/jefeobraApi";
 import { formatShortDate } from "@/utils/registroEstado";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
@@ -14,17 +15,21 @@ export default function ControlInspeccionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState<RegistroTypeValue>("todos");
+  const queryVersion = useRef(0);
   const [controles, setControles] = useState<ControlCorreccion[]>([]);
 
   const loadData = useCallback(async (forceRefresh = false) => {
+    const version = ++queryVersion.current;
     try {
       setError("");
-      const data = await getControlesPendientesCorreccion(forceRefresh);
+      const data = await getControlesPendientesCorreccion(forceRefresh, tipoFiltro);
+      if (version !== queryVersion.current) return;
       setControles(data);
     } catch (err: any) {
-      setError(err?.message || "No se pudo cargar el módulo de control de inspección");
+      if (version === queryVersion.current) setError(err?.message || "No se pudo cargar el módulo de control de inspección");
     }
-  }, []);
+  }, [tipoFiltro]);
 
   useFocusEffect(
     useCallback(() => {
@@ -81,6 +86,7 @@ export default function ControlInspeccionScreen() {
         <View style={styles.brandHeader}>
           <BrandHeader subtitle="Control de inspección · Correcciones" />
         </View>
+      <RegistroTypeFilter value={tipoFiltro} onChange={setTipoFiltro} />
       <Text style={styles.countLabel}>
         {controles.length} {controles.length === 1 ? "control pendiente" : "controles pendientes"}
       </Text>

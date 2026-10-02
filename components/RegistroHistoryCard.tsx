@@ -1,3 +1,4 @@
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import type { RegistroCliente } from "@/services/api/clienteApi";
 import type { RegistroHistorialApi } from "@/services/api/registrosApi";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
@@ -75,14 +76,14 @@ export function RegistroHistoryCard({ registro, onPress, pdfDisponible, clienteV
       <View style={styles.header}>
         <View style={styles.iconBox}>
           <MaterialCommunityIcons
-            name={isJunta ? "ruler" : "fire"}
+            name={tipoRegistroIcon(tipo)}
             size={21}
             color="#0f172a"
           />
         </View>
         <View style={styles.titleGroup}>
           <Text style={styles.title}>
-            {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}
+            {nombreTipoRegistro(tipo)}
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
             {obraNombre || "Obra sin nombre"} · {obraCodigo || "Sin código"}

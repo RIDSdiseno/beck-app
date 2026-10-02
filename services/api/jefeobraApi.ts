@@ -1,3 +1,4 @@
+import type { TipoRegistro } from "@/utils/tipoRegistro";
 import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
@@ -68,14 +69,16 @@ export function clearControlesPendientesCache() {
 
 export async function getControlesPendientesCorreccion(
   forceRefresh = false,
+  tipoRegistro?: TipoRegistro | "todos",
 ): Promise<ControlCorreccion[]> {
   const { token, userId } = await getToken();
-  const cached = controlesPendientesCache.get(userId);
+  const cacheKey = `${userId}:${tipoRegistro || "todos"}`;
+  const cached = controlesPendientesCache.get(cacheKey);
   if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/jefeobra/control-inspeccion/pendientes`,
+    `${API_BASE_URL}/api/jefeobra/control-inspeccion/pendientes${tipoRegistro && tipoRegistro !== "todos" ? `?tipoRegistro=${encodeURIComponent(tipoRegistro)}` : ""}`,
     { method: "GET", headers: { Authorization: `Bearer ${token}` } },
   );
   const result = await readJsonResponse(response);
@@ -83,7 +86,7 @@ export async function getControlesPendientesCorreccion(
     throw new Error(result?.error || "No se pudieron obtener los controles pendientes de corrección");
   }
   const data = result.data as ControlCorreccion[];
-  controlesPendientesCache.set(userId, {
+  controlesPendientesCache.set(cacheKey, {
     data,
     expiresAt: Date.now() + CONTROLES_PENDIENTES_CACHE_MS,
   });

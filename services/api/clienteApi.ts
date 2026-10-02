@@ -1,3 +1,4 @@
+import type { TipoRegistro } from "@/utils/tipoRegistro";
 import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
@@ -90,9 +91,9 @@ export async function getClienteObras(): Promise<ObraCliente[]> {
   return result.data as ObraCliente[];
 }
 
-export async function getClienteRegistrosObra(obraId: string): Promise<RegistroCliente[]> {
+export async function getClienteRegistrosObra(obraId: string, tipoRegistro?: TipoRegistro | "todos"): Promise<RegistroCliente[]> {
   const token = await getToken();
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/cliente/obras/${obraId}/registros`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/cliente/obras/${obraId}/registros${tipoRegistro && tipoRegistro !== "todos" ? `?tipoRegistro=${encodeURIComponent(tipoRegistro)}` : ""}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -120,6 +121,7 @@ export type ClienteHistorialPage = {
 };
 
 export async function getClienteHistorialPage(params: {
+  tipoRegistro?: TipoRegistro | "todos";
   cursor?: string | null;
   limit?: number;
   search?: string;
@@ -128,6 +130,7 @@ export async function getClienteHistorialPage(params: {
 } = {}): Promise<ClienteHistorialPage> {
   const token = await getToken();
   const query = new URLSearchParams({ paginated: "true" });
+  if (params.tipoRegistro && params.tipoRegistro !== "todos") query.set("tipoRegistro", params.tipoRegistro);
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.limit) query.set("limit", String(params.limit));
   if (params.search?.trim()) query.set("search", params.search.trim());

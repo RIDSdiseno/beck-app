@@ -1,3 +1,4 @@
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import {
   compartirPdfCliente,
   getClienteRegistrosObra,
@@ -434,11 +435,11 @@ export default function ClienteRegistroScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeading}>
               <View style={styles.summaryIcon}>
-                <MaterialCommunityIcons name={isJunta ? "ruler" : "fire"} size={26} color="#0f172a" />
+                <MaterialCommunityIcons name={tipoRegistroIcon(registro.tipoRegistro)} size={26} color="#0f172a" />
               </View>
               <View style={styles.summaryCopy}>
                 <Text style={styles.eyebrow}>{registroCodigo}</Text>
-                <Text style={styles.title}>{isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
+                <Text style={styles.title}>{nombreTipoRegistro(registro.tipoRegistro)}</Text>
               </View>
             </View>
             <View style={styles.badgeRow}>
@@ -473,12 +474,12 @@ export default function ClienteRegistroScreen() {
             <FieldRow label="Piso"            value={campoVisible("piso") ? registro.piso : null} />
             <FieldRow label="Eje numérico" value={campoVisible("ejeNumerico") ? registro.ejeNumerico : null} />
             <FieldRow label="Eje alfabético" value={campoVisible("ejeAlfabetico") ? registro.ejeAlfabetico : null} />
-            {!isJunta && campoVisible("numeroSello") && (
+            {campoVisible("numeroSello") && (
               <FieldRow label="N° de sello" value={registro.numeroSello} />
             )}
             {campoVisible("cantidadSellos") && (
               <FieldRow
-                label={isJunta ? "Longitud (m)" : "Cantidad de sellos (Sin Factor)"}
+                label={isJunta ? "Cantidad de ml (Sin Factor)" : registro.tipoRegistro === "tabiqueria" ? "Cantidad (Sin Factor)" : "Cantidad de sellos (Sin Factor)"}
                 value={isJunta ? registro.metrosLineales : registro.cantidadSellos}
               />
             )}
@@ -490,12 +491,12 @@ export default function ClienteRegistroScreen() {
 
           <SectionTitle title="Factores y cantidades" icon="calculator-variant-outline" />
           <View style={styles.section}>
-            <FieldRow label="Holgura (cm)"    value={campoVisible("holgura") ? registro.holgura : null} />
-            <FieldRow label="Factor holgura"  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
+            <FieldRow label={isJunta ? "Separación (cm)" : "Holgura (cm)"}    value={campoVisible("holgura") ? registro.holgura : null} />
+            <FieldRow label={isJunta ? "Factor separación" : "Factor holgura"}  value={campoVisible("factorPorHolguras") ? registro.factorPorHolguras : null} />
             <FieldRow label="Accesibilidad" value={campoVisible("cieloModular") ? getAccesibilidadLabel(registro) : null} />
-            <FieldRow label="Sellos con factores" value={campoVisible("cantidadSellosConFactores") ? registro.cantidadSellosConFactores : null} />
+            <FieldRow label={isJunta ? "Cantidad de ml con factores" : "Cantidad con factores"} value={campoVisible("cantidadSellosConFactores") ? registro.cantidadSellosConFactores : null} />
             <FieldRow label="Aislación" value={campoVisible("aislacion") ? getAislacionLabel(registro) : null} />
-            <FieldRow label="Sellos aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />
+            <FieldRow label="Factor de aislación" value={campoVisible("cantidadSellosAislacion") ? registro.cantidadSellosAislacion : null} />
             <FieldRow label="Reparación tabique" value={campoVisible("reparacionTabique") ? getAplicacionLabel(registro.reparacionTabique) : null} />
           </View>
 
@@ -610,10 +611,10 @@ export default function ClienteRegistroScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.signatureSummary}>
-              <MaterialCommunityIcons name={isJunta ? "ruler" : "fire"} size={24} color="#ea580c" />
+              <MaterialCommunityIcons name={tipoRegistroIcon(registro.tipoRegistro)} size={24} color="#ea580c" />
               <View style={styles.summaryCopy}>
                 <Text style={styles.signatureRecord}>{registroCodigo}</Text>
-                <Text style={styles.summaryHint}>{isJunta ? "Junta lineal espuma" : "Sello cortafuego"}</Text>
+                <Text style={styles.summaryHint}>{nombreTipoRegistro(registro.tipoRegistro)}</Text>
               </View>
             </View>
 

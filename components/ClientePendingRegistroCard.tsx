@@ -1,3 +1,4 @@
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import React, { memo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
@@ -16,7 +17,7 @@ export const ClientePendingRegistroCard = memo(
       ? registro.metrosLineales != null
         ? `${registro.metrosLineales} m`
         : "Sin metraje"
-      : `${registro.cantidadSellos} ${registro.cantidadSellos === 1 ? "sello" : "sellos"}`;
+      : `${registro.cantidadSellos} ${registro.tipoRegistro === "tabiqueria" ? (registro.cantidadSellos === 1 ? "unidad" : "unidades") : registro.cantidadSellos === 1 ? "sello" : "sellos"}`;
     const identificador = isJunta
       ? visible("folio") ? `Folio ${registro.folio || "—"}` : "Junta lineal"
       : `Sello ${registro.numeroSello || "—"}`;
@@ -39,14 +40,14 @@ export const ClientePendingRegistroCard = memo(
         <View style={styles.heading}>
           <View style={styles.icon}>
             <MaterialCommunityIcons
-              name={isJunta ? "ruler" : "fire"}
+              name={tipoRegistroIcon(registro.tipoRegistro)}
               size={22}
               color="#0f172a"
             />
           </View>
           <View style={styles.identity}>
             <Text style={styles.title}>
-              {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}
+              {nombreTipoRegistro(registro.tipoRegistro)}
             </Text>
             <Text style={styles.code} numberOfLines={1}>
               {(visible("codigoBeck") && registro.codigoBeck) ||
@@ -94,7 +95,7 @@ export const ClientePendingRegistroCard = memo(
               color="#f97316"
             />
             <Text style={[styles.detailText, styles.seal]}>
-              {identificador}{visible("cantidadSellos") ? ` · ${unidades}` : ""}
+              {identificador}{visible(isJunta ? "metrosLineales" : "cantidadSellos") ? ` · ${unidades}` : ""}
             </Text>
           </View>
         </View>

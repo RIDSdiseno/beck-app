@@ -38,7 +38,7 @@ test.each([[0, "0 sellos"], [1, "1 sello"]])("conserva la cantidad %s sin aplica
   expect(resumenTarjetaCliente({ ...registro, cantidadSellos }, config).cantidad).toBe(cantidad);
 });
 
-test("las juntas muestran el metraje, usando la visibilidad de cantidad de sellos", () => {
+test("las juntas muestran el metraje, usando la opción de cantidad configurada en el CRM", () => {
   const junta = { ...registro, tipoRegistro: "junta_lineal_espuma", metrosLineales: 2.5 };
   expect(resumenTarjetaCliente(junta, config).cantidad).toBe("2.5 m");
   expect(resumenTarjetaCliente(junta, { ...config, cantidadSellos: false }).cantidad).toBeNull();

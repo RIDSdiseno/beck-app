@@ -1,6 +1,4 @@
-import { BeckDateFilter } from "@/components/BeckDateFilter";
-import { BeckOptionFilter } from "@/components/BeckOptionFilter";
-import { BeckSearchInput } from "@/components/BeckSearchInput";
+import { ActividadAdminFilters } from "@/components/ActividadAdminFilters";
 import { BrandHeader } from "@/components/BrandHeader";
 import {
   ActividadAdministrador,
@@ -13,13 +11,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Card, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const MODULOS = [
-  { value: "operario", label: "Operario" },
-  { value: "supervisor", label: "Supervisor" },
-  { value: "ingenieria", label: "Ingeniería" },
-  { value: "administracion", label: "Administración" },
-];
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -80,22 +71,17 @@ export default function ActividadAdminScreen() {
     <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
       <View style={styles.fixedHeader}>
         <BrandHeader subtitle="Mi actividad · Administración" onBack={() => router.replace("/perfil")} />
-        <BeckSearchInput placeholder="Buscar acción o módulo" value={search} onChangeText={setSearch} />
-        <View style={styles.filters}>
-          <BeckDateFilter value={fecha} onChange={setFecha} compact containerStyle={styles.filter} />
-          <BeckOptionFilter
-            label="Filtrar por módulo"
-            value={modulo}
-            allValue="todos"
-            allLabel="Todos los módulos"
-            options={MODULOS}
-            onChange={setModulo}
-            icon="view-dashboard-outline"
-            compact
-            containerStyle={styles.filter}
-          />
-        </View>
-        <Text style={styles.total}>{total} {total === 1 ? "acción" : "acciones"}</Text>
+        <ActividadAdminFilters
+          search={search} onSearch={setSearch}
+          fecha={fecha} onFecha={setFecha}
+          modulo={modulo} onModulo={setModulo}
+          total={total} loading={loading || refreshing}
+          onClear={() => {
+            setSearch("");
+            setFecha("");
+            setModulo("todos");
+          }}
+        />
       </View>
       {loading && !items.length ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#f97316" /></View>
@@ -135,9 +121,6 @@ export default function ActividadAdminScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f7fb" },
   fixedHeader: { backgroundColor: "#f5f7fb", paddingHorizontal: 16, paddingBottom: 6 },
-  filters: { flexDirection: "row", gap: 8 },
-  filter: { flex: 1, minWidth: 0, marginBottom: 4 },
-  total: { color: "#64748b", fontSize: 12, fontWeight: "700", marginBottom: 5 },
   list: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 5, paddingBottom: 80 },
   card: { backgroundColor: "#fffaf0", borderColor: "#FDC10B", borderRadius: 17, borderWidth: 1, marginBottom: 11 },
   clip: { borderRadius: 17, overflow: "hidden" },

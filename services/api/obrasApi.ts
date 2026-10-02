@@ -1,3 +1,4 @@
+import type { TipoRegistro } from "@/utils/tipoRegistro";
 import { API_BASE_URL, ensureArray, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
@@ -52,6 +53,16 @@ export type ConfiguracionCampoRegistroApi = {
 };
 
 const obrasCache = new Map<string, ObraApi[]>();
+export type TramoHolguraObra = { holguraMax: number; factor: number };
+const tramosRegistroCache = new Map<string, Partial<Record<TipoRegistro, TramoHolguraObra[]>>>();
+export function getTramosRegistroConfigurados(obraId: string) {
+  return tramosRegistroCache.get(obraId) ?? {};
+}
+const tiposRegistroCache = new Map<string, TipoRegistro[]>();
+export function getTiposRegistroConfigurados(obraId: string): TipoRegistro[] {
+  return tiposRegistroCache.get(obraId) ?? ["sello_cortafuego", "junta_lineal_espuma", "tabiqueria"];
+}
+
 const configuracionRegistroCache = new Map<string, ConfiguracionCampoRegistroApi[]>();
 
 const CAMPO_CONFIG_ALIASES: Record<string, CampoConfiguracionRegistro> = {
@@ -111,11 +122,15 @@ export function isObraDisponible(estado?: string | null) {
 export function clearMisObrasCache() {
   obrasCache.clear();
   configuracionRegistroCache.clear();
+  tiposRegistroCache.clear();
+  tramosRegistroCache.clear();
 }
 
 export async function getMisObras(forceRefresh = false): Promise<ObraApi[]> {
   if (forceRefresh) {
     configuracionRegistroCache.clear();
+  tiposRegistroCache.clear();
+  tramosRegistroCache.clear();
   }
 
   const session = await getSession();
@@ -198,6 +213,10 @@ export async function getConfiguracionRegistro(
       campo: normalizeCampoConfiguracion(campo.campo) || campo.campo,
     }))
     .filter((campo) => normalizeCampoConfiguracion(campo.campo));
+  if (Array.isArray(result.tiposRegistroPermitidos)) {
+    tiposRegistroCache.set(obraId, result.tiposRegistroPermitidos.filter((tipo: string) => ["sello_cortafuego", "junta_lineal_espuma", "tabiqueria"].includes(tipo)));
+  }
+  if (result.tramosHolguraPorTipo) tramosRegistroCache.set(obraId, result.tramosHolguraPorTipo);
   configuracionRegistroCache.set(cacheKey, data);
   return data;
 }

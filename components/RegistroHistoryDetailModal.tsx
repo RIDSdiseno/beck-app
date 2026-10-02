@@ -1,3 +1,4 @@
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import type { RegistroCliente } from "@/services/api/clienteApi";
 import { getConfiguracionRegistro } from "@/services/api/obrasApi";
 import type { RegistroHistorialApi } from "@/services/api/registrosApi";
@@ -277,14 +278,14 @@ export function RegistroHistoryDetailModal({
               <View style={styles.heroHeading}>
                 <View style={styles.iconBox}>
                   <MaterialCommunityIcons
-                    name={isJunta ? "ruler" : "fire"}
+                    name={tipoRegistroIcon(detail.tipoRegistro)}
                     size={23}
                     color="#0f172a"
                   />
                 </View>
                 <View style={styles.heroText}>
                   <Text style={styles.recordType}>
-                    {isJunta ? "Junta lineal espuma" : "Sello cortafuego"}
+                    {nombreTipoRegistro(detail.tipoRegistro)}
                   </Text>
                   <Text style={styles.obraName} numberOfLines={1}>
                     {detail.obraNombre} · {detail.obraCodigo}
@@ -335,16 +336,13 @@ export function RegistroHistoryDetailModal({
                 <DetailField visible={visible("piso")} label="Piso" value={detail.piso} />
                 <DetailField visible={visible("ejeAlfabetico")} label="Eje alfabético" value={detail.ejeAlfabetico} />
                 <DetailField visible={visible("ejeNumerico")} label="Eje numérico" value={detail.ejeNumerico} />
-                {isJunta ? (
-                  <DetailField visible={visible("metrosLineales")} label="Metros lineales" value={detail.metrosLineales} />
-                ) : (
                   <>
-                    <DetailField label="N° del sello" value={detail.numeroSello} />
-                    <DetailField visible={visible("cantidadSellos")} label={isCliente ? "Cantidad de sellos (Sin Factor)" : "Cantidad de sellos"} value={detail.cantidadSellos} />
-                    <DetailField visible={visible("holgura")} label="Holgura" value={detail.holgura} />
-                    <DetailField visible={visible("factorPorHolguras")} label="Factor por holguras" value={detail.factorHolguras} />
+                    <DetailField visible={visible("numeroSello")} label="N° del sello" value={detail.numeroSello} />
+                    <DetailField visible={visible(isJunta ? "metrosLineales" : "cantidadSellos")} label={isJunta ? "Cantidad de ml" : detail.tipoRegistro === "tabiqueria" ? "Cantidad" : isCliente ? "Cantidad de sellos (Sin Factor)" : "Cantidad de sellos"} value={isJunta ? detail.metrosLineales : detail.cantidadSellos} />
+                    <DetailField visible={visible("holgura")} label={isJunta ? "Separación (cm)" : "Holgura (cm)"} value={detail.holgura} />
+                    <DetailField visible={visible("factorPorHolguras")} label={isJunta ? "Factor por separación" : "Factor por holguras"} value={detail.factorHolguras} />
                     <DetailField visible={visible("cieloModular")} label="Accesibilidad" value={detail.accesibilidad} />
-                    <DetailField visible={visible("cantidadSellosConFactores")} label="Sellos con factores" value={detail.cantidadConFactores} />
+                    <DetailField visible={visible("cantidadSellosConFactores")} label={isJunta ? "Cantidad de ml con factores" : "Cantidad con factores"} value={detail.cantidadConFactores} />
                     <DetailField
                       label="Aislación"
                       visible={visible("aislacion")}
@@ -353,11 +351,10 @@ export function RegistroHistoryDetailModal({
                         aislacionAplica: detail.aislacionAplica,
                       })}
                     />
-                    <DetailField visible={visible("cantidadSellosAislacion")} label="Sellos por aislación" value={detail.cantidadAislacion} />
+                    <DetailField visible={visible("cantidadSellosAislacion")} label="Factor de aislación" value={detail.cantidadAislacion} />
                     <DetailField visible={visible("reparacionTabique")} label="Reparación de tabique" value={getAplicacionLabel(detail.reparacionTabique)} />
                     <DetailField visible={visible("cantidadFinal")} label={isCliente ? "Cantidad Final (Con Factor)" : "Cantidad final"} value={detail.cantidadFinal} />
                   </>
-                )}
                 <DetailField visible={visible("folio")} label="Folio" value={detail.folio} />
               </View>
               {detail.observaciones ? (

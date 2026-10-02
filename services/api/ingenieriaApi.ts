@@ -1,3 +1,4 @@
+import type { TipoRegistro } from "@/utils/tipoRegistro";
 import { API_BASE_URL, readJsonResponse } from "@/services/api/config";
 import { authenticatedFetch } from "@/services/api/authenticatedFetch";
 import { getSession } from "@/services/auth/session";
@@ -158,6 +159,7 @@ export type UpdateRegistroIngenieriaPayload = {
   ejeAlfabetico?: string;
   numeroSello?: string;
   cantidadSellos?: number;
+  metrosLineales?: number;
   nombreSellador?: string;
   holgura?: number;
   accesibilidad?: number;
@@ -174,9 +176,10 @@ async function getToken() {
   return session.token;
 }
 
-export async function getIngenieriaResumen(): Promise<IngenieriaResumen> {
+export async function getIngenieriaResumen(tipoRegistro?: TipoRegistro): Promise<IngenieriaResumen> {
   const token = await getToken();
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/ingenieria/resumen`, {
+  const query = tipoRegistro ? `?tipoRegistro=${encodeURIComponent(tipoRegistro)}` : "";
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/ingenieria/resumen${query}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -213,6 +216,7 @@ export async function getIngenieriaRegistros(params?: {
 }
 
 export async function getIngenieriaRegistrosPage(params?: {
+  tipoRegistro?: TipoRegistro | "todos";
   estado?: "en_revision" | "validado" | "rechazado" | "todos";
   obraId?: string;
   fecha?: string;
@@ -222,6 +226,7 @@ export async function getIngenieriaRegistrosPage(params?: {
 }): Promise<IngenieriaRegistrosPage> {
   const token = await getToken();
   const query = new URLSearchParams({ paginated: "true" });
+  if (params?.tipoRegistro && params.tipoRegistro !== "todos") query.set("tipoRegistro", params.tipoRegistro);
   if (params?.estado && params.estado !== "todos") {
     query.set("estado", params.estado);
   }

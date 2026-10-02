@@ -1,3 +1,6 @@
+import { RegistroListFilters } from "@/components/RegistroListFilters";
+import { type RegistroTypeValue } from "@/components/RegistroTypeFilter";
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import {
   getIngenieriaRegistrosPage,
   RegistroIngenieriaApi,
@@ -22,9 +25,6 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
-import { BeckSearchInput } from "../../components/BeckSearchInput";
-import { BeckDateFilter } from "../../components/BeckDateFilter";
-import { SelectSheet } from "../../components/SelectSheet";
 
 const ACCENT = "#f97316";
 
@@ -42,17 +42,19 @@ const FILTROS: {
 ];
 
 function getTipoLabel(tipo: string) {
-  return tipo === "junta_lineal_espuma" ? "Junta Lineal" : "Sello";
+  return nombreTipoRegistro(tipo);
 }
 
 export default function IngenieriaScreen() {
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatingFilters, setUpdatingFilters] = useState(false);
   const [error, setError] = useState("");
   const [registros, setRegistros] = useState<RegistroIngenieriaApi[]>([]);
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("en_revision");
   const [obraFiltro, setObraFiltro] = useState<string>("todas");
+  const [tipoFiltro, setTipoFiltro] = useState<RegistroTypeValue>("todos");
   const [fechaFiltro, setFechaFiltro] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -78,11 +80,13 @@ export default function IngenieriaScreen() {
   const loadData = useCallback(async (forceRefresh = false) => {
     void forceRefresh;
     const queryVersion = ++queryVersionRef.current;
+    setUpdatingFilters(true);
     try {
       setError("");
       setNextCursor(null);
       const page = await getIngenieriaRegistrosPage({
         estado: filtroEstado,
+        tipoRegistro: tipoFiltro,
         obraId: obraFiltro,
         fecha: fechaFiltro,
         search: debouncedSearch,
@@ -97,11 +101,13 @@ export default function IngenieriaScreen() {
       if (queryVersionRef.current === queryVersion) {
         setError(err?.message || "No se pudo cargar el módulo de ingeniería");
       }
+    } finally {
+      if (queryVersionRef.current === queryVersion) setUpdatingFilters(false);
     }
-  }, [debouncedSearch, fechaFiltro, filtroEstado, obraFiltro]);
+  }, [tipoFiltro, debouncedSearch, fechaFiltro, filtroEstado, obraFiltro]);
 
   const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMoreRef.current) return;
+    if (!nextCursor || loadingMoreRef.current || updatingFilters) return;
 
     const queryVersion = queryVersionRef.current;
     loadingMoreRef.current = true;
@@ -109,6 +115,7 @@ export default function IngenieriaScreen() {
     try {
       const page = await getIngenieriaRegistrosPage({
         estado: filtroEstado,
+        tipoRegistro: tipoFiltro,
         obraId: obraFiltro,
         fecha: fechaFiltro,
         search: debouncedSearch,
@@ -132,7 +139,7 @@ export default function IngenieriaScreen() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [debouncedSearch, fechaFiltro, filtroEstado, nextCursor, obraFiltro]);
+  }, [tipoFiltro, debouncedSearch, fechaFiltro, filtroEstado, nextCursor, obraFiltro, updatingFilters]);
 
   useFocusEffect(
     useCallback(() => {
@@ -170,50 +177,27 @@ export default function IngenieriaScreen() {
     <View>
       <BrandHeader subtitle="Procesamiento · Ingeniería" />
 
-      <BeckSearchInput
-        placeholder="Buscar por registro, responsable, sello, piso o eje"
-        value={search}
-        onChangeText={setSearch}
-      />
-
-      <View style={styles.filtersRow}>
-        <View style={styles.filterColumn}>
-          <BeckDateFilter
-            value={fechaFiltro}
-            onChange={setFechaFiltro}
-            compact
-            containerStyle={styles.inlineDateFilter}
-          />
-        </View>
-        <View style={styles.filterColumn}>
-          <SelectSheet
-            label="Obra"
-            value={obraFiltro === "todas" ? null : obraFiltro}
-            placeholder="Todas las obras"
-            accentColor={ACCENT}
-            icon="office-building-outline"
-            includeAllOption={{ label: "Todas las obras" }}
-            options={obras.map((obra) => ({ value: obra.id, label: obra.nombre }))}
-            onChange={(value) => setObraFiltro(value ?? "todas")}
-          />
-        </View>
-      </View>
-      <SelectSheet
-        label="Estado"
-        value={filtroEstado === "todos" ? null : filtroEstado}
-        placeholder="Todos los estados"
-        accentColor={ACCENT}
-        icon="list-status"
-        includeAllOption={{ label: `Todos (${filterCounts.todos})` }}
-        options={FILTROS.filter((filter) => filter.value !== "todos").map(
-          (filter) => ({
-            value: filter.value,
-            label: `${filter.label} (${filterCounts[filter.value]})`,
-          }),
-        )}
-        onChange={(value) =>
-          setFiltroEstado((value ?? "todos") as FiltroEstado)
-        }
+      <RegistroListFilters<FiltroEstado>
+        search={search} onSearch={setSearch}
+        searchPlaceholder="Registro, responsable, sello, piso o eje"
+        tipo={tipoFiltro} onTipo={setTipoFiltro}
+        fecha={fechaFiltro} onFecha={setFechaFiltro}
+        estado={filtroEstado} onEstado={setFiltroEstado}
+        states={FILTROS} allState="todos"
+        counts={filterCounts} total={filterCounts[filtroEstado]}
+        loading={updatingFilters || refreshing}
+        obra={{
+          value: obraFiltro, onChange: setObraFiltro,
+          options: obras.map((obra) => ({ value: obra.id, label: obra.nombre })),
+        }}
+        onClear={() => {
+          setSearch("");
+          setDebouncedSearch("");
+          setObraFiltro("todas");
+          setTipoFiltro("todos");
+          setFechaFiltro("");
+          setFiltroEstado("todos");
+        }}
       />
 
       {error ? (
@@ -269,7 +253,6 @@ export default function IngenieriaScreen() {
 }
 
 function RegistroCard({ registro }: { registro: RegistroIngenieriaApi }) {
-  const isJunta = registro.tipo_registro === "junta_lineal_espuma";
 
   return (
     <Pressable
@@ -282,7 +265,7 @@ function RegistroCard({ registro }: { registro: RegistroIngenieriaApi }) {
       <View style={styles.cardHeader}>
         <View style={styles.cardIcon}>
           <MaterialCommunityIcons
-            name={isJunta ? "ruler" : "fire"}
+            name={tipoRegistroIcon(registro.tipo_registro)}
             size={21}
             color="#0f172a"
           />
@@ -366,9 +349,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   helper: { marginTop: 12, color: "#475569" },
-  filtersRow: { flexDirection: "row", gap: 8 },
-  filterColumn: { flex: 1, minWidth: 0 },
-  inlineDateFilter: { marginBottom: 12 },
   errorCard: {
     backgroundColor: "#fff7ed",
     borderColor: "#fed7aa",

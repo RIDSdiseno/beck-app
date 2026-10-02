@@ -1,9 +1,8 @@
-import { BeckDateFilter } from "@/components/BeckDateFilter";
-import { BeckOptionFilter } from "@/components/BeckOptionFilter";
+import type { RegistroTypeValue } from "@/components/RegistroTypeFilter";
+import { HistorialRegistroFilters } from "@/components/HistorialRegistroFilters";
 import { BrandHeader } from "@/components/BrandHeader";
 import { RegistroHistoryCard } from "@/components/RegistroHistoryCard";
 import { RegistroHistoryDetailModal } from "@/components/RegistroHistoryDetailModal";
-import { RegistroHistorySearch } from "@/components/RegistroHistorySearch";
 import {
   compartirPdfCliente,
   getClienteHistorialPage,
@@ -59,6 +58,7 @@ export default function HistorialScreen() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState<RegistroTypeValue>("todos");
   const [dateFilter, setDateFilter] = useState("");
   const [obraFilter, setObraFilter] = useState("todas");
   const [estadoFilter, setEstadoFilter] = useState<EstadoRegistroApi | "todos">("todos");
@@ -86,7 +86,7 @@ export default function HistorialScreen() {
   const loadPage = useCallback(async (reset: boolean) => {
     if (!ready || (!reset && !nextCursor)) return;
     const requestId = ++requestIdRef.current;
-    if (reset) setLoading(true); else setLoadingMore(true);
+    if (reset) { setLoading(true); setNextCursor(null); setItems([]); } else setLoadingMore(true);
     setError("");
     try {
       const params = {
@@ -94,6 +94,7 @@ export default function HistorialScreen() {
         limit: 25,
         search,
         fecha: dateFilter,
+        tipoRegistro: tipoFiltro,
         obraId: obraFilter,
         estado: estadoFilter,
       };
@@ -129,22 +130,24 @@ export default function HistorialScreen() {
         setRefreshing(false);
       }
     }
-  }, [dateFilter, estadoFilter, nextCursor, obraFilter, ready, role, search, items]);
+  }, [tipoFiltro, dateFilter, estadoFilter, nextCursor, obraFilter, ready, role, search, items]);
 
   useEffect(() => {
     if (!ready || role === "cliente") return;
+    requestIdRef.current += 1;
     const timer = setTimeout(() => { void loadPage(true); }, 350);
-    return () => clearTimeout(timer);
-  }, [ready, role, search, dateFilter, obraFilter, estadoFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { clearTimeout(timer); requestIdRef.current += 1; };
+  }, [ready, role, search, dateFilter, obraFilter, estadoFilter, tipoFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Al volver al historial del cliente, consultar las opciones actuales del CRM.
   useFocusEffect(useCallback(() => {
     if (!ready || role !== "cliente") return;
+    requestIdRef.current += 1;
     setClienteVisibility({});
     setLoading(true);
     const timer = setTimeout(() => { void loadPage(true); }, 350);
     return () => { clearTimeout(timer); requestIdRef.current += 1; };
-  }, [ready, role, search, dateFilter, obraFilter, estadoFilter])); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, role, search, dateFilter, obraFilter, estadoFilter, tipoFiltro])); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleItems = useMemo(
     () => items.filter((item) => item.estado !== "validado" || !hiddenValidatedIds.has(item.id)),
@@ -189,36 +192,40 @@ export default function HistorialScreen() {
         subtitle="Registros realizados · BECK"
         onBack={() => router.replace("/perfil")}
       />
-      <RegistroHistorySearch
-        value={search}
-        onChangeText={setSearch}
-        placeholder={role === "cliente" ? "Buscar sello, piso, recinto, ejes o material" : undefined}
+      <HistorialRegistroFilters
+        role={role}
+        search={search}
+        onSearch={setSearch}
+        obra={{ value: obraFilter, options: obraOptions, onChange: setObraFilter }}
+        fecha={dateFilter}
+        onFecha={setDateFilter}
+        tipo={tipoFiltro}
+        onTipo={(next) => {
+          if (next === tipoFiltro) return;
+          requestIdRef.current += 1;
+          setNextCursor(null);
+          setItems([]);
+          setTotal(0);
+          setLoading(true);
+          setTipoFiltro(next);
+        }}
+        estado={estadoFilter}
+        onEstado={setEstadoFilter}
+        total={total}
+        loading={loading || refreshing}
+        onClear={() => {
+          requestIdRef.current += 1;
+          setNextCursor(null);
+          setItems([]);
+          setTotal(0);
+          setLoading(true);
+          setSearch("");
+          setDateFilter("");
+          setObraFilter("todas");
+          setTipoFiltro("todos");
+          setEstadoFilter("todos");
+        }}
       />
-      <View style={styles.filters}>
-        <BeckDateFilter value={dateFilter} onChange={setDateFilter} compact containerStyle={styles.filter} />
-        <BeckOptionFilter
-          label="Filtrar por obra" value={obraFilter} allValue="todas" allLabel="Todas las obras"
-          options={obraOptions} onChange={setObraFilter} compact containerStyle={styles.filter}
-        />
-      </View>
-      {role === "administrador" ? (
-        <BeckOptionFilter
-          label="Filtrar por estado"
-          value={estadoFilter}
-          allValue="todos"
-          allLabel="Todos los estados"
-          icon="list-status"
-          options={[
-            { value: "pendiente", label: "Pendiente" },
-            { value: "en_revision", label: "En revisión" },
-            { value: "rechazado", label: "Rechazado" },
-            { value: "validado", label: "Validado" },
-          ]}
-          onChange={(value) => setEstadoFilter(value as EstadoRegistroApi | "todos")}
-          compact
-        />
-      ) : null}
-      <Text style={styles.total}>{total} {total === 1 ? "registro" : "registros"}</Text>
     </View>
   );
 
@@ -264,9 +271,6 @@ export default function HistorialScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f7fb" },
   fixedHeader: { backgroundColor: "#f5f7fb", paddingHorizontal: 16, paddingBottom: 6 },
-  filters: { flexDirection: "row", gap: 8, marginBottom: 4 },
-  filter: { flex: 1, minWidth: 0, marginBottom: 0 },
-  total: { color: "#64748b", fontSize: 12, fontWeight: "700", marginBottom: 5 },
   listContent: { paddingHorizontal: 16, paddingTop: 5, paddingBottom: 80, flexGrow: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   helper: { color: "#64748b", marginTop: 8, textAlign: "center" },

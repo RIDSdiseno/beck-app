@@ -1,3 +1,4 @@
+import { tipoRegistroLabel as nombreTipoRegistro, tipoRegistroIcon } from "@/utils/tipoRegistro";
 import {
   Conformidad,
   ControlInspeccion,
@@ -157,6 +158,7 @@ export default function IngenieriaDetalleScreen() {
     ejeAlfabetico: "",
     numeroSello: "",
     cantidadSellos: "",
+    metrosLineales: "",
     nombreSellador: "",
     holgura: "",
     accesibilidad: "",
@@ -225,6 +227,7 @@ export default function IngenieriaDetalleScreen() {
           ejeAlfabetico: data.eje_alfabetico || "",
           numeroSello: data.numero_sello || "",
           cantidadSellos: String(data.cantidad_sellos ?? ""),
+          metrosLineales: String(data.metros_lineales ?? ""),
           nombreSellador: data.nombre_sellador || "",
           holgura: String(data.holgura ?? ""),
           accesibilidad: String(data.accesibilidad ?? ""),
@@ -383,7 +386,8 @@ export default function IngenieriaDetalleScreen() {
         ejeNumerico: editFields.ejeNumerico || undefined,
         ejeAlfabetico: editFields.ejeAlfabetico || undefined,
         numeroSello: editFields.numeroSello || undefined,
-        cantidadSellos: editFields.cantidadSellos ? Number(editFields.cantidadSellos) : undefined,
+        cantidadSellos: registro?.tipo_registro === "junta_lineal_espuma" ? undefined : Number(editFields.cantidadSellos),
+        metrosLineales: registro?.tipo_registro === "junta_lineal_espuma" ? Number(editFields.metrosLineales.replace(",", ".")) : undefined,
         nombreSellador: editFields.nombreSellador || undefined,
         holgura: editFields.holgura ? Number(editFields.holgura.replace(",", ".")) : undefined,
         accesibilidad: editFields.accesibilidad ? Number(editFields.accesibilidad) : undefined,
@@ -557,14 +561,14 @@ export default function IngenieriaDetalleScreen() {
           <View style={styles.summaryHeader}>
             <View style={styles.summaryIcon}>
               <MaterialCommunityIcons
-                name={registro.tipo_registro === "junta_lineal_espuma" ? "ruler" : "fire"}
+                name={tipoRegistroIcon(registro.tipo_registro)}
                 size={23}
                 color="#0f172a"
               />
             </View>
             <View style={styles.summaryTitleGroup}>
               <Text style={styles.summaryTitle}>
-                {registro.tipo_registro === "junta_lineal_espuma" ? "Junta lineal espuma" : "Sello cortafuego"}
+                {nombreTipoRegistro(registro.tipo_registro)}
               </Text>
               <Text style={styles.summarySubtitle} numberOfLines={1}>
                 {registro.obra?.nombre || "Obra sin nombre"} · {registro.obra?.codigo || "Sin código"}
@@ -631,18 +635,18 @@ export default function IngenieriaDetalleScreen() {
           {campoVisible("recinto") ? <InfoRow label="Recinto" value={registro.recinto} /> : null}
           {campoVisible("modulo") ? <InfoRow label="Módulo / Edificio" value={registro.modulo} /> : null}
           {campoVisible("numeroSello") ? <InfoRow label="Nº Sello" value={registro.numero_sello} /> : null}
-          {campoVisible("cantidadSellos") ? <InfoRow label="Cantidad sellos" value={registro.cantidad_sellos} /> : null}
-          {campoVisible("holgura") ? <InfoRow label="Holgura (cm)" value={formatDecimal(registro.holgura)} /> : null}
-          {campoVisible("factorPorHolguras") ? <InfoRow label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} /> : null}
+          {campoVisible(registro.tipo_registro === "junta_lineal_espuma" ? "metrosLineales" : "cantidadSellos") ? <InfoRow label={registro.tipo_registro === "junta_lineal_espuma" ? "Cantidad de ml" : "Cantidad"} value={registro.tipo_registro === "junta_lineal_espuma" ? registro.metros_lineales : registro.cantidad_sellos} /> : null}
+          {campoVisible("holgura") ? <InfoRow label={registro.tipo_registro === "junta_lineal_espuma" ? "Separación (cm)" : "Holgura (cm)"} value={formatDecimal(registro.holgura)} /> : null}
+          {campoVisible("factorPorHolguras") ? <InfoRow label={registro.tipo_registro === "junta_lineal_espuma" ? "Factor por separación" : "Factor por holguras"} value={formatDecimal(registro.factor_por_holguras)} /> : null}
           {campoVisible("cieloModular") ? <InfoRow label="Accesibilidad" value={registro.accesibilidad} /> : null}
-          {campoVisible("cantidadSellosConFactores") ? <InfoRow label="Sellos con factores" value={formatDecimal(registro.cantidad_sellos_con_factores)} /> : null}
+          {campoVisible("cantidadSellosConFactores") ? <InfoRow label="Cantidad con factores" value={formatDecimal(registro.cantidad_sellos_con_factores)} /> : null}
           {campoVisible("aislacion") ? <InfoRow label="Aislación" value={getAislacionLabel(registro)} /> : null}
-          {campoVisible("cantidadSellosAislacion") ? <InfoRow label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} /> : null}
+          {campoVisible("cantidadSellosAislacion") ? <InfoRow label="Factor de aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} /> : null}
           {campoVisible("reparacionTabique") ? <InfoRow label="Reparación tabique" value={getAplicacionLabel(registro.reparacion_tabique)} /> : null}
           {campoVisible("cantidadFinal") ? <InfoRow label="Cantidad final" value={formatDecimal(registro.cantidad_final)} /> : null}
           {campoVisible("observaciones") && registro.observaciones ? <InfoRow label="Observaciones" value={registro.observaciones} /> : null}
           {campoVisible("folio") ? <InfoRow label="Folio" value={registro.folio} /> : null}
-          {campoVisible("tipoRegistro") ? <InfoRow label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} /> : null}
+          {campoVisible("tipoRegistro") ? <InfoRow label="Tipo" value={nombreTipoRegistro(registro.tipo_registro)} /> : null}
           {campoVisible("metrosLineales") && registro.metros_lineales ? <InfoRow label="Longitud (m)" value={`${registro.metros_lineales} m`} /> : null}
         </View>
 
@@ -995,12 +999,12 @@ export default function IngenieriaDetalleScreen() {
             <TextInput label="Recinto" value={editFields.recinto} onChangeText={(v) => setEditFields((p) => ({ ...p, recinto: v }))} mode="outlined" style={styles.editInput} />
             <TextInput label="Módulo / Edificio" value={editFields.modulo} onChangeText={(v) => setEditFields((p) => ({ ...p, modulo: v }))} mode="outlined" style={styles.editInput} />
             <TextInput label="Nº Sello" value={editFields.numeroSello} onChangeText={(v) => setEditFields((p) => ({ ...p, numeroSello: v }))} mode="outlined" style={styles.editInput} />
-            <TextInput label="Cantidad de sellos" value={editFields.cantidadSellos} onChangeText={(v) => setEditFields((p) => ({ ...p, cantidadSellos: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
-            <TextInput label="Holgura (cm)" value={editFields.holgura} onChangeText={(v) => setEditFields((p) => ({ ...p, holgura: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
-            <TextInput label="Factor por holguras" value={formatDecimal(registro.factor_por_holguras)} mode="outlined" style={styles.editInput} editable={false} />
+            <TextInput label={registro.tipo_registro === "junta_lineal_espuma" ? "Cantidad de ml" : "Cantidad"} value={registro.tipo_registro === "junta_lineal_espuma" ? editFields.metrosLineales : editFields.cantidadSellos} onChangeText={(v) => setEditFields((p) => ({ ...p, [registro.tipo_registro === "junta_lineal_espuma" ? "metrosLineales" : "cantidadSellos"]: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label={registro.tipo_registro === "junta_lineal_espuma" ? "Separación (cm)" : "Holgura (cm)"} value={editFields.holgura} onChangeText={(v) => setEditFields((p) => ({ ...p, holgura: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
+            <TextInput label={registro.tipo_registro === "junta_lineal_espuma" ? "Factor por separación" : "Factor por holguras"} value={formatDecimal(registro.factor_por_holguras)} mode="outlined" style={styles.editInput} editable={false} />
             <TextInput label="Accesibilidad" value={editFields.accesibilidad} onChangeText={(v) => setEditFields((p) => ({ ...p, accesibilidad: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
             <TextInput label="Aislación" value={editFields.aislacion} onChangeText={(v) => setEditFields((p) => ({ ...p, aislacion: v }))} mode="outlined" style={styles.editInput} keyboardType="decimal-pad" />
-            <TextInput label="Sellos aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} mode="outlined" style={styles.editInput} editable={false} />
+            <TextInput label="Factor de aislación" value={formatDecimal(registro.cantidad_sellos_aislacion)} mode="outlined" style={styles.editInput} editable={false} />
             <Text style={styles.binaryFieldLabel}>Reparación de tabique</Text>
             <SegmentedButtons
               value={editFields.reparacionTabique}
@@ -1018,7 +1022,7 @@ export default function IngenieriaDetalleScreen() {
             />
             <TextInput label="Observaciones" value={editFields.observaciones} onChangeText={(v) => setEditFields((p) => ({ ...p, observaciones: v }))} mode="outlined" style={styles.editInput} multiline numberOfLines={3} />
             <TextInput label="Folio" value={editFields.folio} onChangeText={(v) => setEditFields((p) => ({ ...p, folio: v }))} mode="outlined" style={styles.editInput} />
-            <TextInput label="Tipo" value={registro.tipo_registro === "junta_lineal_espuma" ? "Junta Lineal Espuma" : "Sello Cortafuego"} mode="outlined" style={styles.editInput} editable={false} />
+            <TextInput label="Tipo" value={nombreTipoRegistro(registro.tipo_registro)} mode="outlined" style={styles.editInput} editable={false} />
 
             <Button
               mode="contained"

@@ -52,6 +52,44 @@ export async function getAdminResumen(): Promise<AdminResumen> {
   return result.data as AdminResumen;
 }
 
+export type PeriodoAvance = "hoy" | "semana" | "mes" | "todo";
+export type ObraAvance = { id: string; nombre: string; codigo: string | null; estado: string };
+export type GrupoAvance = { nombre: string; registros: number; sellos: number; metros: number };
+export type AdminAvance = {
+  obra: ObraAvance;
+  periodo: PeriodoAvance;
+  desde: string | null;
+  hasta: string | null;
+  resumen: { registros: number; pendientesSupervisor: number; enRevision: number; validados: number; correcciones: number };
+  sellos: number;
+  metros: number;
+  pisosTotal: number;
+  responsablesTotal: number;
+  pisos: GrupoAvance[];
+  responsables: GrupoAvance[];
+  ultimos: {
+    id: string; fecha: string; created_at: string; numero_sello: string; piso: string;
+    nombre_sellador: string; estado: string; tipo_registro: string; es_correccion: boolean; devuelto_a_tecnico: boolean;
+  }[];
+};
+
+async function fetchAvance<T>(path: string): Promise<T> {
+  const session = await getSession();
+  if (!session.token || session.user?.rol !== "administrador" || session.user?.empresa !== "beck") {
+    throw new Error("Acceso exclusivo para administradores BECK");
+  }
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/admin/avance-obras${path}`, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  const result = await readJsonResponse(response);
+  if (!response.ok || !result?.success) throw new Error(result?.error || "No se pudo cargar el avance de las obras");
+  return result.data as T;
+}
+
+export const getAdminAvanceObras = () => fetchAvance<ObraAvance[]>("/opciones");
+export const getAdminAvance = (obraId: string, periodo: PeriodoAvance) =>
+  fetchAvance<AdminAvance>(`?${new URLSearchParams({ obraId, periodo }).toString()}`);
+
 export async function getAdminActividad(params: {
   cursor?: string | null;
   limit?: number;

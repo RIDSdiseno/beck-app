@@ -1,3 +1,5 @@
+import { tipoRegistroLabel, tipoRegistroIcon, type TipoRegistro } from "@/utils/tipoRegistro";
+import { useResumenOperario } from "@/hooks/useResumenOperario";
 import {
   getMisRegistros,
   getResumenSupervisor,
@@ -26,7 +28,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BrandHeader } from "../../components/BrandHeader";
 import { ClienteDashboard } from "@/components/ClienteDashboard";
 import { getClienteObras, type ObraCliente } from "@/services/api/clienteApi";
-import { AdminResumen, getAdminResumen } from "@/services/api/adminApi";
+import { AdminDashboard } from "@/components/AdminDashboard";
 import {
   getIngenieriaResumen,
   IngenieriaResumen,
@@ -36,10 +38,8 @@ function formatDate(value?: string | null) {
   return formatDateOnly(value, { day: "2-digit", month: "short" });
 }
 
-function getRegistroKind(registro: RegistroHistorialApi) {
-  return registro.tipo_registro === "junta_lineal_espuma"
-    ? "Junta Lineal"
-    : "Sello";
+function getRegistroKind(registro: Pick<RegistroHistorialApi, "tipo_registro">) {
+  return tipoRegistroLabel(registro.tipo_registro);
 }
 
 const EMPTY_SUPERVISOR_SUMMARY: ResumenSupervisorApi = {
@@ -52,16 +52,6 @@ const EMPTY_SUPERVISOR_SUMMARY: ResumenSupervisorApi = {
   seguimientoPersonalDisponible: false,
 };
 
-const EMPTY_ADMIN_SUMMARY: AdminResumen = {
-  total: 0,
-  pendientesSupervisor: 0,
-  enRevision: 0,
-  rechazados: 0,
-  validados: 0,
-  correcciones: 0,
-  accionesAdministrador: 0,
-};
-
 const EMPTY_ENGINEERING_SUMMARY: IngenieriaResumen = {
   pendientesRevision: 0,
   enRevisionMios: 0,
@@ -71,6 +61,32 @@ const EMPTY_ENGINEERING_SUMMARY: IngenieriaResumen = {
   revisionesResueltasMes: 0,
 };
 
+const TIPOS_REGISTRO: TipoRegistro[] = ["sello_cortafuego", "junta_lineal_espuma", "tabiqueria"];
+
+const TIPO_REGISTRO_TAB_LABEL: Record<TipoRegistro, string> = {
+  sello_cortafuego: "Sellos",
+  junta_lineal_espuma: "Juntas",
+  tabiqueria: "Tabiquería",
+};
+
+function TipoRegistroTabs({ value, onChange }: {
+  value: TipoRegistro;
+  onChange: (tipo: TipoRegistro) => void;
+}) {
+  return (
+    <View style={styles.supervisorTipoTabs}>
+      {TIPOS_REGISTRO.map((tipo) => (
+        <Button key={tipo} compact mode={value === tipo ? "contained" : "text"}
+          icon={tipoRegistroIcon(tipo)} buttonColor={value === tipo ? "#0f172a" : undefined}
+          textColor={value === tipo ? "#fff" : "#475569"} onPress={() => onChange(tipo)}
+          style={styles.supervisorTipoButton}>
+          {TIPO_REGISTRO_TAB_LABEL[tipo]}
+        </Button>
+      ))}
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
@@ -78,21 +94,26 @@ export default function DashboardScreen() {
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
-  const [activeTipo, setActiveTipo] = useState<
-    "sello_cortafuego" | "junta_lineal_espuma"
-  >("sello_cortafuego");
+  const [operarioTipo, setOperarioTipo] = useState<TipoRegistro>("sello_cortafuego");
+  const operario = useResumenOperario(userRole === "terreno", operarioTipo);
+  const [activeTipo, setActiveTipo] = useState<TipoRegistro>("sello_cortafuego");
   const [registros, setRegistros] = useState<RegistroHistorialApi[]>([]);
   const [clienteObras, setClienteObras] = useState<ObraCliente[] | null>(null);
-  const [adminSummary, setAdminSummary] = useState(EMPTY_ADMIN_SUMMARY);
-  const [engineeringSummary, setEngineeringSummary] = useState(
-    EMPTY_ENGINEERING_SUMMARY,
-  );
+  const [engineeringSummaries, setEngineeringSummaries] = useState<
+    Record<TipoRegistro, IngenieriaResumen>
+  >({
+    sello_cortafuego: EMPTY_ENGINEERING_SUMMARY,
+    junta_lineal_espuma: EMPTY_ENGINEERING_SUMMARY,
+    tabiqueria: EMPTY_ENGINEERING_SUMMARY,
+  });
   const [supervisorSummary, setSupervisorSummary] = useState<{
     sello_cortafuego: ResumenSupervisorApi;
     junta_lineal_espuma: ResumenSupervisorApi;
+    tabiqueria: ResumenSupervisorApi;
   }>({
     sello_cortafuego: EMPTY_SUPERVISOR_SUMMARY,
     junta_lineal_espuma: EMPTY_SUPERVISOR_SUMMARY,
+    tabiqueria: EMPTY_SUPERVISOR_SUMMARY,
   });
 
   const loadDashboard = useCallback(async (forceRefresh = false) => {
@@ -103,23 +124,35 @@ export default function DashboardScreen() {
       setUserRole(session.user?.rol || "");
 
       if (session.user?.rol === "ingenieria") {
-        setEngineeringSummary(await getIngenieriaResumen());
+        const [sellos, juntas, tabiqueria] = await Promise.all([
+          getIngenieriaResumen("sello_cortafuego"),
+          getIngenieriaResumen("junta_lineal_espuma"),
+          getIngenieriaResumen("tabiqueria"),
+        ]);
+        setEngineeringSummaries({
+          sello_cortafuego: sellos,
+          junta_lineal_espuma: juntas,
+          tabiqueria,
+        });
         setRegistros([]);
       } else if (session.user?.rol === "administrador") {
-        setAdminSummary(await getAdminResumen());
         setRegistros([]);
       } else if (session.user?.rol === "jefeobra") {
-        const [sellos, juntas] = await Promise.all([
+        const [sellos, juntas, tabiqueria] = await Promise.all([
           getResumenSupervisor("sello_cortafuego", forceRefresh),
           getResumenSupervisor("junta_lineal_espuma", forceRefresh),
+          getResumenSupervisor("tabiqueria", forceRefresh),
         ]);
         setSupervisorSummary({
           sello_cortafuego: sellos,
           junta_lineal_espuma: juntas,
+          tabiqueria,
         });
         setRegistros([]);
       } else if (session.user?.rol === "cliente") {
         setClienteObras(await getClienteObras());
+        setRegistros([]);
+      } else if (session.user?.rol === "terreno") {
         setRegistros([]);
       } else {
         setRegistros(await getMisRegistros(forceRefresh));
@@ -151,7 +184,7 @@ export default function DashboardScreen() {
     }, [loadDashboard]),
   );
 
-  const metrics = useMemo(() => {
+  const fallbackMetrics = useMemo(() => {
     const registrosRealizados = registros.filter(
       (registro) => !registro.es_correccion && !registro.registro_origen_id,
     ).length;
@@ -196,12 +229,15 @@ export default function DashboardScreen() {
     };
   }, [registros]);
 
-  const recientes = useMemo(() => registros.slice(0, 4), [registros]);
+  const metrics = userRole === "terreno" ? operario.summary?.metrics ?? fallbackMetrics : fallbackMetrics;
+  const recientes = userRole === "terreno" ? operario.summary?.recientes ?? [] : registros.slice(0, 4);
+  const dashboardError = userRole === "terreno" ? error || operario.error : error;
   const jefeObraMetrics = supervisorSummary[activeTipo];
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDashboard(true);
+    if (userRole === "terreno") await operario.refresh(true);
+    else await loadDashboard(true);
     setRefreshing(false);
   };
 
@@ -227,6 +263,7 @@ export default function DashboardScreen() {
   }
 
   if (userRole === "ingenieria") {
+    const engineeringSummary = engineeringSummaries[activeTipo];
     const engineeringMetrics = [
       {
         label: "Pendientes de revisión",
@@ -288,6 +325,8 @@ export default function DashboardScreen() {
               </Text>
             </View>
           </View>
+
+          <TipoRegistroTabs value={activeTipo} onChange={setActiveTipo} />
         </View>
 
         <ScrollView
@@ -390,55 +429,7 @@ export default function DashboardScreen() {
   }
 
   if (userRole === "administrador") {
-    const adminMetrics = [
-      { label: "Pendientes de Supervisor", value: adminSummary.pendientesSupervisor, icon: "clipboard-clock-outline" as const, style: styles.summaryWarm },
-      { label: "En revisión por Ingeniería", value: adminSummary.enRevision, icon: "send-clock-outline" as const, style: styles.summaryBlue },
-      { label: "Rechazados", value: adminSummary.rechazados, icon: "alert-octagon-outline" as const, style: styles.summaryRed },
-      { label: "Validados", value: adminSummary.validados, icon: "check-decagram-outline" as const, style: styles.summaryGreen },
-    ];
-    return (
-      <SafeAreaView style={[styles.container, { paddingTop: 2 }]} edges={["top", "left", "right"]}>
-        <View style={styles.fixedHeader}>
-          <View style={styles.supervisorWelcome}>
-            <View style={styles.supervisorWelcomeIcon}>
-              <MaterialCommunityIcons name="shield-account-outline" size={25} color="#0f172a" />
-            </View>
-            <View style={styles.terrenoWelcomeInfo}>
-              <Text style={styles.supervisorWelcomeEyebrow}>Panel administrativo</Text>
-              <Text style={styles.supervisorWelcomeTitle}>Hola, {userName.split(" ")[0] || "Administrador"}</Text>
-              <Text style={styles.supervisorWelcomeSubtitle}>Opera y supervisa el flujo completo de registros BECK.</Text>
-            </View>
-          </View>
-        </View>
-        <ScrollView
-          contentContainerStyle={[styles.content, styles.contentAfterFixedHeader]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {error ? <Card style={styles.errorCard}><Card.Content><Text style={styles.errorText}>{error}</Text><Button onPress={() => loadDashboard(true)}>Reintentar</Button></Card.Content></Card> : null}
-          <View style={styles.summaryGrid}>
-            {adminMetrics.map((metric) => (
-              <Card key={metric.label} style={[styles.summaryCard, metric.style, styles.supervisorSummaryHalf]}>
-                <Card.Content style={styles.supervisorSummaryContent}>
-                  <View style={styles.supervisorMetricIcon}><MaterialCommunityIcons name={metric.icon} size={20} color="#0f172a" /></View>
-                  <Text style={styles.summaryLabel}>{metric.label}</Text>
-                  <Text style={styles.summaryValue}>{metric.value}</Text>
-                </Card.Content>
-              </Card>
-            ))}
-          </View>
-          <View style={styles.smallSummaryGrid}>
-            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}><Card.Content style={styles.smallSummaryContent}><MaterialCommunityIcons name="file-refresh-outline" size={23} color="#ea580c" /><View style={styles.supervisorActivityText}><Text style={styles.helperText}>Correcciones activas</Text><Text style={styles.smallSummaryValue}>{adminSummary.correcciones}</Text></View></Card.Content></Card>
-            <Card style={[styles.smallSummaryCard, styles.supervisorSmallCard]}><Card.Content style={styles.smallSummaryContent}><MaterialCommunityIcons name="history" size={23} color="#ea580c" /><View style={styles.supervisorActivityText}><Text style={styles.helperText}>Mis acciones</Text><Text style={styles.smallSummaryValue}>{adminSummary.accionesAdministrador}</Text></View></Card.Content></Card>
-          </View>
-          <Text style={styles.supervisorSectionLabel}>Accesos operativos</Text>
-          <View style={styles.terrenoQuickActions}>
-            <Button mode="contained" icon="hard-hat" buttonColor="#0f172a" onPress={() => router.push("/mis-obras")} style={styles.terrenoQuickButton}>Operario</Button>
-            <Button mode="outlined" icon="clipboard-text-outline" textColor="#0f172a" onPress={() => router.push("/registros")} style={[styles.terrenoQuickButton, styles.terrenoQuickButtonOutlined]}>Supervisor</Button>
-          </View>
-          <Button mode="contained" icon="clipboard-check-outline" buttonColor="#f97316" onPress={() => router.push("/ingenieria")} style={styles.supervisorMainButton}>Revisión de Ingeniería</Button>
-        </ScrollView>
-      </SafeAreaView>
-    );
+    return <AdminDashboard name={userName} />;
   }
 
   if (userRole === "jefeobra") {
@@ -463,30 +454,7 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          <View style={styles.supervisorTipoTabs}>
-            <Button
-              mode={activeTipo === "sello_cortafuego" ? "contained" : "text"}
-              icon="fire"
-              compact
-              buttonColor={activeTipo === "sello_cortafuego" ? "#0f172a" : undefined}
-              textColor={activeTipo === "sello_cortafuego" ? "#ffffff" : "#475569"}
-              onPress={() => setActiveTipo("sello_cortafuego")}
-              style={styles.supervisorTipoButton}
-            >
-              Sellos
-            </Button>
-            <Button
-              mode={activeTipo === "junta_lineal_espuma" ? "contained" : "text"}
-              icon="ruler"
-              compact
-              buttonColor={activeTipo === "junta_lineal_espuma" ? "#0f172a" : undefined}
-              textColor={activeTipo === "junta_lineal_espuma" ? "#ffffff" : "#475569"}
-              onPress={() => setActiveTipo("junta_lineal_espuma")}
-              style={styles.supervisorTipoButton}
-            >
-              Junta lineal
-            </Button>
-          </View>
+          <TipoRegistroTabs value={activeTipo} onChange={setActiveTipo} />
         </View>
 
         <ScrollView
@@ -635,6 +603,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
           </View>
+          <TipoRegistroTabs value={operarioTipo} onChange={setOperarioTipo} />
         </View>
       ) : null}
 
@@ -661,13 +630,13 @@ export default function DashboardScreen() {
           </>
         ) : null}
 
-        {error ? (
+        {dashboardError ? (
           <Card style={styles.errorCard}>
             <Card.Content>
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText}>{dashboardError}</Text>
               <Button
                 mode="contained"
-                onPress={() => loadDashboard(true)}
+                onPress={() => userRole === "terreno" ? operario.refresh(true) : loadDashboard(true)}
                 style={styles.button}
               >
                 Reintentar
@@ -676,33 +645,12 @@ export default function DashboardScreen() {
           </Card>
         ) : null}
 
-        {userRole === "terreno" ? (
-          <>
-            <View style={styles.terrenoQuickActions}>
-              <Button
-                mode="contained"
-                icon="office-building-outline"
-                buttonColor="#0f172a"
-                onPress={() => router.push("/mis-obras")}
-                style={styles.terrenoQuickButton}
-                contentStyle={styles.terrenoQuickButtonContent}
-              >
-                Ir a Obras
-              </Button>
-              <Button
-                mode="outlined"
-                icon="clipboard-text-outline"
-                textColor="#0f172a"
-                onPress={() => router.push("/registros")}
-                style={[styles.terrenoQuickButton, styles.terrenoQuickButtonOutlined]}
-                contentStyle={styles.terrenoQuickButtonContent}
-              >
-                Ver registros
-              </Button>
-            </View>
-          </>
-        ) : null}
-
+        {userRole === "terreno" && !operario.summary ? (
+          !dashboardError ? <View style={styles.centerBox}>
+            <ActivityIndicator color="#f97316" />
+            <Text style={styles.helper}>Cargando indicadores…</Text>
+          </View> : null
+        ) : <>
         <View style={styles.kpiGrid}>
           <Card
             style={[
@@ -858,9 +806,7 @@ export default function DashboardScreen() {
             <View style={styles.terrenoCardHeadingText}>
               <Text style={styles.cardTitle}>Foco sugerido</Text>
               <Text style={styles.focusText}>
-                Tu obra con más actividad es {metrics.obraPrincipal}. Prioriza
-                informar a tu supervisor de tus registros realizados, para acelerar
-                el proceso de revisión y para que estos sean validados por ingeniería.
+                {metrics.total ? `Tu obra con más actividad es ${metrics.obraPrincipal}. Prioriza informar a tu supervisor de tus registros realizados, para acelerar el proceso de revisión y para que estos sean validados por ingeniería.` : "No tienes actividad para la obra y el tipo de registro seleccionados."}
               </Text>
             </View>
           </Card.Content>
@@ -905,11 +851,12 @@ export default function DashboardScreen() {
               ))
             ) : (
               <Text style={styles.helperText}>
-                Aún no tienes registros. Cuando envíes uno, aparecerá aquí.
+                No hay registros para los filtros seleccionados.
               </Text>
             )}
           </Card.Content>
         </Card>
+        </>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -972,22 +919,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     marginTop: 2,
-  },
-  terrenoQuickActions: {
-    flexDirection: "row",
-    gap: 9,
-    marginBottom: 14,
-  },
-  terrenoQuickButton: {
-    borderRadius: 13,
-    flex: 1,
-  },
-  terrenoQuickButtonOutlined: {
-    backgroundColor: "#fffaf0",
-    borderColor: "#FDC10B",
-  },
-  terrenoQuickButtonContent: {
-    minHeight: 44,
   },
   title: {
     color: "#0f172a",

@@ -16,11 +16,11 @@ export function resumenTarjetaCliente(registro: DatosTarjeta, config?: ClienteVi
     visible("ejeNumerico") ? `Eje numérico: ${registro.ejeNumerico || "—"}` : null,
     visible("ejeAlfabetico") ? `Eje alfabético: ${registro.ejeAlfabetico || "—"}` : null,
   ].filter(Boolean).join(" · ");
-  const cantidad = !visible("cantidadSellos") ? null
+  const cantidad = !visible(registro.tipoRegistro === "junta_lineal_espuma" ? "metrosLineales" : "cantidadSellos") ? null
     : registro.tipoRegistro === "junta_lineal_espuma"
       ? registro.metrosLineales != null ? `${registro.metrosLineales} m` : "Sin metraje"
       : registro.cantidadSellos != null
-        ? `${registro.cantidadSellos} ${registro.cantidadSellos === 1 ? "sello" : "sellos"}`
+        ? `${registro.cantidadSellos} ${registro.tipoRegistro === "tabiqueria" ? (registro.cantidadSellos === 1 ? "unidad" : "unidades") : registro.cantidadSellos === 1 ? "sello" : "sellos"}`
         : "Sin cantidad";
 
   return {
