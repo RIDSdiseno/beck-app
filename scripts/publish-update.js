@@ -7,6 +7,7 @@
 //   node scripts/publish-update.js production "Mensaje del update"
 //   node scripts/publish-update.js staging    "Mensaje del update"
 //   node scripts/publish-update.js preview    "Mensaje del update"
+//   node scripts/publish-update.js expo-go    "Mensaje del update"   (demos en iPhone)
 
 const { spawnSync } = require("node:child_process");
 const { readFileSync } = require("node:fs");
@@ -17,6 +18,8 @@ const DESTINOS = {
   production: { canal: "production" },
   staging: { canal: "staging" },
   preview: { canal: "preview" },
+  // Demos desde Expo Go en iPhone: se publica con el runtime de Expo Go (ver app.config.js).
+  "expo-go": { canal: "expo-go", expoGo: true },
 };
 
 function leerEnv(archivo) {
@@ -53,7 +56,12 @@ function leerEnv(archivo) {
 // Resuelve el runtime literal que va a llevar el update para dejarlo a la vista
 // antes de publicar. Con la policy "appVersion" el runtime es el campo `version`
 // de app.json: si cambia, los builds ya instalados dejan de recibir OTA.
-function resolverRuntime() {
+function resolverRuntime(expoGo) {
+  if (expoGo) {
+    const { version: versionExpo } = require(path.join(RAIZ, "node_modules/expo/package.json"));
+    return `exposdk:${versionExpo.split(".")[0]}.0.0 (Expo Go, solo iPhone)`;
+  }
+
   const { expo } = require(path.join(RAIZ, "app.json"));
   return `${expo.version} (policy appVersion)`;
 }
@@ -85,7 +93,7 @@ if (faltantes.length > 0) {
 
 console.log(`Canal: ${destino.canal}`);
 console.log(`API: ${variables.EXPO_PUBLIC_API_BASE_URL}`);
-console.log(`Runtime: ${resolverRuntime()}\n`);
+console.log(`Runtime: ${resolverRuntime(destino.expoGo)}\n`);
 
 const resultado = spawnSync(
   "npx",
@@ -110,6 +118,7 @@ const resultado = spawnSync(
       // Desactiva la carga de .env/.env.local dentro de Expo CLI: las
       // variables de arriba ya quedaron fijadas y son las únicas válidas.
       EXPO_NO_DOTENV: "1",
+      ...(destino.expoGo ? { EXPO_GO_UPDATE: "1" } : {}),
     },
   }
 );

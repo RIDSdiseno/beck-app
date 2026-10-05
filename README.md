@@ -313,7 +313,12 @@ node ./scripts/publish-update.js preview "Descripción del cambio"
 
 # Verificación del build de producción (APK del perfil production-apk)
 node ./scripts/publish-update.js staging "Descripción del cambio"
+
+# Demos desde Expo Go en iPhone
+node ./scripts/publish-update.js expo-go "Descripción del cambio"
 ```
+
+> El canal `expo-go` existe para mostrar la app desde Expo Go en iPhone. Se publica con el runtime de Expo Go (`exposdk:<major>.0.0`, ver `app.config.js`) y usa el backend de producción, así que lo que se haga en una demo queda en la base real. Expo Go 57 para Android no carga updates de EAS, por eso es solo para iPhone. Para abrirlo: `exp://u.expo.dev/f5f84148-22c0-48ed-b27f-2cf06ac3704a?channel-name=expo-go`.
 
 > ⚠️ **No corras `eas update --channel …` a mano.** Expo CLI carga `.env.local` con prioridad sobre `.env`, y `.env.local` apunta al backend de desarrollo en la red local. Publicar así hornea la IP de LAN en el bundle de todos los usuarios. El script fija las variables desde `.env` (producción) y desactiva la carga de dotenv para evitarlo.
 
