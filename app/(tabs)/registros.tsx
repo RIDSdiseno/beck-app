@@ -173,6 +173,8 @@ const DEFAULT_CAMPOS_CONFIGURABLES_REGISTRO: Record<
   rendimientoIndividual: true,
 };
 
+const ITEMIZADO_JUNTA_OPTIONS = ["Junta lineal", "Junta lineal dinámica", "Espuma"];
+
 const ITEMIZADO_BECK_OPTIONS = [
   "Tubería metálica SIN Aislación",
   "Tubería metálica CON Aislación",
@@ -1664,13 +1666,22 @@ export default function RegistrosScreen({
   const renderItemizadoTerreno = () => {
     if (!campoConfiguradoVisible("itemizadoBeck")) return null;
 
+    // Sellos y Tabiquería comparten el mismo itemizado básico; Juntas tiene el suyo.
+    const opcionesTipo = isJuntaLineal ? ITEMIZADO_JUNTA_OPTIONS : ITEMIZADO_BECK_OPTIONS;
+    // Un registro antiguo puede tener un itemizado que ya no está en la lista (p. ej.
+    // "Junta lineal espuma"): se agrega para que se vea, en vez de parecer vacío.
+    const opcionesItemizado =
+      itemizadoBeck && !otroItemizado && !opcionesTipo.includes(itemizadoBeck)
+        ? [...opcionesTipo, itemizadoBeck]
+        : opcionesTipo;
+
     return (
       <>
       <SelectSheet
         label="Itemizado Básico"
         value={otroItemizado ? null : itemizadoBeck || null}
         placeholder="Seleccionar itemizado"
-        options={(isJuntaLineal ? ["Junta lineal espuma"] : tipoRegistro === "tabiqueria" ? ["Tabiquería"] : ITEMIZADO_BECK_OPTIONS).map((itemizado) => ({
+        options={opcionesItemizado.map((itemizado) => ({
           value: itemizado,
           label: itemizado,
         }))}
