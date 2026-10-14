@@ -1,3 +1,4 @@
+import { puedeGestionarFiremat } from "@/services/auth/firematAccess";
 import {
   createFirematProducto,
   FirematCategoria,
@@ -79,7 +80,7 @@ export default function FirematProductosScreen() {
       ]);
       setProductos(items);
       setCategorias(categories);
-      setIsBodeguero(session.user?.rol === "bodeguero");
+      setIsBodeguero(puedeGestionarFiremat(session.user));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar los productos");
     } finally {

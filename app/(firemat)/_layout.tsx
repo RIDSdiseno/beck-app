@@ -4,6 +4,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, MD3LightTheme, Provider as PaperProvider, Text } from "react-native-paper";
 import { getSession } from "@/services/auth/session";
+import { puedeAccederFiremat } from "@/services/auth/firematAccess";
 
 const firematTheme = {
   ...MD3LightTheme,
@@ -26,7 +27,8 @@ export default function FirematLayout() {
 
   React.useEffect(() => {
     getSession()
-      .then((session) => setAuthorized(Boolean(session.isAuthenticated && session.user?.empresa === "firemat")))
+      .then((session) => setAuthorized(session.isAuthenticated && puedeAccederFiremat(session.user)))
+      .catch(() => setAuthorized(false))
       .finally(() => setLoading(false));
   }, []);
 

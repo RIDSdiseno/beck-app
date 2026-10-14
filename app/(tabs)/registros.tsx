@@ -22,10 +22,8 @@ import {
   getMisObras,
   ObraApi,
 } from "@/services/api/obrasApi";
-import {
-  getItemizadoOpciones,
-  ItemizadoOpcionApi,
-} from "@/services/api/itemizadoOpcionesApi";
+import type { ItemizadoOpcionApi } from "@/services/api/itemizadoOpcionesApi";
+import { ItemizadoBeckSelector } from "@/components/ItemizadoBeckSelector";
 import {
   clearSelectedObra,
   getSelectedObra,
@@ -492,11 +490,6 @@ export default function RegistrosScreen({
   const [dimensiones, setDimensiones] = useState("");
   const [itemizadoCodigoBeck, setItemizadoCodigoBeck] = useState("");
   const [itemizadoSelectorVisible, setItemizadoSelectorVisible] = useState(false);
-  const [itemizadoSearch, setItemizadoSearch] = useState("");
-  const [itemizadoElementoPenetra, setItemizadoElementoPenetra] = useState("");
-  const [itemizadoMaterialidad, setItemizadoMaterialidad] = useState("");
-  const [itemizadoOpciones, setItemizadoOpciones] = useState<ItemizadoOpcionApi[]>([]);
-  const [loadingItemizadoOpciones, setLoadingItemizadoOpciones] = useState(false);
   const [otroItemizado, setOtroItemizado] = useState(false);
   const [recinto, setRecinto] = useState("");
   const [modulo, setModulo] = useState("");
@@ -973,10 +966,6 @@ export default function RegistrosScreen({
     setDimensiones("");
     setItemizadoCodigoBeck("");
     setItemizadoSelectorVisible(false);
-    setItemizadoSearch("");
-    setItemizadoElementoPenetra("");
-    setItemizadoMaterialidad("");
-    setItemizadoOpciones([]);
     setOtroItemizado(false);
     setRecinto("");
     setModulo("");
@@ -1023,34 +1012,8 @@ export default function RegistrosScreen({
   const itemizadoObraId =
     userRole === "jefeobra" ? editingRegistro?.obras?.id : obra?.id;
 
-  const loadItemizadoOpciones = async () => {
-    if (!itemizadoObraId) {
-      setItemizadoOpciones([]);
-      setError("No se pudo determinar la obra para filtrar los itemizados.");
-      return;
-    }
-
-    try {
-      setLoadingItemizadoOpciones(true);
-      const opciones = await getItemizadoOpciones({
-        search: itemizadoSearch,
-        elementoPenetra: itemizadoElementoPenetra,
-        materialidad: itemizadoMaterialidad,
-        limit: 80,
-        obraId: itemizadoObraId,
-        visible: true,
-      });
-      setItemizadoOpciones(opciones);
-    } catch (err: any) {
-      setError(err?.message || "No se pudieron cargar los itemizados.");
-    } finally {
-      setLoadingItemizadoOpciones(false);
-    }
-  };
-
   const openItemizadoSelector = () => {
     setItemizadoSelectorVisible(true);
-    void loadItemizadoOpciones();
   };
 
   const selectItemizadoOpcion = (opcion: ItemizadoOpcionApi) => {
@@ -1730,118 +1693,14 @@ export default function RegistrosScreen({
     router.replace("/mis-obras");
   };
 
+  // Supervisor al editar: Itemizado BECK con filtros de la obra del registro.
   const renderItemizadoSelectorModal = () => (
-    <Modal
+    <ItemizadoBeckSelector
       visible={itemizadoSelectorVisible}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setItemizadoSelectorVisible(false)}
-    >
-      <Pressable
-        style={[styles.modalBackdrop, styles.itemizadoModalBackdrop]}
-        onPress={() => setItemizadoSelectorVisible(false)}
-      >
-        <Pressable style={styles.itemizadoModal}>
-          <View style={styles.itemizadoSheetHandle} />
-          <View style={styles.modalHeaderRow}>
-            <View style={styles.recordInfo}>
-              <Text style={styles.modalTitle}>Seleccionar Itemizado Básico</Text>
-              <Text style={styles.modalSubtitle}>
-                Solo se muestran los itemizados habilitados para esta obra.
-              </Text>
-            </View>
-            <Button mode="text" compact onPress={() => setItemizadoSelectorVisible(false)}>
-              Cerrar
-            </Button>
-          </View>
-
-          <BeckSearchInput
-            placeholder="Buscar por itemizado, código o tipo"
-            value={itemizadoSearch}
-            onChangeText={setItemizadoSearch}
-            onSubmitEditing={() => void loadItemizadoOpciones()}
-          />
-          <TextInput
-            label="Elemento atravesado"
-            value={itemizadoElementoPenetra}
-            onChangeText={setItemizadoElementoPenetra}
-            mode="outlined"
-            style={styles.input}
-          />
-          <TextInput
-            label="Materialidad"
-            value={itemizadoMaterialidad}
-            onChangeText={setItemizadoMaterialidad}
-            mode="outlined"
-            style={styles.input}
-          />
-
-          <View style={styles.actionRow}>
-            <Button
-              mode="contained"
-              onPress={() => void loadItemizadoOpciones()}
-              loading={loadingItemizadoOpciones}
-              disabled={loadingItemizadoOpciones}
-              style={styles.inlineButton}
-            >
-              Buscar
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={() => {
-                setItemizadoSearch("");
-                setItemizadoElementoPenetra("");
-                setItemizadoMaterialidad("");
-                setItemizadoOpciones([]);
-              }}
-              style={styles.inlineButton}
-            >
-              Limpiar
-            </Button>
-          </View>
-
-          <ScrollView
-            style={styles.itemizadoResults}
-            keyboardShouldPersistTaps="handled"
-          >
-            {loadingItemizadoOpciones ? (
-              <View style={styles.loadingBox}>
-                <ActivityIndicator color="#f97316" />
-                <Text style={styles.emptyText}>Cargando itemizados...</Text>
-              </View>
-            ) : null}
-
-            {!loadingItemizadoOpciones && !itemizadoOpciones.length ? (
-              <Text style={styles.emptyText}>
-                Busca por elemento atravesado, materialidad o texto para ver opciones.
-              </Text>
-            ) : null}
-
-            {itemizadoOpciones.map((opcion) => (
-              <Pressable
-                key={opcion.id}
-                style={styles.itemizadoOption}
-                onPress={() => selectItemizadoOpcion(opcion)}
-              >
-                <Text style={styles.recordTitle}>
-                  {opcion.elemento_pasante || "Sin itemizado"}
-                </Text>
-                <Text style={styles.recordMeta}>
-                  Código BECK: {opcion.codigo_beck || "Sin código"}
-                </Text>
-                <Text style={styles.recordMeta}>
-                  Atravesado: {opcion.elemento_penetra || "Sin dato"} ·{" "}
-                  Materialidad: {opcion.materialidad || "Sin dato"}
-                </Text>
-                {opcion.tipo ? (
-                  <Text style={styles.recordMeta}>Tipo: {opcion.tipo}</Text>
-                ) : null}
-              </Pressable>
-            ))}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      obraId={itemizadoObraId}
+      onClose={() => setItemizadoSelectorVisible(false)}
+      onSelect={selectItemizadoOpcion}
+    />
   );
 
   const renderCalendarModal = () => (
@@ -2226,7 +2085,7 @@ export default function RegistrosScreen({
                 {campoConfiguradoVisible("itemizadoBeck") ? (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Itemizado Básico"
+                    accessibilityLabel="Itemizado BECK"
                     onPress={openItemizadoSelector}
                     style={({ pressed }) => [
                       styles.catalogSelectButton,
@@ -2241,7 +2100,7 @@ export default function RegistrosScreen({
                       />
                     </View>
                     <View style={styles.catalogSelectTextGroup}>
-                      <Text style={styles.catalogSelectLabel}>Itemizado Básico</Text>
+                      <Text style={styles.catalogSelectLabel}>Itemizado BECK</Text>
                       <Text style={styles.catalogSelectValue} numberOfLines={1}>
                         {itemizadoBeck || "Seleccionar itemizado"}
                       </Text>

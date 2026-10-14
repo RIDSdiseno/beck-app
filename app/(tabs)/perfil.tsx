@@ -8,6 +8,7 @@ import {
   RegistroCliente,
 } from "@/services/api/clienteApi";
 import { clearSession, getSession } from "@/services/auth/session";
+import { esAdministradorBeck } from "@/services/auth/firematAccess";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -556,6 +557,14 @@ export default function PerfilScreen() {
           <Text style={styles.terrenoProfileSectionTitle}>Mi actividad</Text>
         ) : null}
         <View style={styles.actions}>
+          {esAdministradorBeck(user) ? (
+            <ProfileAction
+              icon="swap-horizontal"
+              label="Ir a Firemat"
+              onPress={() => router.replace("/(firemat)/productos")}
+              beckStyle
+            />
+          ) : null}
           <ProfileAction
             icon="clipboard-text-clock-outline"
             label="Historial de registros"

@@ -2,6 +2,7 @@ import { clearMisObrasCache } from "@/services/api/obrasApi";
 import { puedeAccederBodegaBeck } from "@/services/api/bodegaBeckApi";
 import { clearMisRegistrosCache } from "@/services/api/registrosApi";
 import { clearSession, getSession, SessionUser } from "@/services/auth/session";
+import { esAdministradorBeck } from "@/services/auth/firematAccess";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
@@ -68,7 +69,7 @@ export default function FirematPerfilScreen() {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <View style={styles.infoIcon}><MaterialCommunityIcons name="domain" size={20} color="#a3a3a3" /></View>
-            <View style={styles.infoText}><Text style={styles.label}>EMPRESA</Text><Text style={styles.value}>Firemat</Text></View>
+            <View style={styles.infoText}><Text style={styles.label}>EMPRESA</Text><Text style={styles.value}>{user?.empresa === "beck" ? "Beck" : "Firemat"}</Text></View>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
@@ -85,6 +86,11 @@ export default function FirematPerfilScreen() {
           Ir a Bodega BECK
         </Button>}
         <View style={styles.logoutCard}>
+          {esAdministradorBeck(user) && (
+            <Button mode="contained" buttonColor="#ffc400" textColor="#0f172a" icon="swap-horizontal" style={[styles.button, { marginBottom: 16 }]} contentStyle={styles.buttonContent} onPress={() => router.replace("/(tabs)/perfil")}>
+              Volver a Beck
+            </Button>
+          )}
           <Button mode="contained" buttonColor="#dc2626" textColor="#ffffff" icon="logout" onPress={logout} loading={loggingOut} disabled={loggingOut} style={styles.button} contentStyle={styles.buttonContent} labelStyle={styles.buttonLabel}>
             Cerrar sesión
           </Button>

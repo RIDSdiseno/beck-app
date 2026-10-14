@@ -1,3 +1,4 @@
+import { puedeGestionarFiremat } from "@/services/auth/firematAccess";
 import {
   FirematInventarioResumen,
   FirematProducto,
@@ -96,7 +97,7 @@ export default function FirematInventarioScreen() {
       if (requestId !== requestIdRef.current) return;
       setProductos((current) => reconcileFirematProducts(current, data.productos));
       setResumen(data.resumen);
-      setIsBodeguero(session.user?.rol === "bodeguero");
+      setIsBodeguero(puedeGestionarFiremat(session.user));
       loadedRef.current = { key: filterKey, revision };
     } catch (err) {
       if (requestId !== requestIdRef.current) return;

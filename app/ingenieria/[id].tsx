@@ -21,10 +21,8 @@ import {
   CampoConfiguracionRegistro,
   getConfiguracionRegistro,
 } from "@/services/api/obrasApi";
-import {
-  getItemizadoOpciones,
-  ItemizadoOpcionApi,
-} from "@/services/api/itemizadoOpcionesApi";
+import type { ItemizadoOpcionApi } from "@/services/api/itemizadoOpcionesApi";
+import { ItemizadoBeckSelector } from "@/components/ItemizadoBeckSelector";
 import { estadoColor, getEstadoLabel, formatShortDate } from "@/utils/registroEstado";
 import { formatTime24WithPeriod } from "@/utils/dateTime";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -51,7 +49,6 @@ import {
 } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { TextInput } from "@/components/AppTextInput";
-import { BeckSearchInput } from "@/components/BeckSearchInput";
 import { ExpandableImage } from "@/components/ExpandableImage";
 import { getAislacionLabel, getAplicacionLabel } from "@/utils/factoresRegistro";
 
@@ -143,9 +140,6 @@ export default function IngenieriaDetalleScreen() {
   const [motivoRechazo, setMotivoRechazo] = useState("");
 
   const [itemizadoSelectorVisible, setItemizadoSelectorVisible] = useState(false);
-  const [itemizadoSearch, setItemizadoSearch] = useState("");
-  const [itemizadoOpciones, setItemizadoOpciones] = useState<ItemizadoOpcionApi[]>([]);
-  const [loadingItemizadoOpciones, setLoadingItemizadoOpciones] = useState(false);
 
   const [editFields, setEditFields] = useState({
     codigoBeck: "",
@@ -437,32 +431,8 @@ export default function IngenieriaDetalleScreen() {
     }
   };
 
-  const loadItemizadoOpciones = async () => {
-    const obraId = registro?.obra?.id;
-    if (!obraId) {
-      setItemizadoOpciones([]);
-      return;
-    }
-
-    try {
-      setLoadingItemizadoOpciones(true);
-      const opciones = await getItemizadoOpciones({
-        search: itemizadoSearch,
-        limit: 80,
-        obraId,
-        visible: true,
-      });
-      setItemizadoOpciones(opciones);
-    } catch (err: any) {
-      Alert.alert("Error", err?.message || "No se pudieron cargar los itemizados.");
-    } finally {
-      setLoadingItemizadoOpciones(false);
-    }
-  };
-
   const openItemizadoSelector = () => {
     setItemizadoSelectorVisible(true);
-    void loadItemizadoOpciones();
   };
 
   const selectItemizadoOpcion = (opcion: ItemizadoOpcionApi) => {
@@ -827,73 +797,13 @@ export default function IngenieriaDetalleScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal
+      {/* Itemizado BECK con filtros de la obra del registro. */}
+      <ItemizadoBeckSelector
         visible={itemizadoSelectorVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setItemizadoSelectorVisible(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setItemizadoSelectorVisible(false)}
-        >
-          <Pressable style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Seleccionar Itemizado Básico</Text>
-            <Text style={styles.modalSubtitle}>
-              Solo se muestran los itemizados habilitados para esta obra.
-            </Text>
-
-            <BeckSearchInput
-              placeholder="Buscar por itemizado, código o tipo"
-              value={itemizadoSearch}
-              onChangeText={setItemizadoSearch}
-              onSubmitEditing={() => void loadItemizadoOpciones()}
-            />
-            <Button
-              mode="contained"
-              onPress={() => void loadItemizadoOpciones()}
-              loading={loadingItemizadoOpciones}
-              disabled={loadingItemizadoOpciones}
-              style={styles.modalInput}
-            >
-              Buscar
-            </Button>
-
-            <ScrollView style={styles.itemizadoResults} keyboardShouldPersistTaps="handled">
-              {loadingItemizadoOpciones ? (
-                <ActivityIndicator color="#3b82f6" />
-              ) : null}
-              {!loadingItemizadoOpciones && !itemizadoOpciones.length ? (
-                <Text style={styles.modalSubtitle}>
-                  No hay itemizados visibles para esta obra con ese filtro.
-                </Text>
-              ) : null}
-              {itemizadoOpciones.map((opcion) => (
-                <Pressable
-                  key={opcion.id}
-                  style={styles.itemizadoOption}
-                  onPress={() => selectItemizadoOpcion(opcion)}
-                >
-                  <Text style={styles.itemizadoOptionTitle}>
-                    {opcion.elemento_pasante || "Sin nombre"}
-                  </Text>
-                  <Text style={styles.itemizadoOptionSubtitle}>
-                    {[opcion.codigo_beck, opcion.tipo].filter(Boolean).join(" · ")}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <Button
-              mode="text"
-              onPress={() => setItemizadoSelectorVisible(false)}
-              style={styles.modalInput}
-            >
-              Cerrar
-            </Button>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        obraId={registro?.obra?.id}
+        onClose={() => setItemizadoSelectorVisible(false)}
+        onSelect={selectItemizadoOpcion}
+      />
 
       <Modal visible={showEdit} animationType="slide">
         <View style={styles.editModal}>
@@ -1300,10 +1210,6 @@ const styles = StyleSheet.create({
   itemizadoLabel: { color: "#475569", fontSize: 12, marginBottom: 4, marginTop: 4 },
   itemizadoSelectBtn: { marginBottom: 4, borderColor: "#94a3b8", justifyContent: "center" },
   itemizadoSelectBtnContent: { justifyContent: "flex-start" },
-  itemizadoResults: { maxHeight: 320, marginBottom: 8 },
-  itemizadoOption: { paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
-  itemizadoOptionTitle: { color: "#0f172a", fontWeight: "600", fontSize: 14 },
-  itemizadoOptionSubtitle: { color: "#64748b", fontSize: 12, marginTop: 2 },
   pdfRow: { marginTop: 16, marginBottom: 4 },
   pdfBtn: { borderRadius: 12, backgroundColor: "#dc2626" },
   fotosHint: { color: "#64748b", fontSize: 12, marginBottom: 8 },
